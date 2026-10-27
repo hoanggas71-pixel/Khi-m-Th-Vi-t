@@ -1,0 +1,21 @@
+====================================================================
+HƯỚNG DẪN CÀI ĐẶT ỨNG DỤNG KHIẾM THỊ VIỆT TRÊN ĐIỆN THOẠI TỪ FILE ZIP
+(KHÔNG CẦN DÙNG CODE ASSIST)
+====================================================================
+
+1. TẠI SAO KHÔNG CẦN DÙNG CODE ASSIST (module.toml)?
+- Ứng dụng Code Assist trên điện thoại chỉ đọc được chuẩn module.toml cũ và không biên dịch được dự án Android Studio hiện đại (Gradle Version Catalog + Jetpack Compose + Firebase Cloud).
+- Hệ thống đã biên dịch sẵn file cài đặt .apk hoàn chỉnh ngay trong file ZIP này cho bạn!
+
+2. CÁCH CÀI ĐẶT TRÊN MÁY CHÍNH (ADMIN):
+- Bước 1: Giải nén file .zip vừa tải về bằng trình Quản lý File mặc định của điện thoại (hoặc ứng dụng ZArchiver / Files by Google).
+- Bước 2: Ngay tại thư mục gốc vừa giải nén (hoặc mở thư mục "CAI_DAT_APK"), chạm trực tiếp vào file:
+  👉 KhiemThiViet-CaiDat.apk
+- Bước 3: Chọn "Cài đặt" (Install). Nếu điện thoại hỏi cấp quyền cài ứng dụng từ nguồn này, hãy bật "Cho phép".
+- Bước 4: Mở ứng dụng "Khiếm Thị Việt", bấm "Kết nối Đám mây Google" và đăng nhập tài khoản Admin (Mặc định: SĐT 0397772963 / Mật khẩu 247208).
+
+3. CÁCH CHIA SẺ & CÀI ĐẶT CHO CÁC MÁY NHÂN VIÊN:
+- Bước 1: Trên máy Admin đã cài app, vào "Tab Quyền hạn" -> bấm nút "Gửi file APK cài đặt" để gửi thẳng file KhiemThiViet-CaiDat.apk qua Zalo / Quick Share sang máy nhân viên.
+- Bước 2: Trên máy nhân viên, chạm vào file KhiemThiViet-CaiDat.apk nhận được để cài đặt.
+- Bước 3: Mở app trên máy nhân viên, bấm "Kết nối Đám mây Google" 1 lần bằng Gmail của nhân viên để đồng bộ danh sách tài khoản thời gian thực từ máy chủ.
+- Bước 4: Nhập Số điện thoại (hoặc Gmail) và Mật khẩu do Admin tạo để đăng nhập.

@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return incoming().keys().hasOnly(fields);
+    }
+
+    function isValidSpaWorkspace(workspaceId) {
+      let allowed = [
+        'workspaceId',
+        'shopName',
+        'payloadJson',
+        'accountsCount',
+        'customersCount',
+        'ticketsCount',
+        'updatedByUid',
+        'updatedByName',
+        'updatedAt'
+      ];
+      return hasOnlyAllowedFields(allowed)
+        && incoming().keys().hasAll(allowed)
+        && incoming().workspaceId is string
+        && incoming().workspaceId == workspaceId
+        && incoming().workspaceId.size() >= 1
+        && incoming().workspaceId.size() <= 100
+        && incoming().shopName is string
+        && incoming().shopName.size() >= 1
+        && incoming().shopName.size() <= 200
+        && incoming().payloadJson is string
+        && incoming().payloadJson.size() >= 2
+        && incoming().payloadJson.size() <= 900000
+        && incoming().accountsCount is int
+        && incoming().accountsCount >= 1
+        && incoming().accountsCount <= 500
+        && incoming().customersCount is int
+        && incoming().customersCount >= 0
+        && incoming().customersCount <= 10000
+        && incoming().ticketsCount is int
+        && incoming().ticketsCount >= 0
+        && incoming().ticketsCount <= 50000
+        && incoming().updatedByUid is string
+        && incoming().updatedByUid == request.auth.uid
+        && incoming().updatedByName is string
+        && incoming().updatedByName.size() >= 1
+        && incoming().updatedByName.size() <= 200
+        && incoming().updatedAt is timestamp
+        && incoming().updatedAt <= request.time;
+    }
+
+    function isValidUserProfile(userId) {
+      let allowed = [
+        'uid',
+        'displayName',
+        'email',
+        'spaPhone',
+        'spaRole',
+        'updatedAt'
+      ];
+      return hasOnlyAllowedFields(allowed)
+        && incoming().keys().hasAll(allowed)
+        && incoming().uid is string
+        && incoming().uid == userId
+        && incoming().uid == request.auth.uid
+        && incoming().displayName is string
+        && incoming().displayName.size() >= 1
+        && incoming().displayName.size() <= 150
+        && incoming().email is string
+        && incoming().email.size() >= 3
+        && incoming().email.size() <= 254
+        && incoming().spaPhone is string
+        && incoming().spaPhone.size() <= 30
+        && incoming().spaRole in ['ADMIN', 'STAFF']
+        && incoming().updatedAt is timestamp
+        && incoming().updatedAt <= request.time;
+    }
+
+    match /spa_workspaces/{workspaceId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && isValidSpaWorkspace(workspaceId);
+      allow update: if isSignedIn()
+                    && isValidSpaWorkspace(workspaceId)
+                    && incoming().workspaceId == existing().workspaceId;
+      allow delete: if false;
+    }
+
+    match /users/{userId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserProfile(userId);
+      allow update: if isOwner(userId)
+                    && isValidUserProfile(userId)
+                    && incoming().uid == existing().uid;
+      allow delete: if isOwner(userId);
+    }
+  }
+}

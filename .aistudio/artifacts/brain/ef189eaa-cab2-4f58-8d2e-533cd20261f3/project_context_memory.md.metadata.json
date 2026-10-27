@@ -1,0 +1,5 @@
+{
+  "summary":  "Cập nhật kiến trúc gehihi: Loại bỏ toàn bộ cơ chế chặn bắt từ khóa thô sơ trước LLM, trao quyền thấu hiểu ngôn ngữ tự nhiên 100% cho Gemini 3.8 Flash, bóc tách chính xác các trường thông tin KTV và giải quyết triệt để lỗi hiểu nhầm sang lệnh sửa nhân viên khác.",
+  "updatedAt":  "2026-10-27T05:25:35.441178987Z",
+  "userFacing":  true
+}

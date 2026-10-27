@@ -1,0 +1,16 @@
+{
+  "firestore": {
+    "database": "ai-studio-android-khimthvi-ef189eaa-cab2-4f58-8d2e-533cd20261f3",
+    "rules": "firestore.rules"
+  },
+  "emulators": {
+    "firestore": {
+      "host": "127.0.0.1",
+      "port": 8085
+    },
+    "auth": {
+      "host": "127.0.0.1",
+      "port": 9099
+    }
+  }
+}

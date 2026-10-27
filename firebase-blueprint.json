@@ -1,0 +1,114 @@
+{
+  "entities": {
+    "SpaWorkspace": {
+      "title": "SpaWorkspace",
+      "description": "Shared real-time cloud state for Khiem Thi Viet Spa across Admin and Staff devices.",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "Unique workspace identifier (e.g., khiem_thi_viet_shared)."
+        },
+        "shopName": {
+          "type": "string",
+          "description": "Display name of the Spa shop."
+        },
+        "payloadJson": {
+          "type": "string",
+          "description": "Serialized JSON payload containing accounts, staff, services, packages, customers, registrations, tickets, cashbook, and AI memories."
+        },
+        "accountsCount": {
+          "type": "integer",
+          "description": "Total number of accounts in the workspace."
+        },
+        "customersCount": {
+          "type": "integer",
+          "description": "Total number of customers in the workspace."
+        },
+        "ticketsCount": {
+          "type": "integer",
+          "description": "Total number of service tickets in the workspace."
+        },
+        "updatedByUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the device/user that last pushed an update."
+        },
+        "updatedByName": {
+          "type": "string",
+          "description": "Display name or Spa account name of the user that last pushed an update."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the latest cloud sync."
+        }
+      },
+      "required": [
+        "workspaceId",
+        "shopName",
+        "payloadJson",
+        "accountsCount",
+        "customersCount",
+        "ticketsCount",
+        "updatedByUid",
+        "updatedByName",
+        "updatedAt"
+      ]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated device user profile metadata.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name."
+        },
+        "email": {
+          "type": "string",
+          "description": "User Google email address."
+        },
+        "spaPhone": {
+          "type": "string",
+          "description": "Linked Spa phone login username."
+        },
+        "spaRole": {
+          "type": "string",
+          "enum": ["ADMIN", "STAFF"],
+          "description": "Spa role on this device."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was updated."
+        }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "email",
+        "spaPhone",
+        "spaRole",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/spa_workspaces/{workspaceId}": {
+      "schema": {
+        "$ref": "#/entities/SpaWorkspace"
+      },
+      "description": "Shared real-time workspace document synchronized across all authenticated Admin and Staff phones."
+    },
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Per-user device metadata owned by the authenticated user."
+    }
+  }
+}

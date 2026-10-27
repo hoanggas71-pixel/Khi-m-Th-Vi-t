@@ -1,0 +1,6 @@
+{
+  "name": "Khiếm Thị Việt",
+  "description": "Ứng dụng quản lý vận hành vé, khách hàng, gói liệu trình, sổ quỹ và doanh thu nội bộ Spa/Massage Khiếm Thị Việt.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
