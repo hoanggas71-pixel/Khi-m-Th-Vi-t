@@ -17,6 +17,19 @@ enum class VaiTro(val badgeLabel: String) {
     STAFF("")
 }
 
+enum class SystemRole {
+    DEVELOPER,
+    OWNER,
+    STAFF,
+    CUSTOMER
+}
+
+enum class TrangThaiTaiKhoan {
+    ACTIVE,
+    INACTIVE,
+    SUSPENDED
+}
+
 enum class QuyenHan(val title: String, val desc: String) {
     CAN_EDIT_COMPLETED_TICKET(
         "Sửa vé đã chốt",
@@ -56,21 +69,108 @@ enum class BoLocThoiGian(val label: String) {
     TAT_CA("Từ trước đến giờ")
 }
 
+const val DEFAULT_TENANT_ID = "khiem_thi_viet"
+const val DEV_ADMIN_UID = ""
+
 /**
  * 2. MÔ HÌNH DỮ LIỆU CỐT LÕI (JSON SCHEMA)
  * Tương thích cả chuẩn mới và chuẩn backup cũ (menu_mới_nhất_2.json)
  */
+data class TenantInfo(
+    val tenantId: String = DEFAULT_TENANT_ID,
+    val shopName: String = "",
+    val status: String = "ACTIVE",
+    val isLocked: Boolean = false,
+    val lockedReason: String = "",
+    val subscriptionExpiresAt: Long = 0L,
+    val planId: String = "PLAN_FREE",
+    val ownerPhone: String = "",
+    val ownerEmail: String = "",
+    val qrPaymentUrl: String = "",
+    val accountsCount: Int = 0,
+    val ticketsCount: Int = 0,
+    val customersCount: Int = 0,
+    val createdAt: String = todayDateStr()
+) {
+    val isEffectiveLocked: Boolean get() = isLocked || status != "ACTIVE"
+}
+
+typealias TenantStatus = TenantInfo
+
 data class TaiKhoan(
-    val id: String,
-    val username: String,
-    val matKhauHash: String,
-    val quyen: VaiTro,
+    val id: String = "",
+    val username: String = "",
+    val matKhauHash: String = "",
     val nvId: String = "",
-    val hoTen: String,
+    val hoTen: String = "",
     val cacQuyenDuocCap: Set<QuyenHan> = emptySet(),
     val matKhauHienThi: String = "",
-    val email: String = ""
-)
+    val email: String = "",
+    val tenantId: String = DEFAULT_TENANT_ID,
+    val role: SystemRole = SystemRole.STAFF,
+    val deviceTokenFcm: String = ""
+) {
+    val quyen: VaiTro
+        get() = if (role == SystemRole.OWNER || role == SystemRole.DEVELOPER) VaiTro.OWNER else VaiTro.STAFF
+
+    fun isDev(): Boolean = role == SystemRole.DEVELOPER || username == DEFAULT_ADMIN_PHONE
+
+    // Secondary constructor đảm bảo tương thích ngược tuyệt đối với code cũ truyền quyen: VaiTro
+    constructor(
+        id: String,
+        username: String,
+        matKhauHash: String,
+        quyen: VaiTro,
+        nvId: String = "",
+        hoTen: String,
+        cacQuyenDuocCap: Set<QuyenHan> = emptySet(),
+        matKhauHienThi: String = "",
+        email: String = "",
+        tenantId: String = DEFAULT_TENANT_ID,
+        role: SystemRole = if (quyen == VaiTro.OWNER) SystemRole.OWNER else SystemRole.STAFF,
+        deviceTokenFcm: String = ""
+    ) : this(
+        id = id,
+        username = username,
+        matKhauHash = matKhauHash,
+        nvId = nvId,
+        hoTen = hoTen,
+        cacQuyenDuocCap = cacQuyenDuocCap,
+        matKhauHienThi = matKhauHienThi,
+        email = email,
+        tenantId = tenantId,
+        role = role,
+        deviceTokenFcm = deviceTokenFcm
+    )
+
+    // Overload copy(quyen = ...) đảm bảo tương thích ngược cho các lệnh copy() truyền quyen
+    fun copy(
+        id: String = this.id,
+        username: String = this.username,
+        matKhauHash: String = this.matKhauHash,
+        quyen: VaiTro,
+        nvId: String = this.nvId,
+        hoTen: String = this.hoTen,
+        cacQuyenDuocCap: Set<QuyenHan> = this.cacQuyenDuocCap,
+        matKhauHienThi: String = this.matKhauHienThi,
+        email: String = this.email,
+        tenantId: String = this.tenantId,
+        role: SystemRole = if (quyen == VaiTro.OWNER) SystemRole.OWNER else SystemRole.STAFF,
+        deviceTokenFcm: String = this.deviceTokenFcm
+    ): TaiKhoan = copy(
+        id = id,
+        username = username,
+        matKhauHash = matKhauHash,
+        nvId = nvId,
+        hoTen = hoTen,
+        cacQuyenDuocCap = cacQuyenDuocCap,
+        matKhauHienThi = matKhauHienThi,
+        email = email,
+        tenantId = tenantId,
+        role = role,
+        deviceTokenFcm = deviceTokenFcm
+    )
+}
 
 fun normalizePhoneDigits(raw: String): String {
     val trimmed = raw.trim().replace(" ", "").replace(".", "").replace("-", "")
@@ -229,6 +329,7 @@ const val DEFAULT_ADMIN_PASS = "247208"
 
 fun TaiKhoan?.isAdmin(): Boolean = this?.quyen == VaiTro.OWNER
 fun TaiKhoan?.isOwner(): Boolean = isAdmin()
+fun TaiKhoan?.isDev(): Boolean = this?.role == SystemRole.DEVELOPER || this?.username == DEFAULT_ADMIN_PHONE
 
 fun TaiKhoan?.hasPermission(permission: QuyenHan): Boolean {
     if (this == null) return false

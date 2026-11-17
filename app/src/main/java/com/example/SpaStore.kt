@@ -17,9 +17,17 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
+import com.example.data.local.SpaDatabase
+import com.example.data.local.entity.toEntity
+import com.example.fcm.SpaFirebaseMessagingService
+import com.example.vietqr.ThongTinNganHang
+import com.example.vietqr.VietQrHelper
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -204,15 +212,109 @@ class SpaStore(context: Context) {
     var currentUser by mutableStateOf<TaiKhoan?>(null)
         private set
 
+    // Multi-Tenant: Trạng thái tenant (Kill-Switch)
+    var tenantInfo by mutableStateOf<TenantInfo?>(null)
+        private set
+    var isTenantLocked by mutableStateOf(false)
+        private set
+    var tenantLockReason by mutableStateOf("")
+        private set
+    var tenantLockQrUrl by mutableStateOf("")
+        private set
+    private var tenantStatusListener: ListenerRegistration? = null
+
+    val roomDb by lazy {
+        SpaDatabase.getInstance(appContext)
+    }
+
+    var thongTinNganHang by mutableStateOf(
+        ThongTinNganHang(
+            bankCode = prefs.getString("bank_code", "MB") ?: "MB",
+            soTaiKhoan = prefs.getString("bank_stk", "") ?: "",
+            tenChuTaiKhoan = prefs.getString("bank_chutk", "") ?: ""
+        )
+    )
+        private set
+
+    fun capNhatThongTinNganHang(bankCode: String, stk: String, chuTk: String) {
+        thongTinNganHang = ThongTinNganHang(bankCode.trim().uppercase(), stk.trim(), chuTk.trim().uppercase())
+        prefs.edit()
+            .putString("bank_code", thongTinNganHang.bankCode)
+            .putString("bank_stk", thongTinNganHang.soTaiKhoan)
+            .putString("bank_chutk", thongTinNganHang.tenChuTaiKhoan)
+            .apply()
+    }
+
+    fun taoVietQrChoVe(ve: Luot, soTienTuyChinh: Long? = null): String {
+        val amount = soTienTuyChinh ?: ve.thu
+        return VietQrHelper.taoLinkVietQrDong(
+            bankCode = thongTinNganHang.bankCode,
+            soTaiKhoan = thongTinNganHang.soTaiKhoan,
+            tenChuTaiKhoan = thongTinNganHang.tenChuTaiKhoan,
+            soTien = amount,
+            noiDung = VietQrHelper.taoNoiDungChuyenKhoanVe(ve.id)
+        )
+    }
+
+    fun taoVietQrGiaHanTenant(tenantId: String, soTien: Long): String {
+        return VietQrHelper.taoLinkVietQrDong(
+            bankCode = "MB",
+            soTaiKhoan = DEFAULT_ADMIN_PHONE,
+            tenChuTaiKhoan = "KHIEM THI VIET DEV",
+            soTien = soTien,
+            noiDung = VietQrHelper.taoNoiDungGiaHanSaaS(tenantId)
+        )
+    }
+
+    fun initFcmToken() {
+        val fcmPrefs = appContext.getSharedPreferences(SpaFirebaseMessagingService.PREFS_FCM, Context.MODE_PRIVATE)
+        val cachedToken = fcmPrefs.getString(SpaFirebaseMessagingService.KEY_DEVICE_TOKEN, null)
+        if (!cachedToken.isNullOrBlank()) {
+            syncFcmTokenToProfile(cachedToken)
+        }
+        runCatching {
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                .addOnSuccessListener { token ->
+                    if (!token.isNullOrBlank()) {
+                        fcmPrefs.edit().putString(SpaFirebaseMessagingService.KEY_DEVICE_TOKEN, token).apply()
+                        syncFcmTokenToProfile(token)
+                    }
+                }
+        }
+    }
+
+    private fun syncFcmTokenToProfile(token: String) {
+        val fbUser = firebaseAuth?.currentUser ?: return
+        val db = firestoreDb ?: return
+        db.collection(SpaCloudRepository.USERS_COLLECTION).document(fbUser.uid)
+            .update("deviceTokenFcm", token)
+            .addOnFailureListener {
+                db.collection(SpaCloudRepository.USERS_COLLECTION).document(fbUser.uid)
+                    .set(mapOf("deviceTokenFcm" to token), com.google.firebase.firestore.SetOptions.merge())
+            }
+    }
+
+    val devAllTenants = mutableStateListOf<TenantInfo>()
+    var isDevTenantsLoading by mutableStateOf(false)
+        private set
+    var devStatusMessage by mutableStateOf("")
+        private set
+    var activeTenantOverride by mutableStateOf<String?>(null)
+        private set
+
+    // Cập nhật currentTenantId hỗ trợ Dev chuyển đổi ngữ cảnh cơ sở
+    val currentTenantId: String
+        get() = activeTenantOverride ?: currentUser?.tenantId?.takeIf { it.isNotBlank() } ?: DEFAULT_TENANT_ID
+
     var aiIsLoading by mutableStateOf(false)
         private set
 
-    // Điều khiển Tab con trong mục Quyền hạn (0: Cấp quyền & TK NV, 1: Sửa TK Admin gốc, 2: Backup Xuất / Nhập)
+    // Điều khiển Tab con trong mục Quyền hạn (0: Cấp quyền & TK NV, 1: Sửa TK Admin gốc, 2: Backup Xuất / Nhập, 3: Dev Console)
     var requestedAdminSubTab by mutableIntStateOf(0)
         private set
 
     fun selectAdminSubTab(index: Int) {
-        requestedAdminSubTab = index.coerceIn(0, 2)
+        requestedAdminSubTab = index.coerceIn(0, 3)
     }
 
     // Lệnh THÊM / SỬA / XÓA đang chờ Admin xác nhận lại trước khi thực thi thật
@@ -260,6 +362,7 @@ class SpaStore(context: Context) {
     init {
         loadFromPrefs()
         loadGehihiMemoryVault()
+        initFcmToken()
         if (taiKhoans.isEmpty()) {
             seedDefaultData()
             dongBoTatCaPhieuThuChiTuVeDaChot(luuNgay = false)
@@ -568,6 +671,7 @@ class SpaStore(context: Context) {
             currentUser = finalMatched
             prefs.edit().putString(KEY_LOGGED_IN_ACCOUNT_ID, finalMatched.id).apply()
             syncCurrentUserProfileToCloud()
+            startTenantStatusListener()
             return true
         }
         return false
@@ -589,6 +693,7 @@ class SpaStore(context: Context) {
         currentUser = tk
         prefs.edit().putString(KEY_LOGGED_IN_ACCOUNT_ID, tk.id).apply()
         syncCurrentUserProfileToCloud()
+        startTenantStatusListener()
         return true
     }
 
@@ -646,6 +751,15 @@ class SpaStore(context: Context) {
     fun logout() {
         currentUser = null
         prefs.edit().remove(KEY_LOGGED_IN_ACCOUNT_ID).apply()
+        tenantStatusListener?.remove()
+        tenantStatusListener = null
+        isTenantLocked = false
+        tenantLockReason = ""
+        tenantLockQrUrl = ""
+        tenantInfo = null
+        activeTenantOverride = null
+        devAllTenants.clear()
+        devStatusMessage = ""
     }
 
     /**
@@ -681,6 +795,7 @@ class SpaStore(context: Context) {
         cloudSyncStatus = "Đang kết nối đồng bộ thời gian thực..."
 
         syncCurrentUserProfileToCloud()
+        startTenantStatusListener()
 
         workspaceListener?.remove()
         val docRef = db.collection(SpaCloudRepository.WORKSPACE_COLLECTION)
@@ -722,6 +837,39 @@ class SpaStore(context: Context) {
                 pushToCloudWorkspace()
             }
         }
+    }
+
+    fun startTenantStatusListener() {
+        val db = firestoreDb ?: return
+        tenantStatusListener?.remove()
+        tenantStatusListener = db.collection("tenants")
+            .document(currentTenantId)
+            .addSnapshotListener { snap, err ->
+                if (err != null || snap == null || !snap.exists()) return@addSnapshotListener
+                val status = snap.getString("status") ?: "ACTIVE"
+                val isLocked = snap.getBoolean("isLocked") ?: false
+                val lockedReason = snap.getString("lockedReason") ?: ""
+                val qrUrl = snap.getString("qrPaymentUrl") ?: snap.getString("lockDetails.qrPaymentUrl") ?: ""
+                isTenantLocked = (status != "ACTIVE" || isLocked)
+                tenantLockReason = if (isTenantLocked) lockedReason.ifBlank { "Tài khoản đã bị tạm khóa. Vui lòng liên hệ hỗ trợ." } else ""
+                tenantLockQrUrl = qrUrl
+                tenantInfo = TenantInfo(
+                    tenantId = currentTenantId,
+                    shopName = snap.getString("shopName") ?: "Khiếm Thị Việt",
+                    status = status,
+                    isLocked = isLocked,
+                    lockedReason = lockedReason,
+                    subscriptionExpiresAt = snap.getLong("subscriptionExpiresAt") ?: 0L,
+                    planId = snap.getString("planId") ?: "PLAN_FREE",
+                    ownerPhone = snap.getString("ownerPhone") ?: "",
+                    ownerEmail = snap.getString("ownerEmail") ?: "",
+                    qrPaymentUrl = qrUrl,
+                    accountsCount = snap.getLong("accountsCount")?.toInt() ?: 0,
+                    ticketsCount = snap.getLong("ticketsCount")?.toInt() ?: 0,
+                    customersCount = snap.getLong("customersCount")?.toInt() ?: 0,
+                    createdAt = snap.getString("createdAt") ?: ""
+                )
+            }
     }
 
     /**
@@ -4408,6 +4556,7 @@ class SpaStore(context: Context) {
 
         return buildString {
             appendLine("Bạn là 'gehihi' — CỐ VẤN KINH DOANH VÀ TRỢ LÝ ĐIỀU HÀNH FULL QUYỀN 100% CỦA CHỦ SPA KHIẾM THỊ VIỆT.")
+            appendLine("Tenant ID cơ sở: $currentTenantId. Dev Super Admin UID: $DEV_ADMIN_UID.")
             appendLine("Trình bày sạch sẽ, lịch sự, chuyên nghiệp, KHÔNG dùng ký tự sao ** markdown.")
             appendLine()
             appendLine("1. NĂNG LỰC TƯ VẤN KINH DOANH & PHÂN TÍCH TÀI CHÍNH:")
@@ -5640,11 +5789,94 @@ class SpaStore(context: Context) {
         }
     }
 
+    /**
+     * Tự động lưu trữ danh sách bộ nhớ sang SQLite Room Database chạy nền (Local Cache)
+     */
+    fun persistToRoomDbAsync() {
+        val tId = currentTenantId
+        val curLuots = luots.toList()
+        val curTcs = tcs.toList()
+        val curKhs = khs.toList()
+        val curNvs = nvs.toList()
+        val curDvs = dvs.toList()
+        val curGois = gois.toList()
+        val curDks = dks.toList()
+        val curTks = taiKhoans.toList()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val db = roomDb
+                db.ticketDao().insertAll(curLuots.map { it.toEntity(tId) })
+                db.cashbookDao().insertAll(curTcs.map { it.toEntity(tId) })
+                db.customerDao().insertAll(curKhs.map { it.toEntity(tId) })
+                db.staffDao().insertAll(curNvs.map { it.toEntity(tId) })
+                db.serviceDao().insertAll(curDvs.map { it.toEntity(tId) })
+                db.packageDao().insertAll(curGois.map { it.toEntity(tId) })
+                db.packageSubDao().insertAll(curDks.map { it.toEntity(tId) })
+                db.accountDao().insertAll(curTks.map { it.toEntity(tId) })
+            } catch (e: Exception) {
+                Log.w(TAG, "Room DB persist background warning: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Đồng bộ Granular vé trực tiếp lên Firestore subcollection /tenants/{tenantId}/tickets/{id}
+     */
+    fun syncTicketToGranularCloud(ticket: Luot) {
+        val db = firestoreDb ?: return
+        val tId = currentTenantId
+        val data = mapOf(
+            "id" to ticket.id,
+            "tenantId" to tId,
+            "khId" to ticket.khId,
+            "nvId" to ticket.nvId,
+            "dvIds" to ticket.dvIds,
+            "dkId" to ticket.dkId,
+            "tgbd" to ticket.tgbd,
+            "tgkt" to ticket.tgkt,
+            "thu" to ticket.thu,
+            "daXacNhan" to ticket.daXacNhan,
+            "ngay" to ticket.ngay,
+            "dvNgoai" to ticket.dvNgoai,
+            "hoaHongChot" to (ticket.hoaHongChot ?: 0L),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        db.collection("tenants").document(tId).collection("tickets").document(ticket.id)
+            .set(data)
+            .addOnFailureListener { e ->
+                Log.w(TAG, "Granular ticket sync offline warning: ${e.message}")
+            }
+    }
+
+    /**
+     * Đồng bộ Granular phiếu thu chi trực tiếp lên /tenants/{tenantId}/cashbook/{id}
+     */
+    fun syncCashbookToGranularCloud(tc: TC) {
+        val db = firestoreDb ?: return
+        val tId = currentTenantId
+        val data = mapOf(
+            "id" to tc.id,
+            "tenantId" to tId,
+            "loai" to tc.loai.name,
+            "tien" to tc.tien,
+            "lyDo" to tc.lyDo,
+            "ngay" to tc.ngay,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        db.collection("tenants").document(tId).collection("cashbook").document(tc.id)
+            .set(data)
+            .addOnFailureListener { e ->
+                Log.w(TAG, "Granular cashbook sync offline warning: ${e.message}")
+            }
+    }
+
     fun saveToPrefs() {
         val root = buildBackupJsonObject()
         val jsonStr = root.toString()
         prefs.edit().putString(KEY_DATA_JSON, jsonStr).apply()
         saveGehihiMemoryVault()
+        persistToRoomDbAsync()
         if (!isApplyingCloudSnapshot) {
             pushToCloudWorkspace(jsonStr)
         }
@@ -5919,8 +6151,300 @@ class SpaStore(context: Context) {
 
     private fun shortId(): String = UUID.randomUUID().toString().replace("-", "").take(6)
 
+    // =========================================================================
+    // DEVELOPER CONSOLE & MULTI-TENANT BACKEND MANAGEMENT
+    // =========================================================================
+
+    /**
+     * Tải tất cả documents từ collection `tenants` trên Firestore, parse thành `TenantInfo` và nạp vào `devAllTenants`.
+     * Nếu collection chưa có gì, tự động tạo document mặc định cho DEFAULT_TENANT_ID.
+     */
+    fun fetchDevAllTenants(onComplete: (Boolean, String) -> Unit = { _, _ -> }) {
+        val db = firestoreDb ?: run {
+            onComplete(false, "Chưa kết nối Firebase")
+            return
+        }
+        isDevTenantsLoading = true
+        devStatusMessage = "Đang tải danh sách cơ sở..."
+
+        db.collection("tenants")
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                isDevTenantsLoading = false
+                if (querySnapshot.isEmpty) {
+                    val defaultExpires = System.currentTimeMillis() + 365L * 86_400_000L
+                    val defaultTenant = TenantInfo(
+                        tenantId = DEFAULT_TENANT_ID,
+                        shopName = "Khiếm Thị Việt",
+                        status = "ACTIVE",
+                        isLocked = false,
+                        lockedReason = "",
+                        subscriptionExpiresAt = defaultExpires,
+                        planId = "PLAN_PRO",
+                        ownerPhone = "0968608795",
+                        ownerEmail = "admin@khiemthiviet.vn",
+                        qrPaymentUrl = "",
+                        accountsCount = taiKhoans.size,
+                        ticketsCount = luots.size,
+                        customersCount = khs.size,
+                        createdAt = todayDateStr()
+                    )
+                    val initData = mapOf(
+                        "tenantId" to defaultTenant.tenantId,
+                        "shopName" to defaultTenant.shopName,
+                        "status" to defaultTenant.status,
+                        "isLocked" to defaultTenant.isLocked,
+                        "lockedReason" to defaultTenant.lockedReason,
+                        "subscriptionExpiresAt" to defaultTenant.subscriptionExpiresAt,
+                        "planId" to defaultTenant.planId,
+                        "ownerPhone" to defaultTenant.ownerPhone,
+                        "ownerEmail" to defaultTenant.ownerEmail,
+                        "qrPaymentUrl" to "",
+                        "lockDetails.qrPaymentUrl" to "",
+                        "accountsCount" to defaultTenant.accountsCount,
+                        "ticketsCount" to defaultTenant.ticketsCount,
+                        "customersCount" to defaultTenant.customersCount,
+                        "createdAt" to defaultTenant.createdAt,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                    db.collection("tenants").document(DEFAULT_TENANT_ID).set(initData)
+                        .addOnSuccessListener {
+                            devAllTenants.clear()
+                            devAllTenants.add(defaultTenant)
+                            devStatusMessage = "Đã khởi tạo cơ sở mặc định"
+                            onComplete(true, "Đã khởi tạo cơ sở mặc định")
+                        }
+                        .addOnFailureListener { e ->
+                            devStatusMessage = "Lỗi khởi tạo: ${e.localizedMessage}"
+                            onComplete(false, e.localizedMessage ?: "Lỗi khởi tạo")
+                        }
+                } else {
+                    devAllTenants.clear()
+                    for (doc in querySnapshot.documents) {
+                        val t = TenantInfo(
+                            tenantId = doc.id,
+                            shopName = doc.getString("shopName") ?: doc.id,
+                            status = doc.getString("status") ?: "ACTIVE",
+                            isLocked = doc.getBoolean("isLocked") ?: false,
+                            lockedReason = doc.getString("lockedReason") ?: "",
+                            subscriptionExpiresAt = doc.getLong("subscriptionExpiresAt") ?: 0L,
+                            planId = doc.getString("planId") ?: "PLAN_FREE",
+                            ownerPhone = doc.getString("ownerPhone") ?: "",
+                            ownerEmail = doc.getString("ownerEmail") ?: "",
+                            qrPaymentUrl = doc.getString("qrPaymentUrl") ?: doc.getString("lockDetails.qrPaymentUrl") ?: "",
+                            accountsCount = doc.getLong("accountsCount")?.toInt() ?: 0,
+                            ticketsCount = doc.getLong("ticketsCount")?.toInt() ?: 0,
+                            customersCount = doc.getLong("customersCount")?.toInt() ?: 0,
+                            createdAt = doc.getString("createdAt") ?: ""
+                        )
+                        devAllTenants.add(t)
+                    }
+                    devStatusMessage = "Đã tải ${devAllTenants.size} cơ sở"
+                    onComplete(true, "Thành công")
+                }
+            }
+            .addOnFailureListener { e ->
+                isDevTenantsLoading = false
+                devStatusMessage = "Lỗi tải cơ sở: ${e.localizedMessage}"
+                onComplete(false, e.localizedMessage ?: "Lỗi kết nối")
+            }
+    }
+
+    /**
+     * Khóa hoặc mở khóa một cơ sở (Tenant Kill-Switch).
+     */
+    fun devToggleLockTenant(
+        tenantId: String,
+        lock: Boolean,
+        reason: String = "",
+        qrUrl: String = "",
+        onDone: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        val db = firestoreDb ?: run {
+            onDone(false, "Chưa kết nối Firebase")
+            return
+        }
+        val newStatus = if (lock) "LOCKED_EXPIRED" else "ACTIVE"
+        val updates = mapOf(
+            "isLocked" to lock,
+            "status" to newStatus,
+            "lockedReason" to reason,
+            "lockDetails.qrPaymentUrl" to qrUrl,
+            "qrPaymentUrl" to qrUrl,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        db.collection("tenants").document(tenantId)
+            .update(updates)
+            .addOnSuccessListener {
+                val index = devAllTenants.indexOfFirst { it.tenantId == tenantId }
+                if (index != -1) {
+                    val old = devAllTenants[index]
+                    devAllTenants[index] = old.copy(
+                        isLocked = lock,
+                        status = newStatus,
+                        lockedReason = reason,
+                        qrPaymentUrl = qrUrl
+                    )
+                }
+                if (currentTenantId == tenantId) {
+                    isTenantLocked = lock
+                    tenantLockReason = if (lock) reason.ifBlank { "Tài khoản đã bị tạm khóa. Vui lòng liên hệ hỗ trợ." } else ""
+                    tenantLockQrUrl = qrUrl
+                }
+                onDone(true, if (lock) "Đã khóa cơ sở $tenantId" else "Đã mở khóa cơ sở $tenantId")
+            }
+            .addOnFailureListener { e ->
+                onDone(false, e.localizedMessage ?: "Lỗi cập nhật trạng thái khóa")
+            }
+    }
+
+    /**
+     * Gia hạn thuê bao gói cho cơ sở.
+     */
+    fun devExtendSubscription(
+        tenantId: String,
+        addDays: Int,
+        onDone: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        val db = firestoreDb ?: run {
+            onDone(false, "Chưa kết nối Firebase")
+            return
+        }
+        val currentTenant = devAllTenants.firstOrNull { it.tenantId == tenantId }
+        val baseTime = maxOf(System.currentTimeMillis(), currentTenant?.subscriptionExpiresAt ?: 0L)
+        val newExpiresAt = baseTime + addDays * 86_400_000L
+
+        val updates = mapOf(
+            "subscriptionExpiresAt" to newExpiresAt,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        db.collection("tenants").document(tenantId)
+            .update(updates)
+            .addOnSuccessListener {
+                val index = devAllTenants.indexOfFirst { it.tenantId == tenantId }
+                if (index != -1) {
+                    val old = devAllTenants[index]
+                    devAllTenants[index] = old.copy(subscriptionExpiresAt = newExpiresAt)
+                }
+                onDone(true, "Đã gia hạn thêm $addDays ngày cho cơ sở $tenantId")
+            }
+            .addOnFailureListener { e ->
+                onDone(false, e.localizedMessage ?: "Lỗi gia hạn gói")
+            }
+    }
+
+    /**
+     * Thay đổi gói dịch vụ cước của cơ sở.
+     */
+    fun devChangeTenantPlan(
+        tenantId: String,
+        newPlanId: String,
+        onDone: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        val db = firestoreDb ?: run {
+            onDone(false, "Chưa kết nối Firebase")
+            return
+        }
+        val updates = mapOf(
+            "planId" to newPlanId,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        db.collection("tenants").document(tenantId)
+            .update(updates)
+            .addOnSuccessListener {
+                val index = devAllTenants.indexOfFirst { it.tenantId == tenantId }
+                if (index != -1) {
+                    val old = devAllTenants[index]
+                    devAllTenants[index] = old.copy(planId = newPlanId)
+                }
+                onDone(true, "Đã đổi gói cước thành $newPlanId cho cơ sở $tenantId")
+            }
+            .addOnFailureListener { e ->
+                onDone(false, e.localizedMessage ?: "Lỗi cập nhật gói cước")
+            }
+    }
+
+    /**
+     * Tạo document cơ sở mới trên Firestore.
+     */
+    fun devCreateNewTenant(
+        tenantId: String,
+        shopName: String,
+        ownerPhone: String,
+        planId: String,
+        trialDays: Int,
+        onDone: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        val cleanId = tenantId.trim().lowercase().replace(" ", "_")
+        if (cleanId.isBlank()) {
+            onDone(false, "Mã cơ sở (Tenant ID) không được để trống")
+            return
+        }
+        val db = firestoreDb ?: run {
+            onDone(false, "Chưa kết nối Firebase")
+            return
+        }
+        val expiresAt = System.currentTimeMillis() + trialDays * 86_400_000L
+        val newTenant = TenantInfo(
+            tenantId = cleanId,
+            shopName = shopName.take(200).ifBlank { "Cơ sở $cleanId" },
+            status = "ACTIVE",
+            isLocked = false,
+            lockedReason = "",
+            subscriptionExpiresAt = expiresAt,
+            planId = planId.ifBlank { "PLAN_FREE" },
+            ownerPhone = ownerPhone.trim(),
+            ownerEmail = "",
+            qrPaymentUrl = "",
+            accountsCount = 0,
+            ticketsCount = 0,
+            customersCount = 0,
+            createdAt = todayDateStr()
+        )
+        val data = mapOf(
+            "tenantId" to newTenant.tenantId,
+            "shopName" to newTenant.shopName,
+            "status" to newTenant.status,
+            "isLocked" to newTenant.isLocked,
+            "lockedReason" to newTenant.lockedReason,
+            "subscriptionExpiresAt" to newTenant.subscriptionExpiresAt,
+            "planId" to newTenant.planId,
+            "ownerPhone" to newTenant.ownerPhone,
+            "ownerEmail" to newTenant.ownerEmail,
+            "qrPaymentUrl" to "",
+            "accountsCount" to 0,
+            "ticketsCount" to 0,
+            "customersCount" to 0,
+            "createdAt" to newTenant.createdAt,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        db.collection("tenants").document(cleanId)
+            .set(data)
+            .addOnSuccessListener {
+                val existingIndex = devAllTenants.indexOfFirst { it.tenantId == cleanId }
+                if (existingIndex >= 0) {
+                    devAllTenants[existingIndex] = newTenant
+                } else {
+                    devAllTenants.add(newTenant)
+                }
+                onDone(true, "Đã tạo thành công cơ sở ${newTenant.shopName} ($cleanId)")
+            }
+            .addOnFailureListener { e ->
+                onDone(false, e.localizedMessage ?: "Lỗi tạo cơ sở mới")
+            }
+    }
+
+    /**
+     * Chuyển đổi ngữ cảnh cơ sở (Tenant Context) đang quan sát/điều hành cho Developer.
+     */
+    fun devSwitchTenantContext(tenantId: String?) {
+        activeTenantOverride = tenantId?.takeIf { it.isNotBlank() }
+        startTenantStatusListener()
+    }
+
     companion object {
         private const val TAG = "SpaStoreGehihi"
+        const val DEFAULT_TENANT_ID = "khiem_thi_viet"
         const val PREFS_NAME = "tamquat_fresh_v2"
         const val KEY_DATA_JSON = "data_json"
         const val KEY_GEHIHI_MEMORY_JSON = "gehihi_memory_vault_json"

@@ -4,6 +4,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import com.example.vietqr.VietQrHelper
+import com.example.vietqr.ThongTinNganHang
+import com.example.vietqr.NganHangInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
@@ -138,6 +142,8 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -382,6 +388,12 @@ fun KhiemThiVietApp(store: SpaStore) {
     // Khi cài APK lần đầu hoặc khi đã đăng xuất -> Bắt buộc qua màn hình Đăng nhập 1 lần duy nhất
     if (user == null) {
         OneTimeLoginScreen(store = store)
+        return
+    }
+
+    // Kill-Switch: Nếu tenant bị khóa, hiển thị màn hình khóa thay vì nội dung app
+    if (store.isTenantLocked) {
+        TenantLockedScreen(store = store)
         return
     }
 
@@ -1755,6 +1767,7 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
     var tgktInput by remember { mutableStateOf(nowTimeStr()) }
     var thucThuInput by remember { mutableStateOf(ve.thu.toString()) }
     val hoaHongDuKien = store.tinhHoaHongVe(ve)
+    var showVietQrDialog by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1781,6 +1794,21 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    OutlinedButton(
+                        onClick = { showVietQrDialog = true },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(18.dp), tint = SpaRosewoodDark)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "📲 Quét mã VietQR (${formatVnd(thucThuInput.toLongOrNull() ?: ve.thu)})",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = SpaRosewoodDark
+                        )
+                    }
                 } else {
                     Text("Vé đi làm Gói (LT): Thu 0 đồng (Đã trả trước lúc đăng ký gói).", fontWeight = FontWeight.SemiBold, color = SpaRosewoodDark)
                 }
@@ -1810,6 +1838,179 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
         },
         dismissButton = {
             TextButton(onClick = onDismiss, modifier = Modifier.height(48.dp)) { Text("Đóng") }
+        }
+    )
+
+    if (showVietQrDialog) {
+        VietQrPaymentDialog(
+            store = store,
+            ve = ve,
+            amount = thucThuInput.toLongOrNull() ?: ve.thu,
+            onPaymentDone = {
+                store.hoanThanhVe(
+                    luotId = ve.id,
+                    tgktInput = tgktInput,
+                    thucThu = thucThuInput.toLongOrNull() ?: ve.thu
+                )
+                showVietQrDialog = false
+                onDismiss()
+            },
+            onDismiss = { showVietQrDialog = false }
+        )
+    }
+}
+
+@Composable
+fun VietQrPaymentDialog(
+    store: SpaStore,
+    ve: Luot,
+    amount: Long,
+    onPaymentDone: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val bank = store.thongTinNganHang
+    val memo = VietQrHelper.taoNoiDungChuyenKhoanVe(ve.id)
+    val qrUrl = store.taoVietQrChoVe(ve, amount)
+    val speakableAmount = formatVndSpeakable(amount)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = SpaRosewoodDark)
+                Spacer(Modifier.width(8.dp))
+                Text("Quét Mã VietQR Chuyển Khoản", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "Thanh toán VietQR Napas 247. Số tiền: $speakableAmount. Ngân hàng ${bank.bankCode}, số tài khoản ${bank.soTaiKhoan}, chủ tài khoản ${bank.tenChuTaiKhoan}, nội dung $memo."
+                    },
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Card số tiền nổi bật
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("SỐ TIỀN THANH TOÁN", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SpaRosewoodDark)
+                        Text(formatVnd(amount), fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = SpaRosewoodDark)
+                        Text(speakableAmount, fontSize = 12.sp, color = Color.Gray)
+                    }
+                }
+
+                if (bank.soTaiKhoan.isBlank()) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "⚠️ Chưa cấu hình số tài khoản ngân hàng của cơ sở. Chủ Spa vui lòng vào mục Quyền hạn Admin -> Cấu hình Ngân hàng để nhập STK nhận tiền.",
+                            modifier = Modifier.padding(12.dp),
+                            fontSize = 12.sp,
+                            color = Color(0xFFE65100)
+                        )
+                    }
+                } else {
+                    // Chi tiết tài khoản nhận tiền
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Ngân hàng:", fontSize = 12.sp, color = Color.Gray)
+                                Text(VietQrHelper.timNganHangTheoCode(bank.bankCode).ten, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("Số tài khoản:", fontSize = 12.sp, color = Color.Gray)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(bank.soTaiKhoan, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = SpaRosewoodDark)
+                                    Spacer(Modifier.width(4.dp))
+                                    IconButton(
+                                        onClick = {
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            clipboard.setPrimaryClip(ClipData.newPlainText("STK", bank.soTaiKhoan))
+                                            Toast.makeText(context, "Đã sao chép STK", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = "Sao chép số tài khoản", modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Chủ tài khoản:", fontSize = 12.sp, color = Color.Gray)
+                                Text(bank.tenChuTaiKhoan.ifBlank { "Chủ cơ sở" }, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("Nội dung CK:", fontSize = 12.sp, color = Color.Gray)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(memo, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF0277BD))
+                                    Spacer(Modifier.width(4.dp))
+                                    IconButton(
+                                        onClick = {
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            clipboard.setPrimaryClip(ClipData.newPlainText("NoiDung", memo))
+                                            Toast.makeText(context, "Đã sao chép nội dung", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = "Sao chép nội dung", modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Nút mở ảnh QR trực quan
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(qrUrl))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Không thể mở link mã QR: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth().height(46.dp)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Mở ảnh mã QR / Đưa khách quét", fontSize = 13.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onPaymentDone,
+                colors = ButtonDefaults.buttonColors(containerColor = SpaRosewood),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.height(48.dp)
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Khách đã chuyển xong → Hoàn thành")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.height(48.dp)) {
+                Text("Đóng")
+            }
         }
     )
 }
@@ -4453,15 +4654,16 @@ fun TabQuyenHanAdmin(
         }
     }
 
-    val subTabTitles = listOf(
-        "Cấp quyền & TK NV",
-        "Sửa TK Admin gốc",
-        "Backup Xuất / Nhập"
-    )
+    val isDevUser = store.currentUser.isDev()
+    val subTabTitles = if (isDevUser) {
+        listOf("Cấp quyền & TK NV", "TK Admin gốc", "Sao lưu & Khôi phục", "👑 Dev Console")
+    } else {
+        listOf("Cấp quyền & TK NV", "TK Admin gốc", "Sao lưu & Khôi phục")
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(
-            selectedTabIndex = adminSubTab,
+            selectedTabIndex = adminSubTab.coerceIn(0, subTabTitles.lastIndex),
             containerColor = MaterialTheme.colorScheme.surface,
             contentColor = SpaRosewoodDark
         ) {
@@ -5036,6 +5238,80 @@ fun TabQuyenHanAdmin(
                             }
                         }
 
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, Color(0xFF0277BD).copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Color(0xFF0277BD))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "💳 Cấu Hình Ngân Hàng Nhận Tiền VietQR",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 15.sp,
+                                        color = Color(0xFF0277BD)
+                                    )
+                                }
+                                Text(
+                                    "Dùng để tự động tạo mã VietQR Napas 247 khi thu tiền vé hoặc gia hạn gói cước, KTV khiếm thị không cần tính tiền hay đọc số tài khoản thủ công.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                var bankCodeInput by remember(store.thongTinNganHang) { mutableStateOf(store.thongTinNganHang.bankCode) }
+                                var stkInput by remember(store.thongTinNganHang) { mutableStateOf(store.thongTinNganHang.soTaiKhoan) }
+                                var chuTkInput by remember(store.thongTinNganHang) { mutableStateOf(store.thongTinNganHang.tenChuTaiKhoan) }
+
+                                OutlinedTextField(
+                                    value = bankCodeInput,
+                                    onValueChange = { bankCodeInput = it.uppercase() },
+                                    label = { Text("Mã Ngân hàng (MB, VCB, TCB, VPB, ACB, BIDV, ...)") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                OutlinedTextField(
+                                    value = stkInput,
+                                    onValueChange = { stkInput = it.filter { c -> c.isDigit() || c.isLetter() } },
+                                    label = { Text("Số tài khoản thụ hưởng") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                OutlinedTextField(
+                                    value = chuTkInput,
+                                    onValueChange = { chuTkInput = it.uppercase() },
+                                    label = { Text("Tên chủ tài khoản (VIẾT HOA KHÔNG DẤU)") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Button(
+                                    onClick = {
+                                        store.capNhatThongTinNganHang(bankCodeInput, stkInput, chuTkInput)
+                                        Toast.makeText(context, "Đã lưu cấu hình tài khoản ngân hàng thành công!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0277BD)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(50.dp)
+                                ) {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("LƯU CẤU HÌNH NGÂN HÀNG VIETQR", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                            }
+                        }
+
                         if (store.currentUser.isAdmin()) {
                             Card(
                                 shape = RoundedCornerShape(14.dp),
@@ -5493,6 +5769,9 @@ fun TabQuyenHanAdmin(
                     Spacer(modifier = Modifier.height(72.dp))
                 }
             }
+            3 -> {
+                DevConsoleSubTab(store = store)
+            }
         }
     }
 
@@ -5917,6 +6196,789 @@ fun TabQuyenHanAdmin(
             dismissButton = { TextButton(onClick = { tkConfirmDelete = null }) { Text("Hủy") } }
         )
     }
+}
+
+// =========================================================================
+// DEVELOPER SUPER ADMIN CONSOLE: QUẢN TRỊ TOÀN DIỆN SAAS MULTI-TENANT
+// =========================================================================
+@Composable
+fun DevConsoleSubTab(store: SpaStore) {
+    val context = LocalContext.current
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var tenantToLock by remember { mutableStateOf<TenantInfo?>(null) }
+    var tenantToExtend by remember { mutableStateOf<TenantInfo?>(null) }
+
+    LaunchedEffect(Unit) {
+        store.fetchDevAllTenants()
+    }
+
+    val totalTenants = store.devAllTenants.size
+    val activeTenantsCount = store.devAllTenants.count { !it.isEffectiveLocked }
+    val lockedTenantsCount = store.devAllTenants.count { it.isEffectiveLocked }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Banner cảnh báo nếu Dev đang ở góc nhìn của cơ sở khác
+        if (store.activeTenantOverride != null) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFF9800)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "👁️ Chế độ Góc nhìn Spa Đang Bật",
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFE65100),
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                "Bạn đang quản lý & quan sát dữ liệu cơ sở: ${store.activeTenantOverride}",
+                                fontSize = 12.sp,
+                                color = Color(0xFF5D4037)
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                store.devSwitchTenantContext(null)
+                                Toast.makeText(context, "Đã quay về cơ sở mặc định", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text("Về mặc định", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Header & Thẻ thống kê
+        item {
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                "👑 Developer Super Admin Console",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 16.sp,
+                                color = SpaRosewoodDark
+                            )
+                            Text(
+                                "Giám sát & Quản trị Multi-Tenant toàn hệ thống",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (store.isDevTenantsLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                        }
+                    }
+
+                    // 3 Ô Thống kê trực quan
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Tổng số
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("TỔNG CƠ SỞ", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                                Text("$totalTenants", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = SpaRosewoodDark)
+                            }
+                        }
+                        // Đang hoạt động (Xanh lá)
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("HOẠT ĐỘNG", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                                Text("$activeTenantsCount", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF2E7D32))
+                            }
+                        }
+                        // Bị khóa (Đỏ)
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("BỊ KHÓA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+                                Text("$lockedTenantsCount", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFC62828))
+                            }
+                        }
+                    }
+
+                    // Hàng nút hành động chung
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                store.fetchDevAllTenants { ok, msg ->
+                                    Toast.makeText(context, if (ok) "Đã cập nhật danh sách cơ sở" else msg, Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Làm mới", fontSize = 13.sp)
+                        }
+
+                        Button(
+                            onClick = { showCreateDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = SpaRosewood),
+                            modifier = Modifier.weight(1.2f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Thêm cơ sở mới", fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Danh sách Tenants
+        item {
+            Text(
+                "Danh sách các cơ sở Spa (${store.devAllTenants.size}):",
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = SpaRosewoodDark
+            )
+        }
+
+        if (store.devAllTenants.isEmpty()) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(modifier = Modifier.padding(24.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("Chưa có cơ sở nào. Bấm 'Thêm cơ sở mới' để bắt đầu.", color = Color.Gray, fontSize = 13.sp)
+                    }
+                }
+            }
+        } else {
+            items(store.devAllTenants, key = { it.tenantId }) { tenant ->
+                DevTenantCard(
+                    tenant = tenant,
+                    isCurrentActive = store.activeTenantOverride == tenant.tenantId || (store.activeTenantOverride == null && tenant.tenantId == store.currentTenantId),
+                    onToggleLock = {
+                        if (tenant.isEffectiveLocked) {
+                            // Mở khóa trực tiếp
+                            store.devToggleLockTenant(tenant.tenantId, lock = false) { ok, msg ->
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            // Mở dialog khóa
+                            tenantToLock = tenant
+                        }
+                    },
+                    onOpenExtendPlan = {
+                        tenantToExtend = tenant
+                    },
+                    onSwitchContext = {
+                        if (store.activeTenantOverride == tenant.tenantId) {
+                            store.devSwitchTenantContext(null)
+                            Toast.makeText(context, "Đã thoát chế độ góc nhìn cơ sở", Toast.LENGTH_SHORT).show()
+                        } else {
+                            store.devSwitchTenantContext(tenant.tenantId)
+                            Toast.makeText(context, "Đã chuyển góc nhìn sang cơ sở: ${tenant.shopName}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+            }
+        }
+
+        item {
+            Spacer(Modifier.height(80.dp))
+        }
+    }
+
+    // Dialogs
+    if (showCreateDialog) {
+        DevCreateTenantDialog(
+            store = store,
+            onDismiss = { showCreateDialog = false }
+        )
+    }
+
+    tenantToLock?.let { tenant ->
+        DevLockTenantDialog(
+            tenant = tenant,
+            store = store,
+            onDismiss = { tenantToLock = null }
+        )
+    }
+
+    tenantToExtend?.let { tenant ->
+        DevExtendPlanDialog(
+            tenant = tenant,
+            store = store,
+            onDismiss = { tenantToExtend = null }
+        )
+    }
+}
+
+@Composable
+fun DevTenantCard(
+    tenant: TenantInfo,
+    isCurrentActive: Boolean,
+    onToggleLock: () -> Unit,
+    onOpenExtendPlan: () -> Unit,
+    onSwitchContext: () -> Unit
+) {
+    val isLocked = tenant.isEffectiveLocked
+    val planBadgeColor = when (tenant.planId) {
+        "PLAN_ENTERPRISE" -> Color(0xFF6A1B9A)
+        "PLAN_PRO" -> Color(0xFF0277BD)
+        "PLAN_BASIC" -> Color(0xFF00695C)
+        else -> Color(0xFF558B2F)
+    }
+
+    Card(
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = if (isCurrentActive) BorderStroke(2.dp, SpaRosewood) else if (isLocked) BorderStroke(1.dp, Color(0xFFFFCDD2)) else null,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Hàng 1: Tên cơ sở + Badges (Gói cước & Trạng thái)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = tenant.shopName.ifBlank { tenant.tenantId },
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = SpaRosewoodDark
+                        )
+                        if (isCurrentActive) {
+                            Spacer(Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = SpaRosewood.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    "ĐANG XEM",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = SpaRosewood,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        text = "ID: ${tenant.tenantId}",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Badge Gói
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = planBadgeColor.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            tenant.planId.removePrefix("PLAN_"),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = planBadgeColor,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    // Badge Trạng thái
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isLocked) Color(0xFFFFEBEE) else Color(0xFFE8F5E9)
+                    ) {
+                        Text(
+                            if (isLocked) "BỊ KHÓA" else "HOẠT ĐỘNG",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isLocked) Color(0xFFC62828) else Color(0xFF2E7D32),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            // Hàng 2: Chi tiết liên hệ & Hạn sử dụng
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = if (tenant.ownerPhone.isNotBlank()) "📞 ${tenant.ownerPhone}" else "📞 Chưa có SĐT",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                val expiresText = if (tenant.subscriptionExpiresAt > 0L) {
+                    val isExpired = tenant.subscriptionExpiresAt < System.currentTimeMillis()
+                    val sdf = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                    val dStr = sdf.format(java.util.Date(tenant.subscriptionExpiresAt))
+                    if (isExpired) "⚠️ Hết hạn: $dStr" else "Hạn: $dStr"
+                } else {
+                    "Hạn: Vô thời hạn"
+                }
+                Text(
+                    text = expiresText,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (tenant.subscriptionExpiresAt in 1..System.currentTimeMillis()) Color(0xFFC62828) else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Nếu bị khóa, hiển thị lý do
+            if (isLocked && tenant.lockedReason.isNotBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFFF3E0),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "🔒 Lý do: ${tenant.lockedReason}",
+                        fontSize = 12.sp,
+                        color = Color(0xFFD84315),
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+
+            // Hàng 3: Các nút hành động
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Nút Khóa / Mở Khóa
+                Button(
+                    onClick = onToggleLock,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isLocked) Color(0xFF2E7D32) else Color(0xFFC62828)
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = if (isLocked) Icons.Default.CheckCircle else Icons.Default.Lock,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (isLocked) "Mở Khóa" else "Khóa App", fontSize = 12.sp)
+                }
+
+                // Nút Gia hạn / Đổi gói
+                OutlinedButton(
+                    onClick = onOpenExtendPlan,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1.1f)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Gia hạn / Gói", fontSize = 12.sp)
+                }
+
+                // Nút Góc nhìn Spa
+                OutlinedButton(
+                    onClick = onSwitchContext,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1.1f)
+                ) {
+                    Icon(Icons.Default.SwitchAccount, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (isCurrentActive) "Thoát xem" else "Góc nhìn", fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DevCreateTenantDialog(
+    store: SpaStore,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var tenantIdInput by remember { mutableStateOf("") }
+    var shopNameInput by remember { mutableStateOf("") }
+    var ownerPhoneInput by remember { mutableStateOf("") }
+    var selectedPlan by remember { mutableStateOf("PLAN_PRO") }
+    var selectedTrialDays by remember { mutableIntStateOf(30) }
+    var isSubmitting by remember { mutableStateOf(false) }
+
+    val planOptions = listOf("PLAN_FREE", "PLAN_BASIC", "PLAN_PRO", "PLAN_ENTERPRISE")
+    val trialOptions = listOf(14, 30, 90, 365)
+
+    AlertDialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = {
+            Text("➕ Thêm Cơ Sở Spa Mới", fontWeight = FontWeight.Bold, color = SpaRosewoodDark)
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = tenantIdInput,
+                    onValueChange = { tenantIdInput = it.lowercase().replace(" ", "_") },
+                    label = { Text("Mã cơ sở (Tenant ID)") },
+                    placeholder = { Text("vd: spa_quan1, anhduong_hcm") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = shopNameInput,
+                    onValueChange = { shopNameInput = it },
+                    label = { Text("Tên cơ sở Spa") },
+                    placeholder = { Text("vd: Spa Khiếm Thị Ánh Dương") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = ownerPhoneInput,
+                    onValueChange = { ownerPhoneInput = it },
+                    label = { Text("SĐT chủ quán / quản lý") },
+                    placeholder = { Text("vd: 0987654321") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text("Gói dịch vụ:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    planOptions.forEach { p ->
+                        FilterChip(
+                            selected = selectedPlan == p,
+                            onClick = { selectedPlan = p },
+                            label = { Text(p.removePrefix("PLAN_")) }
+                        )
+                    }
+                }
+
+                Text("Thời hạn dùng thử:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    trialOptions.forEach { d ->
+                        FilterChip(
+                            selected = selectedTrialDays == d,
+                            onClick = { selectedTrialDays = d },
+                            label = { Text("$d ngày") }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (tenantIdInput.isBlank()) {
+                        Toast.makeText(context, "Vui lòng nhập Tenant ID", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    isSubmitting = true
+                    store.devCreateNewTenant(
+                        tenantId = tenantIdInput,
+                        shopName = shopNameInput,
+                        ownerPhone = ownerPhoneInput,
+                        planId = selectedPlan,
+                        trialDays = selectedTrialDays
+                    ) { ok, msg ->
+                        isSubmitting = false
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        if (ok) onDismiss()
+                    }
+                },
+                enabled = !isSubmitting,
+                colors = ButtonDefaults.buttonColors(containerColor = SpaRosewood)
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Tạo cơ sở")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSubmitting) {
+                Text("Hủy")
+            }
+        }
+    )
+}
+
+@Composable
+fun DevLockTenantDialog(
+    tenant: TenantInfo,
+    store: SpaStore,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val commonReasons = listOf(
+        "Hết hạn thuê bao dịch vụ SaaS",
+        "Chưa thanh toán cước phí định kỳ",
+        "Tạm dừng hệ thống để bảo trì cơ sở",
+        "Vi phạm điều khoản sử dụng nền tảng"
+    )
+    var selectedReason by remember { mutableStateOf(commonReasons[0]) }
+    var customReason by remember { mutableStateOf("") }
+    var qrUrlInput by remember { mutableStateOf(tenant.qrPaymentUrl.ifBlank { "https://img.vietqr.io/image/970422-0987654321-compact2.png?amount=500000&addInfo=GiaHan+${tenant.tenantId}" }) }
+    var isSubmitting by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFC62828))
+                Spacer(Modifier.width(8.dp))
+                Text("Khóa App Cơ Sở", fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "Bạn sắp kích hoạt Kill-Switch khóa cơ sở: ${tenant.shopName} (${tenant.tenantId}). Toàn bộ nhân viên và chủ spa sẽ thấy màn hình khóa.",
+                    fontSize = 13.sp
+                )
+
+                Text("Chọn lý do khóa:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                commonReasons.forEach { r ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedReason = r }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = selectedReason == r && customReason.isBlank(),
+                            onCheckedChange = { if (it) { selectedReason = r; customReason = "" } }
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(r, fontSize = 13.sp)
+                    }
+                }
+
+                OutlinedTextField(
+                    value = customReason,
+                    onValueChange = { customReason = it },
+                    label = { Text("Hoặc nhập lý do khác") },
+                    placeholder = { Text("vd: Yêu cầu của chủ sở hữu...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = qrUrlInput,
+                    onValueChange = { qrUrlInput = it },
+                    label = { Text("Link QR Thanh toán VietQR (tùy chọn)") },
+                    placeholder = { Text("https://img.vietqr.io/...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val finalReason = customReason.ifBlank { selectedReason }
+                    isSubmitting = true
+                    store.devToggleLockTenant(
+                        tenantId = tenant.tenantId,
+                        lock = true,
+                        reason = finalReason,
+                        qrUrl = qrUrlInput
+                    ) { ok, msg ->
+                        isSubmitting = false
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        if (ok) onDismiss()
+                    }
+                },
+                enabled = !isSubmitting,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Xác nhận Khóa")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSubmitting) {
+                Text("Hủy")
+            }
+        }
+    )
+}
+
+@Composable
+fun DevExtendPlanDialog(
+    tenant: TenantInfo,
+    store: SpaStore,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val dayOptions = listOf(30, 90, 180, 365)
+    var selectedDays by remember { mutableIntStateOf(30) }
+    var selectedPlan by remember { mutableStateOf(tenant.planId) }
+    val planOptions = listOf("PLAN_FREE", "PLAN_BASIC", "PLAN_PRO", "PLAN_ENTERPRISE")
+    var isSubmitting by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = {
+            Text("⏱️ Gia Hạn / Đổi Gói Dịch Vụ", fontWeight = FontWeight.Bold, color = SpaRosewoodDark)
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("Cơ sở: ${tenant.shopName} (${tenant.tenantId})", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+
+                Text("Cộng thêm ngày sử dụng:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    dayOptions.forEach { d ->
+                        FilterChip(
+                            selected = selectedDays == d,
+                            onClick = { selectedDays = d },
+                            label = { Text("+$d ngày") }
+                        )
+                    }
+                }
+
+                Text("Gói cước thuê bao:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    planOptions.forEach { p ->
+                        FilterChip(
+                            selected = selectedPlan == p,
+                            onClick = { selectedPlan = p },
+                            label = { Text(p.removePrefix("PLAN_")) }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    isSubmitting = true
+                    store.devExtendSubscription(tenant.tenantId, selectedDays) { ok1, msg1 ->
+                        if (selectedPlan != tenant.planId) {
+                            store.devChangeTenantPlan(tenant.tenantId, selectedPlan) { ok2, msg2 ->
+                                isSubmitting = false
+                                Toast.makeText(context, "$msg1 - $msg2", Toast.LENGTH_LONG).show()
+                                onDismiss()
+                            }
+                        } else {
+                            isSubmitting = false
+                            Toast.makeText(context, msg1, Toast.LENGTH_LONG).show()
+                            onDismiss()
+                        }
+                    }
+                },
+                enabled = !isSubmitting,
+                colors = ButtonDefaults.buttonColors(containerColor = SpaRosewood)
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Lưu thay đổi")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSubmitting) {
+                Text("Hủy")
+            }
+        }
+    )
 }
 
 // =========================================================================
@@ -6890,6 +7952,75 @@ fun AccountSwitchDialog(
             }
         }
     )
+}
+
+@Composable
+fun TenantLockedScreen(store: SpaStore) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1a1a2e))
+            .semantics { contentDescription = "Tài khoản bị khóa. Vui lòng liên hệ hỗ trợ để gia hạn." },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = null,
+                tint = Color(0xFFFF6B6B),
+                modifier = Modifier.size(80.dp)
+            )
+            Text(
+                text = "Tài Khoản Tạm Thời Bị Khóa",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Bold
+            )
+            if (store.tenantLockReason.isNotBlank()) {
+                Text(
+                    text = store.tenantLockReason,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFFFFD93D),
+                    textAlign = TextAlign.Center
+                )
+            }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
+            Text(
+                text = "Vui lòng quét mã VietQR bên dưới để gia hạn gói dịch vụ, hoặc liên hệ hotline hỗ trợ.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center
+            )
+            if (store.tenantLockQrUrl.isNotBlank()) {
+                // Hiển thị URL thanh toán
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Text(
+                        text = "🔗 ${store.tenantLockQrUrl}",
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Black
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = { /* Mở Zalo/Call hỗ trợ */ },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
+            ) {
+                Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Liên hệ hỗ trợ")
+            }
+        }
+    }
 }
 
 @Composable

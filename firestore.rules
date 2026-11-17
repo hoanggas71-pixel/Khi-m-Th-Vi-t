@@ -1,116 +1,104 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny all
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
+    
+    // --- HELPER FUNCTIONS ---
     function isSignedIn() {
       return request.auth != null;
     }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    
+    // Developer được nhận diện qua Firebase Custom Claims: request.auth.token.role == 'DEVELOPER'
+    function isDev() {
+      return isSignedIn() && request.auth.token.get('role', '') == 'DEVELOPER';
+    }
+    
+    // Kiểm tra user thuộc tenant
+    function isTenantMember(tenantId) {
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.primaryTenantId == tenantId;
+    }
+    
+    // Kiểm tra tenant ACTIVE (Kill-Switch): đọc document /tenants/{tenantId}
+    function isTenantActive(tenantId) {
+      let t = get(/databases/$(database)/documents/tenants/$(tenantId)).data;
+      return t.status == 'ACTIVE' && t.isLocked == false;
+    }
+    
+    // Kiểm tra Owner (Chủ Spa) của tenant
+    function isTenantOwner(tenantId) {
+      return isTenantMember(tenantId) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'OWNER';
     }
 
-    function incoming() {
-      return request.resource.data;
+    // --- TẦNG 1: DEV CONSOLE (Chỉ Developer) ---
+    match /dev_console/{document=**} {
+      allow read, write: if isDev();
     }
 
-    function existing() {
-      return resource.data;
-    }
-
-    function hasOnlyAllowedFields(fields) {
-      return incoming().keys().hasOnly(fields);
-    }
-
-    function isValidSpaWorkspace(workspaceId) {
-      let allowed = [
-        'workspaceId',
-        'shopName',
-        'payloadJson',
-        'accountsCount',
-        'customersCount',
-        'ticketsCount',
-        'updatedByUid',
-        'updatedByName',
-        'updatedAt'
-      ];
-      return hasOnlyAllowedFields(allowed)
-        && incoming().keys().hasAll(allowed)
-        && incoming().workspaceId is string
-        && incoming().workspaceId == workspaceId
-        && incoming().workspaceId.size() >= 1
-        && incoming().workspaceId.size() <= 100
-        && incoming().shopName is string
-        && incoming().shopName.size() >= 1
-        && incoming().shopName.size() <= 200
-        && incoming().payloadJson is string
-        && incoming().payloadJson.size() >= 2
-        && incoming().payloadJson.size() <= 900000
-        && incoming().accountsCount is int
-        && incoming().accountsCount >= 1
-        && incoming().accountsCount <= 500
-        && incoming().customersCount is int
-        && incoming().customersCount >= 0
-        && incoming().customersCount <= 10000
-        && incoming().ticketsCount is int
-        && incoming().ticketsCount >= 0
-        && incoming().ticketsCount <= 50000
-        && incoming().updatedByUid is string
-        && incoming().updatedByUid == request.auth.uid
-        && incoming().updatedByName is string
-        && incoming().updatedByName.size() >= 1
-        && incoming().updatedByName.size() <= 200
-        && incoming().updatedAt is timestamp
-        && incoming().updatedAt <= request.time;
-    }
-
-    function isValidUserProfile(userId) {
-      let allowed = [
-        'uid',
-        'displayName',
-        'email',
-        'spaPhone',
-        'spaRole',
-        'updatedAt'
-      ];
-      return hasOnlyAllowedFields(allowed)
-        && incoming().keys().hasAll(allowed)
-        && incoming().uid is string
-        && incoming().uid == userId
-        && incoming().uid == request.auth.uid
-        && incoming().displayName is string
-        && incoming().displayName.size() >= 1
-        && incoming().displayName.size() <= 150
-        && incoming().email is string
-        && incoming().email.size() >= 3
-        && incoming().email.size() <= 254
-        && incoming().spaPhone is string
-        && incoming().spaPhone.size() <= 30
-        && incoming().spaRole in ['ADMIN', 'STAFF']
-        && incoming().updatedAt is timestamp
-        && incoming().updatedAt <= request.time;
-    }
-
-    match /spa_workspaces/{workspaceId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && isValidSpaWorkspace(workspaceId);
-      allow update: if isSignedIn()
-                    && isValidSpaWorkspace(workspaceId)
-                    && incoming().workspaceId == existing().workspaceId;
-      allow delete: if false;
-    }
-
+    // --- USERS (Ánh xạ Firebase Auth → Tenant & Role) ---
     match /users/{userId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidUserProfile(userId);
-      allow update: if isOwner(userId)
-                    && isValidUserProfile(userId)
-                    && incoming().uid == existing().uid;
-      allow delete: if isOwner(userId);
+      allow read: if isSignedIn() && (request.auth.uid == userId || isDev());
+      allow write: if isDev() || (isSignedIn() && request.auth.uid == userId);
+    }
+
+    // --- TẦNG 2-3: TENANTS (Dữ liệu cách ly hoàn toàn từng Spa) ---
+    match /tenants/{tenantId} {
+      // Chỉ Dev mới được đổi status/isLocked (Kill-Switch)
+      allow read: if isSignedIn() && (isDev() || isTenantMember(tenantId));
+      allow create: if isDev();
+      // Update: Dev full quyền; Owner chỉ được update trừ status và isLocked
+      allow update: if isDev() || (isTenantOwner(tenantId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'isLocked']));
+      allow delete: if isDev();
+
+      // Sub-collections: Chỉ ghi khi tenant ACTIVE
+      match /staff/{staffId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantOwner(tenantId) && isTenantActive(tenantId);
+      }
+      match /accounts/{accountId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantOwner(tenantId) && isTenantActive(tenantId);
+      }
+      match /services/{serviceId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+      }
+      match /service_packages/{packageId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+      }
+      match /customers/{customerId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+      }
+      match /package_subscriptions/{subId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+      }
+      match /tickets/{ticketId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+      }
+      match /cashbook/{entryId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+      }
+      match /ai_conversations/{sessionId} {
+        allow read, write: if isTenantOwner(tenantId) && isTenantActive(tenantId);
+      }
+      match /ai_memories/{memoryId} {
+        allow read, write: if isTenantOwner(tenantId) && isTenantActive(tenantId);
+      }
+      match /subscription_invoices/{invoiceId} {
+        allow read: if isDev() || isTenantOwner(tenantId);
+        allow write: if isDev();
+      }
+    }
+
+    // Legacy: Giữ lại cấu trúc cũ nhưng hạn chế (migration path)
+    match /spa_workspaces/{workspaceId} {
+      allow read: if isDev();
+      allow write: if false; // Không cho ghi vào schema cũ nữa
     }
   }
 }
