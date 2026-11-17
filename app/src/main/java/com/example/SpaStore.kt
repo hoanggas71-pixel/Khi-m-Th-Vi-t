@@ -2916,7 +2916,7 @@ class SpaStore(context: Context) {
         attachedFileName: String = "",
         attachedFileContent: String = ""
     ) {
-        if (!currentUser.isAdmin()) return
+        val user = currentUser ?: return
         val rawPrompt = userPrompt.trim()
         val cleanPrompt = when {
             rawPrompt.isNotBlank() -> rawPrompt
@@ -2936,8 +2936,17 @@ class SpaStore(context: Context) {
         try {
             val normPrompt = normalizeVietnameseText(cleanPrompt).trim()
 
-            // Nếu Admin đính kèm file JSON Backup (từ nút +), xử lý đọc và xác nhận khôi phục trực tiếp
+            // Nếu đính kèm file JSON Backup (từ nút +), chỉ Admin mới được nạp
             if (attachedFileContent.isNotBlank()) {
+                if (!user.isAdmin()) {
+                    themTinNhanAi(
+                        isUser = false,
+                        text = "Chức năng nạp file sao lưu chỉ dành riêng cho Chủ Spa (Admin). Kỹ thuật viên không thể can thiệp dữ liệu này.",
+                        actionNote = "Từ chối quyền nạp file"
+                    )
+                    aiIsLoading = false
+                    return
+                }
                 val rawJson = attachedFileContent.trim()
                 if (rawJson.startsWith("{")) {
                     val previewObj = runCatching { JSONObject(rawJson) }.getOrNull()
@@ -3156,6 +3165,11 @@ class SpaStore(context: Context) {
      * Tất cả lệnh XÓA, THÊM và SỬA đều yêu cầu xác nhận lại trước khi thực sự thay đổi dữ liệu.
      */
     private fun thucThiLenhTrucTiepTrenApp(prompt: String): KetQuaAiBot? {
+        val user = currentUser
+        if (user?.isAdmin() != true) {
+            // Kỹ thuật viên không được can thiệp vào các lệnh quản trị cơ sở
+            return null
+        }
         val norm = normalizeVietnameseText(prompt).trim()
 
         // 0. LỆNH XÓA / SỬA (YÊU CẦU XÁC NHẬN LẠI TRƯỚC KHI THỰC THI)
@@ -4529,6 +4543,46 @@ class SpaStore(context: Context) {
         attachedFileContent: String = ""
     ): String {
         val today = todayDateStr()
+        val user = currentUser
+        val isAdmin = user?.isAdmin() == true
+
+        if (!isAdmin) {
+            val myId = user?.id.orEmpty()
+            val myVeDangLam = luots.filter { it.dangLam && it.nvId == myId }
+            val myVeChoChot = luots.filter { it.choChot && it.nvId == myId }
+            val myVeDaChotHomNay = luots.filter { it.daHoanTat && it.ngay == today && it.nvId == myId }
+            val myHoaHongHomNay = myVeDaChotHomNay.sumOf { tinhHoaHongVe(it) }
+            val recentHistory = aiMessages.takeLast(40)
+
+            return buildString {
+                appendLine("Bạn là 'gehihi' — TRỢ LÝ HỖ TRỢ KỸ THUẬT VIÊN SPA KHIẾM THỊ VIỆT.")
+                appendLine("Người dùng hiện tại: ${user?.hoTen ?: "Kỹ thuật viên"} (SĐT: ${user?.username ?: "N/A"}).")
+                appendLine("Trình bày sạch sẽ, lịch sự, thân thiện, KHÔNG dùng ký tự sao ** markdown.")
+                appendLine()
+                appendLine("QUY TẮC BẢO MẬT & PHÂN QUYỀN (BẮT BUỘC TUÂN THỦ 100%):")
+                appendLine("1. BẢO VỆ DOANH THU & TÀI CHÍNH QUÁN: Tuyệt đối KHÔNG tiết lộ doanh thu tổng của quán, số dư sổ quỹ, lợi nhuận của chủ quán hay tiền hoa hồng của nhân viên khác. Chỉ trả lời số liệu cá nhân của chính KTV này.")
+                appendLine("2. BẢO VỆ THÔNG TIN KHÁCH HÀNG: Tuyệt đối KHÔNG tiết lộ số điện thoại đầy đủ của khách hàng (nếu nhắc đến phải che 3 số giữa, ví dụ: 0912***345).")
+                appendLine("3. CẤM THAO TÁC QUẢN TRỊ: Tuyệt đối KHÔNG nhận lệnh hoặc thực hiện bất kỳ thao tác quản trị nào như thêm/sửa/xóa nhân viên, thay đổi quyền hạn, sửa giá dịch vụ, xóa vé, hay mở khóa quyền cho KTV. Nếu KTV yêu cầu, hãy từ chối lịch sự: 'Chức năng này thuộc thẩm quyền của Chủ Spa. Bạn không thể thực hiện thao tác này.' Tuyệt đối KHÔNG gắn các thẻ [ACTION:ADD_STAFF], [ACTION:DELETE_STAFF], [ACTION:EDIT_SERVICE], [ACTION:WIPE_ALL_DATA], [ACTION:ADD_FINANCE_CHI], [ACTION:ADD_FINANCE_THU], [ACTION:DELETE_TICKETS].")
+                appendLine("4. TRỢ LÝ CHUYÊN MÔN & THƯỜNG THỨC: Tận dụng toàn bộ trí tuệ Gemini để trả lời mọi câu hỏi kiến thức thường thức, đời sống, khoa học, lịch ngày tháng năm, kỹ thuật massage xoa bóp bấm huyệt phục hồi chức năng, mẹo chăm sóc và giao tiếp thân thiện với khách hàng.")
+                appendLine()
+                appendLine("DỮ LIỆU CÁ NHÂN CỦA KỸ THUẬT VIÊN HÔM NAY (Ca ngày $today):")
+                appendLine("• Đã chốt hôm nay: ${myVeDaChotHomNay.size} vé.")
+                appendLine("• Tổng hoa hồng tạm tính hôm nay: ${formatVnd(myHoaHongHomNay)}.")
+                appendLine("• Vé đang làm: ${myVeDangLam.size} vé | Vé chờ chốt: ${myVeChoChot.size} vé.")
+                appendLine("• Bảng giá dịch vụ của quán (${dvs.size} dịch vụ): ${dvs.joinToString { "${it.ten} (${it.gia}đ)" }}.")
+                appendLine()
+                if (recentHistory.isNotEmpty()) {
+                    appendLine("LỊCH SỬ HỘI THOẠI:")
+                    recentHistory.forEach { m ->
+                        val role = if (m.isUser) (user?.hoTen ?: "KTV") else "gehihi"
+                        appendLine("- $role: ${m.text.take(240)}")
+                    }
+                    appendLine()
+                }
+                appendLine("CÂU HỎI CỦA KỸ THUẬT VIÊN: \"$userQuestion\"")
+            }
+        }
+
         val veDangLam = luots.filter { it.dangLam }
         val veChoChot = luots.filter { it.choChot }
         val veDaChotHomNay = luots.filter { it.daHoanTat && it.ngay == today }
@@ -4644,6 +4698,13 @@ class SpaStore(context: Context) {
         val actionRegex = Regex("\\[ACTION:([^\\]]+)\\]")
         val match = actionRegex.find(rawText)
         val cleanReply = rawText.replace(actionRegex, "").replace("**", "").trim()
+
+        if (currentUser?.isAdmin() != true) {
+            // Kỹ thuật viên không có quyền kích hoạt bất kỳ lệnh quản trị nào
+            return KetQuaAiBot(
+                cauTraLoi = cleanReply.ifBlank { "gehihi đã ghi nhận câu hỏi của bạn." }
+            )
+        }
 
         if (match != null) {
             val parts = match.groupValues[1].split("|")
@@ -5298,6 +5359,44 @@ class SpaStore(context: Context) {
     private fun traLoiThongMinhNoiBo(prompt: String): KetQuaAiBot {
         val norm = normalizeVietnameseText(prompt).trim()
         val today = todayDateStr()
+        val user = currentUser
+
+        if (user?.isAdmin() != true) {
+            // Xử lý thông minh ngoại tuyến dành riêng cho Kỹ thuật viên:
+            if (norm.contains("doanh thu") || norm.contains("hoa hong") || norm.contains("ve") || norm.contains("luot") || norm.contains("tien") || norm.contains("luong")) {
+                val myId = user?.id.orEmpty()
+                val myVe = luots.filter { it.daHoanTat && it.ngay == today && it.nvId == myId }
+                val myDangLam = luots.count { it.dangLam && it.nvId == myId }
+                val myHoaHong = myVe.sumOf { tinhHoaHongVe(it) }
+                return KetQuaAiBot(
+                    cauTraLoi = "Hôm nay (${today}) bạn ${user?.hoTen ?: "KTV"} đã hoàn thành ${myVe.size} vé (đang làm $myDangLam vé).\n" +
+                        "Tổng hoa hồng cá nhân hôm nay: ${formatVnd(myHoaHong)}.\n" +
+                        "(Lưu ý: Doanh thu tổng của cơ sở được bảo mật bởi Chủ Spa).",
+                    hanhDongThucThi = "Báo cáo vé cá nhân",
+                    chuyenTab = 0
+                )
+            }
+            if (norm.contains("dich vu") || norm.contains("gia") || norm.contains("menu")) {
+                val dsDv = dvs.joinToString("\n• ", prefix = "• ") { "${it.ten}: ${formatVnd(it.gia)} (${it.phut} phút)" }
+                return KetQuaAiBot(
+                    cauTraLoi = "Bảng giá dịch vụ của cơ sở:\n$dsDv",
+                    hanhDongThucThi = "Xem dịch vụ",
+                    chuyenTab = 2
+                )
+            }
+            if (norm.contains("tai khoan") || norm.contains("mat khau") || norm.contains("pin") || norm.contains("quyen") || norm.contains("admin")) {
+                return KetQuaAiBot(
+                    cauTraLoi = "Kỹ thuật viên không có quyền xem thông tin tài khoản của nhân sự khác. Nếu bạn muốn đổi mật khẩu PIN hoặc kiểm tra phân quyền, vui lòng liên hệ Chủ Spa để được hỗ trợ.",
+                    hanhDongThucThi = "Từ chối quyền truy cập tài khoản"
+                )
+            }
+            traLoiCauHoiThoiGianVaLich(prompt, norm)?.let { return it }
+            tinhBieuThucToanHoc(prompt)?.let { return KetQuaAiBot(cauTraLoi = it) }
+
+            return KetQuaAiBot(
+                cauTraLoi = "Chào bạn ${user?.hoTen ?: "KTV"}! Hiện tại máy đang ở chế độ ngoại tuyến nên gehihi chỉ có thể đọc dữ liệu vé, dịch vụ và hoa hồng cá nhân của bạn trên máy. Khi có kết nối mạng Internet, gehihi sẽ hỗ trợ trả lời mọi câu hỏi kiến thức và chuyên môn của bạn nhé!"
+            )
+        }
 
         // 0. BỘ THỰC THI LỆNH TRỰC TIẾP (Xóa, Sửa, Thêm, Điều hướng, Mở vé, Sổ quỹ...):
         // Khi Gemini mất mạng hoặc không phản hồi, thực thi ngay các khẩu lệnh của Admin

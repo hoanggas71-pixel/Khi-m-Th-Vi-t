@@ -555,7 +555,7 @@ fun KhiemThiVietApp(store: SpaStore) {
         )
     }
 
-    if (showAiBotDialog && isAdmin) {
+    if (showAiBotDialog) {
         AdminAiAssistantBotDialog(
             store = store,
             onNavigateTab = { targetTab ->
@@ -1048,16 +1048,17 @@ fun SpaHeaderBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                if (isAdmin) {
-                    Surface(
-                        onClick = onOpenAiBot,
-                        color = SpaChampagne.copy(alpha = 0.25f),
-                        shape = RoundedCornerShape(50),
-                        border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.7f)),
-                        modifier = Modifier
-                            .semantics { contentDescription = "Mở trợ lý AI gehihi cho Admin" }
-                            .testTag("btn_ai_assistant")
-                    ) {
+                Surface(
+                    onClick = onOpenAiBot,
+                    color = SpaChampagne.copy(alpha = 0.25f),
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.7f)),
+                    modifier = Modifier
+                        .semantics {
+                            contentDescription = if (isAdmin) "Mở trợ lý AI gehihi cho Chủ Spa" else "Mở trợ lý AI gehihi cho Kỹ thuật viên"
+                        }
+                        .testTag("btn_ai_assistant")
+                ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -1078,7 +1079,6 @@ fun SpaHeaderBar(
                                 softWrap = false
                             )
                         }
-                    }
                 }
 
                 Surface(
@@ -7115,17 +7115,30 @@ fun AdminAiAssistantBotDialog(
         chatScrollState.animateScrollTo(chatScrollState.maxValue)
     }
 
-    val quickCommands = listOf(
-        "Chuyển hướng tới mục nhân viên",
-        "Xóa bớt ngẫu nhiên 1 nhân viên rồi báo cáo",
-        "Mai là thứ mấy?",
-        "Báo cáo doanh thu hôm nay",
-        "Sửa mail admin",
-        "Sửa dịch vụ Chườm đá nóng giá 80k hoa hồng 30k",
-        "Hoàn thành tất cả vé đang làm",
-        "Chốt tất cả vé đang chờ",
-        "Bảng lương hoa hồng KTV tháng này"
-    )
+    val currentUser = store.currentUser
+    val isAdmin = currentUser.isAdmin()
+
+    val quickCommands = if (isAdmin) {
+        listOf(
+            "Chuyển hướng tới mục nhân viên",
+            "Mai là thứ mấy?",
+            "Báo cáo doanh thu hôm nay",
+            "Sửa mail admin",
+            "Sửa dịch vụ Chườm đá nóng giá 80k hoa hồng 30k",
+            "Hoàn thành tất cả vé đang làm",
+            "Chốt tất cả vé đang chờ",
+            "Bảng lương hoa hồng KTV tháng này"
+        )
+    } else {
+        listOf(
+            "Hôm nay tôi đã làm được mấy vé?",
+            "Hoa hồng hôm nay của tôi là bao nhiêu?",
+            "Mai là thứ mấy?",
+            "Gợi ý kỹ thuật massage bấm huyệt cổ vai gáy",
+            "Mẹo chăm sóc khách hàng giúp khách thư giãn",
+            "Danh sách dịch vụ của quán"
+        )
+    }
 
     val handleActionAutoClose: (String) -> Unit = { summary ->
         Toast.makeText(
@@ -7193,7 +7206,7 @@ fun AdminAiAssistantBotDialog(
                         border = BorderStroke(1.dp, geminiChipBorder)
                     ) {
                         Text(
-                            text = "Pro • ${store.aiLongTermMemories.size} nhớ",
+                            text = if (isAdmin) "Chủ Spa • ${store.aiLongTermMemories.size} nhớ" else "Kỹ thuật viên • Trợ lý",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = geminiAccentBlue,
@@ -7309,7 +7322,7 @@ fun AdminAiAssistantBotDialog(
                                     .fillMaxWidth(0.85f)
                                     .semantics(mergeDescendants = true) {
                                         liveRegion = LiveRegionMode.Polite
-                                        contentDescription = "Admin: $displayMsgText"
+                                        contentDescription = "${if (isAdmin) "Chủ Spa" else "Kỹ thuật viên"}: $displayMsgText"
                                     }
                             ) {
                                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
@@ -7790,7 +7803,7 @@ fun AdminAiAssistantBotDialog(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
-                                        text = "Full Quyền ▾",
+                                        text = if (isAdmin) "Full Quyền ▾" else "KTV ▾",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = geminiTextPrimary

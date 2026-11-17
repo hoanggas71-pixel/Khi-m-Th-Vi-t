@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bản Demo Xem Trước - Khiếm Thị Việt SaaS</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    .phone-frame {
+      width: 380px;
+      height: 720px;
+      border: 12px solid #1e293b;
+      border-radius: 40px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #0f172a;
+      position: relative;
+    }
+    .phone-notch {
+      width: 140px;
+      height: 22px;
+      background: #1e293b;
+      border-bottom-left-radius: 14px;
+      border-bottom-right-radius: 14px;
+      margin: 0 auto;
+      z-index: 50;
+    }
+    .screen-content {
+      flex: 1;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+    /* Custom scrollbar */
+    .screen-content::-webkit-scrollbar {
+      width: 4px;
+    }
+    .screen-content::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 flex flex-col items-center justify-center font-sans antialiased">
+
+  <!-- Header bar -->
+  <div class="max-w-4xl w-full mb-4 flex items-center justify-between px-2">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+        <h1 class="text-xl font-bold text-white tracking-wide">Mô Phỏng Trực Quan App "Khiếm Thị Việt"</h1>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Bản xem trước tương tác của 4 module mới trước khi cài file APK</p>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="switchScreen('gehihi-ai')" class="tab-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition" data-target="gehihi-ai">🤖 Gehihi AI (KTV & Admin)</button>
+      <button onclick="switchScreen('dev-console')" class="tab-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition" data-target="dev-console">👑 Dev Console</button>
+      <button onclick="switchScreen('kill-switch')" class="tab-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition" data-target="kill-switch">🔒 Kill-Switch</button>
+      <button onclick="switchScreen('vietqr')" class="tab-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition" data-target="vietqr">💳 VietQR</button>
+    </div>
+  </div>
+
+  <!-- Main Container with Phone Simulator & Info Panel -->
+  <div class="max-w-4xl w-full flex flex-col md:flex-row items-center justify-center gap-8">
+    
+    <!-- Phone Mockup Frame -->
+    <div class="phone-frame">
+      <!-- Top Speaker / Notch -->
+      <div class="phone-notch"></div>
+      
+      <!-- Status bar -->
+      <div class="px-5 py-1 flex items-center justify-between text-[11px] text-slate-400 select-none">
+        <span id="clock">11:30</span>
+        <div class="flex items-center gap-1.5">
+          <span>5G</span>
+          <span>📶</span>
+          <span>🔋 95%</span>
+        </div>
+      </div>
+
+      <!-- App Screen Content (Dynamic) -->
+      <div id="screen-container" class="screen-content p-4">
+        
+        <!-- SCREEN 1: DEV SUPER ADMIN CONSOLE -->
+        <div id="screen-dev-console" class="space-y-4">
+          <!-- Header -->
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div>
+              <span class="text-[10px] uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">Super Admin</span>
+              <h2 class="text-base font-bold text-white mt-1">👑 Quản Trị Hệ Thống SaaS</h2>
+            </div>
+            <button onclick="showToast('Đã làm mới dữ liệu hệ thống!')" class="text-xs bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-slate-300">🔄 Làm mới</button>
+          </div>
+
+          <!-- Quick Stats Cards -->
+          <div class="grid grid-cols-3 gap-2">
+            <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700 text-center">
+              <div class="text-[10px] text-slate-400">Tổng Spa</div>
+              <div class="text-lg font-extrabold text-indigo-400">3</div>
+            </div>
+            <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700 text-center">
+              <div class="text-[10px] text-slate-400">Đang bật</div>
+              <div class="text-lg font-extrabold text-emerald-400" id="stat-active-count">2</div>
+            </div>
+            <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700 text-center">
+              <div class="text-[10px] text-slate-400">Tạm khóa</div>
+              <div class="text-lg font-extrabold text-rose-400" id="stat-locked-count">1</div>
+            </div>
+          </div>
+
+          <!-- Active Spa List -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-xs font-semibold text-slate-300">Danh sách cơ sở Spa đối tác</h3>
+              <button onclick="showToast('Mở hộp thoại tạo Spa mới!')" class="text-[11px] text-indigo-400 hover:text-indigo-300">+ Thêm cơ sở</button>
+            </div>
+
+            <!-- Card Spa 1 -->
+            <div class="bg-slate-800/90 rounded-2xl p-3 border border-slate-700 mb-2.5 space-y-2">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400" id="dot-spa-1"></span>
+                    <span class="font-bold text-xs text-white">Spa Khiếm Thị Việt (CS1)</span>
+                  </div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">📞 0397772963 • Gói: <span class="text-amber-400 font-medium">VIP 1 Năm</span></div>
+                  <div class="text-[10px] text-slate-400">Hạn dùng: <span class="text-slate-200">17/11/2027</span> (Còn 365 ngày)</div>
+                </div>
+                <!-- Kill Switch Toggle Button -->
+                <button id="btn-toggle-spa1" onclick="toggleSpaStatus('spa-1')" class="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition">
+                  Đang mở
+                </button>
+              </div>
+
+              <!-- Action buttons -->
+              <div class="flex items-center gap-1.5 pt-1 border-t border-slate-700/60">
+                <button onclick="extendPlan('Spa CS1', 30)" class="flex-1 py-1 text-[10px] font-medium bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200 text-center transition">➕ Gia hạn 30 ngày</button>
+                <button onclick="viewAsSpa('Spa Khiếm Thị Việt (CS1)')" class="flex-1 py-1 text-[10px] font-medium bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50 rounded-lg text-center transition">👁 Góc nhìn Spa</button>
+              </div>
+            </div>
+
+            <!-- Card Spa 2 -->
+            <div class="bg-slate-800/90 rounded-2xl p-3 border border-slate-700 mb-2.5 space-y-2">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400" id="dot-spa-2"></span>
+                    <span class="font-bold text-xs text-white">Spa Hương Sen Ánh Dương</span>
+                  </div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">📞 0988123456 • Gói: <span class="text-blue-400 font-medium">Cơ bản 3 Tháng</span></div>
+                  <div class="text-[10px] text-slate-400">Hạn dùng: <span class="text-slate-200">15/01/2027</span> (Còn 59 ngày)</div>
+                </div>
+                <button id="btn-toggle-spa2" onclick="toggleSpaStatus('spa-2')" class="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition">
+                  Đang mở
+                </button>
+              </div>
+              <div class="flex items-center gap-1.5 pt-1 border-t border-slate-700/60">
+                <button onclick="extendPlan('Spa Ánh Dương', 30)" class="flex-1 py-1 text-[10px] font-medium bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-200 text-center transition">➕ Gia hạn 30 ngày</button>
+                <button onclick="viewAsSpa('Spa Ánh Dương')" class="flex-1 py-1 text-[10px] font-medium bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50 rounded-lg text-center transition">👁 Góc nhìn Spa</button>
+              </div>
+            </div>
+
+            <!-- Card Spa 3 (Đã khóa mẫu) -->
+            <div class="bg-slate-800/50 rounded-2xl p-3 border border-rose-900/40 mb-2.5 space-y-2 opacity-85">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span class="font-bold text-xs text-slate-300 line-through">Spa Hoa Ban Trắng</span>
+                  </div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">📞 0912345678 • <span class="text-rose-400 font-medium">Hết hạn SaaS</span></div>
+                  <div class="text-[10px] text-rose-400/80">Lý do: Đã quá hạn 7 ngày chưa gia hạn</div>
+                </div>
+                <button onclick="switchScreen('kill-switch')" class="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 transition">
+                  Đã khóa
+                </button>
+              </div>
+              <div class="flex items-center gap-1.5 pt-1 border-t border-slate-700/60">
+                <button onclick="extendPlan('Spa Hoa Ban', 30)" class="flex-1 py-1 text-[10px] font-medium bg-emerald-600/40 hover:bg-emerald-600/60 rounded-lg text-emerald-200 text-center transition">🔓 Mở khóa & Gia hạn</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- SCREEN 2: KILL-SWITCH LOCKED SCREEN -->
+        <div id="screen-kill-switch" class="hidden h-full flex flex-col items-center justify-center text-center p-2 space-y-4">
+          <div class="w-16 h-16 rounded-full bg-rose-500/20 border-2 border-rose-500 flex items-center justify-center text-3xl animate-bounce">
+            🔒
+          </div>
+          <div>
+            <span class="text-[10px] uppercase font-bold tracking-wider text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">TalkBack Cảnh Báo</span>
+            <h2 class="text-lg font-bold text-white mt-1">Cơ Sở Tạm Khóa Hoạt Động</h2>
+            <p class="text-xs text-slate-400 mt-1 max-w-[280px]">
+              Tài khoản cơ sở Spa này hiện đang tạm ngưng do hết hạn gói cước SaaS hoặc yêu cầu bảo trì từ Quản trị viên.
+            </p>
+          </div>
+
+          <!-- QR Gia hạn nhanh -->
+          <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 flex flex-col items-center space-y-2 w-full max-w-[260px]">
+            <div class="text-[11px] font-semibold text-slate-300">Quét mã Napas 247 để tự động mở khóa</div>
+            <div class="w-32 h-32 bg-white p-1 rounded-xl flex items-center justify-center">
+              <!-- Simulated QR -->
+              <div class="w-full h-full bg-slate-900 rounded p-1 flex flex-col items-center justify-center text-center text-white">
+                <span class="text-2xl">📱</span>
+                <span class="text-[8px] font-mono mt-1 text-emerald-400">VIETQR NAPAS 247</span>
+                <span class="text-[7px] text-slate-400">MBBANK • 0397772963</span>
+              </div>
+            </div>
+            <div class="text-[10px] text-slate-400">Số tiền: <span class="font-bold text-emerald-400">500.000 đ / tháng</span></div>
+          </div>
+
+          <!-- Hotline Button -->
+          <div class="w-full space-y-2">
+            <button onclick="showToast('Đang kết nối cuộc gọi tới Hotline 0397772963...')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition">
+              <span>📞</span> Gọi Hotline Quản Trị (0397772963)
+            </button>
+            <button onclick="switchScreen('dev-console')" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl transition">
+              Quay lại Dev Console
+            </button>
+          </div>
+        </div>
+
+        <!-- SCREEN 3: DUAL PAYMENT (TIEN MAT & VIETQR NAPAS) -->
+        <div id="screen-vietqr" class="hidden space-y-3">
+          <div class="bg-indigo-600/20 border border-indigo-500/30 p-2.5 rounded-xl flex items-center gap-2">
+            <span class="text-lg">💵💳</span>
+            <div class="text-xs">
+              <div class="font-bold text-indigo-300">Hoàn thành vé & Chọn hình thức thanh toán</div>
+              <div class="text-[10px] text-slate-400">Hỗ trợ cả Tiền mặt (tính tiền thối) & VietQR Napas 247</div>
+            </div>
+          </div>
+
+          <!-- Simulated Ticket Card -->
+          <div class="bg-slate-800 rounded-2xl p-3 border border-slate-700 space-y-2">
+            <div class="flex items-center justify-between text-xs pb-1 border-b border-slate-700">
+              <span class="font-semibold text-slate-300">Vé: #VE-20261117-08</span>
+              <span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-medium">Chờ thanh toán</span>
+            </div>
+            <div class="text-xs space-y-1">
+              <div class="flex justify-between"><span class="text-slate-400">Khách:</span><span class="text-white font-medium">Anh Hoàng (0912***345)</span></div>
+              <div class="flex justify-between"><span class="text-slate-400">Dịch vụ:</span><span class="text-white font-medium">Massage Trị liệu Cổ Vai Gáy 60'</span></div>
+              <div class="flex justify-between"><span class="text-slate-400">KTV:</span><span class="text-white font-medium">Thu Hằng (KTV 02)</span></div>
+              <div class="flex justify-between text-sm pt-1 border-t border-slate-700">
+                <span class="font-bold text-slate-300">Tổng thanh toán:</span>
+                <span class="font-bold text-emerald-400">250.000 đ</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment Method Toggle -->
+          <div class="bg-slate-800/90 rounded-2xl p-3 border border-slate-700 space-y-2.5">
+            <div class="text-xs font-semibold text-slate-300">Chọn phương thức khách trả:</div>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="pay-mode-cash" onclick="setPayMode('cash')" class="py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow transition flex items-center justify-center gap-1.5">
+                <span>💵</span> Tiền mặt tại quầy
+              </button>
+              <button id="pay-mode-vietqr" onclick="setPayMode('vietqr')" class="py-2 rounded-xl text-xs font-bold bg-slate-700 text-slate-300 hover:bg-slate-600 transition flex items-center justify-center gap-1.5">
+                <span>💳</span> VietQR Chuyển khoản
+              </button>
+            </div>
+
+            <!-- Cash Payment Sub-box -->
+            <div id="cash-box" class="space-y-2 pt-1 border-t border-slate-700/60">
+              <div class="text-[11px] text-slate-400">Tiền khách đưa:</div>
+              <div class="grid grid-cols-3 gap-1.5">
+                <button onclick="setCashGiven(250000)" class="py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-200">Đủ 250k</button>
+                <button onclick="setCashGiven(300000)" class="py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-200">300.000 đ</button>
+                <button onclick="setCashGiven(500000)" class="py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] text-slate-200">500.000 đ</button>
+              </div>
+              <input type="number" id="cash-input" value="300000" oninput="calcChange()" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white font-mono" placeholder="Nhập số tiền khách đưa...">
+              <div id="change-result" class="p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 font-bold flex justify-between">
+                <span>👉 Tiền thối lại khách:</span>
+                <span>50.000 đ</span>
+              </div>
+            </div>
+
+            <!-- VietQR Sub-box -->
+            <div id="qr-box" class="hidden space-y-2 pt-1 border-t border-slate-700/60 text-center">
+              <div class="w-32 h-32 mx-auto bg-white p-1 rounded-xl shadow-lg flex flex-col items-center justify-center">
+                <div class="w-full h-full bg-slate-950 rounded flex flex-col items-center justify-center p-1 text-white">
+                  <div class="text-[8px] font-bold text-emerald-400">VIETQR NAPAS</div>
+                  <div class="text-lg my-0.5">📲</div>
+                  <div class="text-[7px] font-mono text-slate-300">MBBANK - 0397772963</div>
+                  <div class="text-[8px] font-bold text-emerald-300">250.000 VND</div>
+                </div>
+              </div>
+              <div class="text-[10px] text-slate-400">Nội dung CK: <span class="font-mono text-amber-400 font-bold">VE 08 HOANG</span></div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button onclick="speakTalkBack('Đã thu hai trăm năm mươi nghìn đồng, tiền thối lại năm mươi nghìn đồng')" class="py-2 bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 rounded-xl text-[11px] font-semibold hover:bg-indigo-600/50 transition">
+                🔊 Đọc TalkBack
+              </button>
+              <button onclick="confirmTicketDone()" class="py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[11px] font-bold shadow-lg shadow-emerald-900/30 transition">
+                ✓ Xác nhận chốt vé
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN 4: BANK CONFIGURATION -->
+        <div id="screen-bank-config" class="hidden space-y-3">
+          <div class="border-b border-slate-800 pb-2">
+            <span class="text-[10px] uppercase font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">Tab 6 • Cấu hình Spa</span>
+            <h2 class="text-sm font-bold text-white mt-1">🏦 Tài Khoản Ngân Hàng Nhận Tiền</h2>
+            <p class="text-[11px] text-slate-400">Thông tin này dùng để tự động tạo mã QR khi khách thanh toán tại quầy</p>
+          </div>
+
+          <div class="bg-slate-800 rounded-2xl p-3 border border-slate-700 space-y-3">
+            <div>
+              <label class="text-[11px] font-medium text-slate-300 block mb-1">Ngân hàng thụ hưởng:</label>
+              <select id="bank-select" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl p-2 focus:ring-1 focus:ring-indigo-500">
+                <option value="MB">MBBank - Ngân hàng Quân Đội (Khuyên dùng)</option>
+                <option value="VCB">Vietcombank - Ngân hàng Ngoại Thương</option>
+                <option value="TCB">Techcombank - Kỹ Thương Việt Nam</option>
+                <option value="ICB">VietinBank - Công Thương Việt Nam</option>
+                <option value="BIDV">BIDV - Đầu tư và Phát triển VN</option>
+                <option value="VPB">VPBank - Việt Nam Thịnh Vượng</option>
+                <option value="ACB">ACB - Á Châu</option>
+                <option value="TPB">TPBank - Tiên Phong</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-[11px] font-medium text-slate-300 block mb-1">Số tài khoản nhận tiền:</label>
+              <input type="text" id="bank-acc" value="0397772963" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl p-2 font-mono focus:ring-1 focus:ring-indigo-500" placeholder="Nhập số tài khoản...">
+            </div>
+
+            <div>
+              <label class="text-[11px] font-medium text-slate-300 block mb-1">Tên chủ tài khoản (Không dấu):</label>
+              <input type="text" id="bank-name" value="NGUYEN VAN HOANG" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl p-2 uppercase font-medium focus:ring-1 focus:ring-indigo-500" placeholder="VD: NGUYEN VAN A">
+            </div>
+
+            <div class="flex items-center gap-2 pt-1">
+              <input type="checkbox" id="bank-active" checked class="w-4 h-4 rounded text-indigo-600 bg-slate-900 border-slate-700">
+              <label for="bank-active" class="text-xs text-slate-300 select-none">Bật thanh toán VietQR động khi xuất vé</label>
+            </div>
+
+            <button onclick="saveBankConfig()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition">
+              💾 Lưu Cấu Hình Ngân Hàng
+            </button>
+          </div>
+        </div>
+
+        <!-- SCREEN 5: TRỢ LÝ GEHIHI AI (ADMIN vs KTV) -->
+        <div id="screen-gehihi-ai" class="space-y-3">
+          <!-- Role Switcher -->
+          <div class="bg-slate-800/90 p-2 rounded-xl border border-slate-700 flex items-center justify-between">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tài khoản đang đăng nhập:</span>
+            <div class="flex gap-1.5">
+              <button id="role-admin-btn" onclick="setGehihiRole('admin')" class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-500 text-slate-900 shadow">👑 Chủ Spa</button>
+              <button id="role-staff-btn" onclick="setGehihiRole('staff')" class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600">💆 KTV Lan</button>
+            </div>
+          </div>
+
+          <!-- Gehihi Header -->
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center gap-2">
+              <span class="text-indigo-400 text-base">✨</span>
+              <span class="font-extrabold text-white text-sm">gehihi</span>
+              <span id="gehihi-badge" class="text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full text-indigo-300 font-semibold">Chủ Spa • 12 nhớ</span>
+            </div>
+            <span id="gehihi-pill" class="text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full text-slate-300 font-medium">Full Quyền ▾</span>
+          </div>
+
+          <!-- Chat Box -->
+          <div id="chat-messages" class="h-64 overflow-y-auto space-y-2.5 pr-1 text-xs bg-slate-950/50 p-2 rounded-xl border border-slate-800/80">
+            <!-- Messages inserted dynamically -->
+          </div>
+
+          <!-- Quick Suggestions -->
+          <div>
+            <div class="text-[10px] text-slate-400 mb-1 font-semibold">💡 Thử nhanh các câu hỏi mẫu:</div>
+            <div id="quick-prompt-chips" class="flex flex-wrap gap-1.5">
+              <!-- Chips inserted dynamically -->
+            </div>
+          </div>
+
+          <!-- Input Box -->
+          <div class="flex gap-1.5 pt-1">
+            <input type="text" id="ai-input" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="Nhắn tin cho gehihi hoặc bấm gợi ý...">
+            <button onclick="sendAiMessage()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow">Gửi</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Android Bottom Navigation Bar (Simulated) -->
+      <div class="h-12 bg-slate-900 border-t border-slate-800 flex items-center justify-around text-slate-400 text-[10px]">
+        <button onclick="showToast('Chuyển Tab Lễ tân')" class="flex flex-col items-center hover:text-white"><span>🛎</span><span>Lễ tân</span></button>
+        <button onclick="showToast('Chuyển Tab KTV')" class="flex flex-col items-center hover:text-white"><span>💆</span><span>KTV</span></button>
+        <button onclick="showToast('Chuyển Tab Thu chi')" class="flex flex-col items-center hover:text-white"><span>💰</span><span>Thu chi</span></button>
+        <button onclick="showToast('Chuyển Tab Khách hàng')" class="flex flex-col items-center hover:text-white"><span>👥</span><span>Khách</span></button>
+        <button onclick="showToast('Chuyển Tab Thống kê')" class="flex flex-col items-center hover:text-white"><span>📊</span><span>Báo cáo</span></button>
+        <button onclick="switchScreen('dev-console')" class="flex flex-col items-center text-indigo-400 font-bold"><span>👑</span><span>Dev</span></button>
+      </div>
+    </div>
+
+    <!-- Right Side: Explanation and Live Guide Panel -->
+    <div class="flex-1 max-w-md space-y-4">
+      <div class="bg-slate-800/80 rounded-2xl p-4 border border-slate-700 shadow-xl space-y-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">💡</span>
+          <h3 class="text-sm font-bold text-white">Hướng Dẫn Kiểm Thử Bản Demo</h3>
+        </div>
+        <p class="text-xs text-slate-300 leading-relaxed">
+          Bạn có thể bấm vào 4 nút ở góc trên (hoặc thao tác trực tiếp trên chiếc điện thoại mô phỏng bên trái) để trải nghiệm trước từng chức năng:
+        </p>
+
+        <div class="space-y-2 text-xs">
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
+            <div class="font-bold text-indigo-400">1. 👑 Developer Super Admin Console (Tab 6)</div>
+            <div class="text-slate-400 text-[11px] mt-0.5">Dành cho số điện thoại Dev (<span class="text-slate-200">0397772963</span>). Cho phép quản lý toàn bộ cơ sở Spa, theo dõi thời hạn hợp đồng SaaS và bật tắt hoạt động tức thì.</div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
+            <div class="font-bold text-rose-400">2. 🔒 Cơ chế Khóa Kill-Switch từ xa</div>
+            <div class="text-slate-400 text-[11px] mt-0.5">Khi một cơ sở hết hạn hợp đồng hoặc bị tắt trong Dev Console, app tại cơ sở đó sẽ lập tức chuyển sang màn hình khóa chuẩn TalkBack với nút gọi Hotline và mã QR nạp tiền gia hạn.</div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
+            <div class="font-bold text-emerald-400">3. 💳 Cổng thanh toán VietQR Động</div>
+            <div class="text-slate-400 text-[11px] mt-0.5">Mỗi khi hoàn thành một vé dịch vụ, app sẽ tự sinh mã QR Napas 247 đúng số tiền vé, khách hàng chỉ cần quét mã là thanh toán chuẩn xác không cần gõ tay.</div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
+            <div class="font-bold text-amber-400">4. ⚙️ Cấu hình Ngân hàng cơ sở</div>
+            <div class="text-slate-400 text-[11px] mt-0.5">Chủ Spa tự cài đặt số tài khoản và ngân hàng thụ hưởng tại Tab Admin để tiền chuyển thẳng vào tài khoản của mình.</div>
+          </div>
+        </div>
+
+        <!-- Status Notification Box -->
+        <div id="toast-box" class="hidden p-3 rounded-xl bg-emerald-500/20 border border-emerald-500 text-emerald-300 text-xs font-semibold text-center transition">
+          Thông báo tương tác
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Screen switcher
+    function switchScreen(screenId) {
+      document.getElementById('screen-gehihi-ai').classList.add('hidden');
+      document.getElementById('screen-dev-console').classList.add('hidden');
+      document.getElementById('screen-kill-switch').classList.add('hidden');
+      document.getElementById('screen-vietqr').classList.add('hidden');
+      document.getElementById('screen-bank-config').classList.add('hidden');
+
+      const target = document.getElementById('screen-' + screenId);
+      if (target) {
+        target.classList.remove('hidden');
+      }
+
+      // Update tab buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.getAttribute('data-target') === screenId) {
+          btn.classList.remove('bg-slate-800', 'text-slate-300');
+          btn.classList.add('bg-indigo-600', 'text-white');
+        } else {
+          btn.classList.remove('bg-indigo-600', 'text-white');
+          btn.classList.add('bg-slate-800', 'text-slate-300');
+        }
+      });
+    }
+
+    // Gehihi AI Simulation (Role-Based Access Control)
+    let gehihiRole = 'admin';
+    const rolePrompts = {
+      admin: [
+        { text: "Báo cáo doanh thu hôm nay", type: "revenue" },
+        { text: "Thêm nhân viên Hoài 0968608795", type: "add_staff" },
+        { text: "Hoàn thành tất cả vé đang làm", type: "complete_tickets" },
+        { text: "Bảng lương hoa hồng KTV tháng này", type: "payroll" }
+      ],
+      staff: [
+        { text: "Hôm nay tôi đã làm được mấy vé?", type: "my_tickets" },
+        { text: "Hoa hồng hôm nay của tôi là bao nhiêu?", type: "my_commission" },
+        { text: "Báo cáo doanh thu quán hôm nay", type: "security_test" },
+        { text: "Gợi ý kỹ thuật massage bấm huyệt vai gáy", type: "technique" }
+      ]
+    };
+
+    function setGehihiRole(role) {
+      gehihiRole = role;
+      const btnAdmin = document.getElementById('role-admin-btn');
+      const btnStaff = document.getElementById('role-staff-btn');
+      const badge = document.getElementById('gehihi-badge');
+      const pill = document.getElementById('gehihi-pill');
+
+      if (role === 'admin') {
+        btnAdmin.className = 'px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-500 text-slate-900 shadow';
+        btnStaff.className = 'px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600';
+        badge.innerText = 'Chủ Spa • 12 nhớ';
+        badge.className = 'text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full text-indigo-300 font-semibold';
+        pill.innerText = 'Full Quyền ▾';
+        showToast('👑 Đang xem giao diện Trợ lý Gehihi của Chủ Spa (Admin)');
+      } else {
+        btnStaff.className = 'px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-500 text-slate-900 shadow';
+        btnAdmin.className = 'px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600';
+        badge.innerText = 'Kỹ thuật viên • Trợ lý';
+        badge.className = 'text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full text-emerald-300 font-semibold';
+        pill.innerText = 'KTV ▾';
+        showToast('💆 Đang xem giao diện Trợ lý Gehihi của Kỹ thuật viên (KTV Lan)');
+      }
+      renderQuickChips();
+      resetChatMessages();
+    }
+
+    function renderQuickChips() {
+      const container = document.getElementById('quick-prompt-chips');
+      container.innerHTML = '';
+      rolePrompts[gehihiRole].forEach(p => {
+        const chip = document.createElement('button');
+        chip.className = 'px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 text-[10px] font-medium transition hover:border-slate-500 text-left';
+        chip.innerText = p.text;
+        chip.onclick = () => triggerPrompt(p);
+        container.appendChild(chip);
+      });
+    }
+
+    function resetChatMessages() {
+      const chat = document.getElementById('chat-messages');
+      chat.innerHTML = '';
+      if (gehihiRole === 'admin') {
+        appendMessage('gehihi', 'Chào Chủ Spa! gehihi là cố vấn kinh doanh và trợ lý điều hành full quyền của bạn. Hôm nay quán có 18 vé chốt, tổng thu 3.420.000đ, hoa hồng KTV 1.470.000đ, lãi ròng 1.950.000đ. Bạn cần tôi hỗ trợ gì?');
+      } else {
+        appendMessage('gehihi', 'Chào bạn Lan! gehihi là trợ lý cá nhân dành cho Kỹ thuật viên. Hôm nay bạn đã phục vụ 4 vé, tổng hoa hồng cá nhân là 280.000đ. Tôi có thể hỗ trợ giải đáp chuyên môn massage và mọi kiến thức đời sống cho bạn!');
+      }
+    }
+
+    function appendMessage(sender, text) {
+      const chat = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      if (sender === 'user') {
+        div.className = 'p-2 rounded-xl bg-indigo-600/30 border border-indigo-500/40 text-slate-100 ml-6 text-right';
+        div.innerHTML = `<span class="text-[9px] text-indigo-300 font-bold block mb-0.5">${gehihiRole === 'admin' ? 'Chủ Spa' : 'KTV Lan'}</span>${text}`;
+      } else {
+        div.className = 'p-2 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-200 mr-4';
+        div.innerHTML = `<div class="flex items-center gap-1.5 mb-1"><span class="text-indigo-400">✨</span><span class="font-bold text-white text-[10px]">gehihi</span></div>${text}`;
+      }
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function triggerPrompt(p) {
+      appendMessage('user', p.text);
+      setTimeout(() => {
+        if (gehihiRole === 'admin') {
+          if (p.type === 'revenue') {
+            appendMessage('gehihi', '📊 Báo cáo doanh thu hôm nay (Ca ngày 17/11):\n• 18 vé hoàn tất: 3.420.000đ\n• Hoa hồng KTV: -1.470.000đ (43%)\n• Chi phát sinh ngoài: -250.000đ\n👉 LÃI RÒNG CHỦ NHẬN: 1.700.000đ');
+          } else if (p.type === 'add_staff') {
+            appendMessage('gehihi', '✅ gehihi đã chuẩn bị lệnh Thêm nhân viên:\n• Họ tên: Mai Văn Hoài\n• SĐT: 0968608795\n• Giới tính: Nam | Mật khẩu: 1234\n👉 Đã tạo thẻ xác nhận 1 chạm cho Admin.');
+          } else if (p.type === 'complete_tickets') {
+            appendMessage('gehihi', '✅ Đã hoàn thành toàn bộ 3 vé đang làm sang trạng thái Chờ chốt.');
+          } else {
+            appendMessage('gehihi', '📋 Bảng lương hoa hồng KTV tháng này:\n• Lan: 42 lượt — 2.940.000đ\n• Hùng: 38 lượt — 2.660.000đ\n• Mai: 31 lượt — 2.170.000đ\nTổng hoa hồng đã trích: 7.770.000đ');
+          }
+        } else {
+          // STAFF ROLE (RBAC STRICT CHECKS)
+          if (p.type === 'my_tickets') {
+            appendMessage('gehihi', '💆 Hôm nay (17/11) bạn Lan đã làm được 4 vé:\n1. 09:15 - Khách Tuấn (Trị liệu 60p)\n2. 11:30 - Khách Hương (Xoa bóp bấm huyệt 90p)\n3. 14:00 - Khách Minh (Cổ vai gáy 60p)\n4. 16:45 - Khách vãng lai (Ngâm chân thảo dược)\nHiện không có vé nào đang làm.');
+          } else if (p.type === 'my_commission') {
+            appendMessage('gehihi', '💰 Hoa hồng hôm nay của bạn Lan:\n• Vé 1 (60p): 70.000đ\n• Vé 2 (90p): 100.000đ\n• Vé 3 (60p): 70.000đ\n• Vé 4 (ngâm chân): 40.000đ\n👉 Tổng hoa hồng hôm nay: 280.000đ.');
+          } else if (p.type === 'security_test') {
+            appendMessage('gehihi', '🔒 Bạn đang đăng nhập bằng tài khoản Kỹ thuật viên (Nhân viên). Doanh thu tổng của cơ sở được bảo mật bởi Chủ Spa. Bạn chỉ có quyền xem số lượt làm và hoa hồng cá nhân của chính mình thôi nhé!');
+          } else if (p.type === 'technique') {
+            appendMessage('gehihi', '💡 Hướng dẫn kỹ thuật massage cổ vai gáy (Gemini AI):\n1. Khởi động: Dùng lòng bàn tay miết nhẹ dọc cơ thang từ chân gáy ra khớp vai (3-5 phút).\n2. Bấm huyệt: Ấn vừa lực vào huyệt Phong Trì (hõm sau gáy), huyệt Kiên Tỉnh (điểm cao nhất của vai), giữ 5 giây rồi nhả.\n3. Nhào cơ: Dùng các đầu ngón tay day bóp vùng cơ cạnh cột sống cổ để giải tỏa co thắt.\n4. Kết thúc: Vỗ nhẹ và rung cơ thả lỏng.');
+          } else {
+            appendMessage('gehihi', 'gehihi đã ghi nhận câu hỏi của bạn. Chúc bạn một ngày làm việc thật vui vẻ!');
+          }
+        }
+      }, 400);
+    }
+
+    function sendAiMessage() {
+      const input = document.getElementById('ai-input');
+      const val = input.value.trim();
+      if (!val) return;
+      input.value = '';
+      appendMessage('user', val);
+      setTimeout(() => {
+        if (gehihiRole === 'staff' && (val.includes('doanh thu') || val.includes('sổ quỹ') || val.includes('xóa') || val.includes('thêm nv'))) {
+          appendMessage('gehihi', '🔒 Chức năng quản trị và xem doanh thu tổng thuộc thẩm quyền của Chủ Spa. Tài khoản Kỹ thuật viên không có quyền thực hiện thao tác này.');
+        } else {
+          appendMessage('gehihi', `🤖 gehihi (Gemini AI): Tôi đã tiếp nhận câu hỏi "${val}". Đây là câu trả lời chi tiết và thông minh dành cho bạn!`);
+        }
+      }, 500);
+    }
+
+    // Dual Payment mode logic
+    let currentPayMode = 'cash';
+    function setPayMode(mode) {
+      currentPayMode = mode;
+      const btnCash = document.getElementById('pay-mode-cash');
+      const btnQr = document.getElementById('pay-mode-vietqr');
+      const cashBox = document.getElementById('cash-box');
+      const qrBox = document.getElementById('qr-box');
+
+      if (mode === 'cash') {
+        btnCash.className = 'py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow transition flex items-center justify-center gap-1.5';
+        btnQr.className = 'py-2 rounded-xl text-xs font-bold bg-slate-700 text-slate-300 hover:bg-slate-600 transition flex items-center justify-center gap-1.5';
+        cashBox.classList.remove('hidden');
+        qrBox.classList.add('hidden');
+      } else {
+        btnQr.className = 'py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow transition flex items-center justify-center gap-1.5';
+        btnCash.className = 'py-2 rounded-xl text-xs font-bold bg-slate-700 text-slate-300 hover:bg-slate-600 transition flex items-center justify-center gap-1.5';
+        cashBox.classList.add('hidden');
+        qrBox.classList.remove('hidden');
+      }
+    }
+
+    function setCashGiven(amount) {
+      document.getElementById('cash-input').value = amount;
+      calcChange();
+    }
+
+    function calcChange() {
+      const given = parseInt(document.getElementById('cash-input').value) || 0;
+      const cost = 250000;
+      const res = document.getElementById('change-result');
+      if (given >= cost) {
+        const change = given - cost;
+        res.innerHTML = `<span>👉 Tiền thối lại khách:</span><span class="font-bold">${change.toLocaleString('vi-VN')} đ</span>`;
+        res.className = 'p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 font-bold flex justify-between';
+      } else {
+        res.innerHTML = `<span>⚠️ Còn thiếu:</span><span class="font-bold text-rose-400">${(cost - given).toLocaleString('vi-VN')} đ</span>`;
+        res.className = 'p-2 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 font-bold flex justify-between';
+      }
+    }
+
+    function confirmTicketDone() {
+      const modeText = currentPayMode === 'cash' ? '💵 TIỀN MẶT' : '💳 CHUYỂN KHOẢN VIETQR';
+      showToast(`✅ Đã chốt vé thành công! Thu: 250.000 đ (${modeText})`);
+    }
+
+    // Toggle Spa Status (Kill-Switch simulation)
+    let spa1Active = true;
+    function toggleSpaStatus(spaId) {
+      if (spaId === 'spa-1') {
+        spa1Active = !spa1Active;
+        const btn = document.getElementById('btn-toggle-spa1');
+        const dot = document.getElementById('dot-spa-1');
+        if (spa1Active) {
+          btn.className = 'px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition';
+          btn.innerText = 'Đang mở';
+          dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+          showToast('🟢 Đã mở khóa hoạt động cho Spa CS1!');
+        } else {
+          btn.className = 'px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 transition';
+          btn.innerText = 'Đã khóa';
+          dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+          showToast('🔴 Đã kích hoạt Kill-Switch: Khóa tạm thời Spa CS1!');
+          setTimeout(() => {
+            switchScreen('kill-switch');
+          }, 600);
+        }
+      }
+    }
+
+    // Extend plan
+    function extendPlan(spaName, days) {
+      showToast(`🎉 Đã gia hạn thành công thêm ${days} ngày dịch vụ SaaS cho ${spaName}!`);
+    }
+
+    // View as Spa
+    function viewAsSpa(spaName) {
+      showToast(`👁 Đã kích hoạt chế độ: 'Góc nhìn Spa' cho ${spaName}`);
+    }
+
+    // Save Bank Config
+    function saveBankConfig() {
+      const bank = document.getElementById('bank-select').value;
+      const acc = document.getElementById('bank-acc').value;
+      showToast(`💾 Đã lưu cấu hình ngân hàng ${bank} - TK: ${acc} thành công!`);
+    }
+
+    // TalkBack speech simulation
+    function speakTalkBack(text) {
+      showToast(`🔊 [TalkBack]: "${text}"`);
+      if ('speechSynthesis' in window) {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'vi-VN';
+        window.speechSynthesis.speak(utter);
+      }
+    }
+
+    // Toast helper
+    let toastTimeout;
+    function showToast(msg) {
+      const toast = document.getElementById('toast-box');
+      toast.innerText = msg;
+      toast.classList.remove('hidden');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3000);
+    }
+
+    // Clock
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('clock').innerText = `${h}:${m}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+    setGehihiRole('admin');
+    switchScreen('gehihi-ai');
+  </script>
+</body>
+</html>
