@@ -95,10 +95,10 @@ service cloud.firestore {
       }
     }
 
-    // Legacy: Giữ lại cấu trúc cũ nhưng hạn chế (migration path)
+    // Legacy: Giữ lại cấu trúc cũ cho đến khi hoàn tất di chuyển toàn bộ
     match /spa_workspaces/{workspaceId} {
-      allow read: if isDev();
-      allow write: if false; // Không cho ghi vào schema cũ nữa
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (isDev() || isTenantActive("khiem_thi_viet"));
     }
   }
 }

@@ -391,8 +391,8 @@ fun KhiemThiVietApp(store: SpaStore) {
         return
     }
 
-    // Kill-Switch: Nếu tenant bị khóa, hiển thị màn hình khóa thay vì nội dung app
-    if (store.isTenantLocked) {
+    // Kill-Switch: Nếu tenant bị khóa, hiển thị màn hình khóa thay vì nội dung app (Developer không bị khóa để có thể can thiệp xử lý)
+    if (store.isTenantLocked && !store.taiKhoanHienTai.isDev()) {
         TenantLockedScreen(store = store)
         return
     }
@@ -8018,6 +8018,17 @@ fun TenantLockedScreen(store: SpaStore) {
                 Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Liên hệ hỗ trợ")
+            }
+
+            if (store.taiKhoanHienTai.isDev()) {
+                Button(
+                    onClick = {
+                        store.devToggleLockTenant(store.currentTenantId, true, "Mở khóa bởi Super Admin")
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                ) {
+                    Text("👑 Mở khóa ngay (Quyền Super Admin)", color = Color.White)
+                }
             }
         }
     }
