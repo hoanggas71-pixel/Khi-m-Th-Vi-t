@@ -1,21 +1,91 @@
-====================================================================
-HƯỚNG DẪN CÀI ĐẶT ỨNG DỤNG KHIẾM THỊ VIỆT TRÊN ĐIỆN THOẠI TỪ FILE ZIP
-(KHÔNG CẦN DÙNG CODE ASSIST)
-====================================================================
+================================================================================
+HƯỚNG DẪN CÀI ĐẶT & TRẢI NGHIỆM ỨNG DỤNG KHIẾM THỊ VIỆT
+(Dự án Quản lý Spa & Trợ lý AI Hỗ trợ Người Khiếm Thị)
+================================================================================
 
-1. TẠI SAO KHÔNG CẦN DÙNG CODE ASSIST (module.toml)?
-- Ứng dụng Code Assist trên điện thoại chỉ đọc được chuẩn module.toml cũ và không biên dịch được dự án Android Studio hiện đại (Gradle Version Catalog + Jetpack Compose + Firebase Cloud).
-- Hệ thống đã biên dịch sẵn file cài đặt .apk hoàn chỉnh ngay trong file ZIP này cho bạn!
+Tài liệu này cung cấp hướng dẫn minh bạch về 2 hình thức trải nghiệm ứng dụng:
+  [PHẦN 1] Cài đặt ngay file APK gốc (Base Build) có sẵn trên điện thoại Android.
+  [PHẦN 2] Kích hoạt biên dịch tự động qua Cloud (GitHub Actions) để nhận file APK
+           chứa đầy đủ các tính năng SaaS Multi-Tenant & Room DB mới nhất.
+  [PHẦN 3] Hướng dẫn biên dịch cục bộ qua Android Studio dành cho lập trình viên.
 
-2. CÁCH CÀI ĐẶT TRÊN MÁY CHÍNH (ADMIN):
-- Bước 1: Giải nén file .zip vừa tải về bằng trình Quản lý File mặc định của điện thoại (hoặc ứng dụng ZArchiver / Files by Google).
-- Bước 2: Ngay tại thư mục gốc vừa giải nén (hoặc mở thư mục "CAI_DAT_APK"), chạm trực tiếp vào file:
-  👉 KhiemThiViet-CaiDat.apk
-- Bước 3: Chọn "Cài đặt" (Install). Nếu điện thoại hỏi cấp quyền cài ứng dụng từ nguồn này, hãy bật "Cho phép".
-- Bước 4: Mở ứng dụng "Khiếm Thị Việt", bấm "Kết nối Đám mây Google" và đăng nhập tài khoản Admin (Mặc định: SĐT 0397772963 / Mật khẩu 247208).
+--------------------------------------------------------------------------------
+PHẦN 1: CÀI ĐẶT & TRẢI NGHIỆM NGAY FILE APK GỐC TRÊN ĐIỆN THOẠI
+--------------------------------------------------------------------------------
+File APK có sẵn: KhiemThiViet-CaiDat.apk (hoặc CAI_DAT_APK/KhiemThiViet-CaiDat.apk)
+Dung lượng: 26.56 MB | Mã băm SHA-256: CA485D7225C220FE4C7F527C5F5692C26B2F8444CDEF5F3958FD55318AECE117
+Tương thích: Mọi dòng điện thoại Android 7.0 đến Android 15/16.
 
-3. CÁCH CHIA SẺ & CÀI ĐẶT CHO CÁC MÁY NHÂN VIÊN:
-- Bước 1: Trên máy Admin đã cài app, vào "Tab Quyền hạn" -> bấm nút "Gửi file APK cài đặt" để gửi thẳng file KhiemThiViet-CaiDat.apk qua Zalo / Quick Share sang máy nhân viên.
-- Bước 2: Trên máy nhân viên, chạm vào file KhiemThiViet-CaiDat.apk nhận được để cài đặt.
-- Bước 3: Mở app trên máy nhân viên, bấm "Kết nối Đám mây Google" 1 lần bằng Gmail của nhân viên để đồng bộ danh sách tài khoản thời gian thực từ máy chủ.
-- Bước 4: Nhập Số điện thoại (hoặc Gmail) và Mật khẩu do Admin tạo để đăng nhập.
+1. Các bước cài đặt:
+   - Bước 1: Sao chép file KhiemThiViet-CaiDat.apk vào bộ nhớ điện thoại (qua Zalo,
+     Google Drive, Quick Share hoặc cáp USB).
+   - Bước 2: Chạm vào file APK để mở trình cài đặt Android.
+   - Bước 3: Nếu điện thoại cảnh báo "Nguồn không xác định", chọn "Cài đặt" / 
+     "Cho phép từ nguồn này".
+   - Bước 4: Mở ứng dụng "Khiếm Thị Việt", bấm "Kết nối Đám mây Google".
+
+2. Tài khoản thử nghiệm có sẵn:
+   - Quyền Quản trị viên (Admin): SĐT 0397772963 | Mật khẩu: 247208
+   - Quyền Kỹ thuật viên (Thợ): Chọn danh sách KTV trong ứng dụng.
+
+3. Phạm vi tính năng trên bản APK gốc:
+   - Quản lý danh mục Dịch vụ và Bán gói liệu trình.
+   - Lập vé làm dịch vụ, phân ca cho Kỹ thuật viên.
+   - Sổ quỹ thu chi cân đối và Báo cáo ô lịch doanh thu nguyên bản.
+   - Trợ lý AI Gehihi tích hợp mô hình Gemini 3.8 Flash (tư vấn kinh doanh & khẩu lệnh).
+   - Kiểm tra chuẩn trợ năng TalkBack dành cho người khiếm thị trên thiết bị thật.
+
+--------------------------------------------------------------------------------
+PHẦN 2: BIÊN DỊCH BẢN CẬP NHẬT SAAS MULTI-TENANT QUA GITHUB ACTIONS (KHUYÊN DÙNG)
+--------------------------------------------------------------------------------
+Toàn bộ mã nguồn tính năng SaaS Multi-Tenant mới (Kiến trúc đa cơ sở, Khóa từ xa
+Kill-Switch, Dev Console Tab 6, Caching Room DB SQLite, Dynamic VietQR Napas 247,
+FCM Push Notification) đã được hoàn thiện 100% trong thư mục mã nguồn app/src/main/java/.
+
+Để xuất file APK mới nhất từ mã nguồn hoàn toàn tự động mà không cần cài đặt phần mềm:
+   - Bước 1: Truy cập repository dự án trên GitHub:
+     https://github.com/hoanggas71-pixel/Khi-m-Th-Vi-t
+   - Bước 2: Chọn thẻ "Actions" -> chọn workflow "Build Khiem Thi Viet APK".
+   - Bước 3: Bấm nút "Run workflow" -> chọn nhánh "main" -> xác nhận "Run workflow".
+   - Bước 4: Chờ hệ thống Cloud build hoàn tất (khoảng 3-5 phút).
+   - Bước 5: Bấm vào lượt chạy vừa hoàn thành, kéo xuống mục "Artifacts" và tải về
+     file "KhiemThiViet-APK.zip".
+   - Bước 6: Giải nén file zip để nhận file app-debug.apk chứa trọn vẹn 100% tính năng SaaS.
+
+--------------------------------------------------------------------------------
+PHẦN 3: BIÊN DỊCH CỤC BỘ DÀNH CHO LẬP TRÌNH VIÊN (LOCAL BUILD)
+--------------------------------------------------------------------------------
+Yêu cầu môi trường máy tính:
+   - Hệ điều hành: Windows 10/11, macOS, hoặc Linux.
+   - Java Development Kit (JDK): JDK 17 hoặc JDK 21 (Temurin / OpenJDK).
+   - Android SDK: Android SDK Platform 36 (minorApiLevel 1 - Android 16 Preview),
+     Build-Tools 36.0.0.
+   - Android Gradle Plugin (AGP): 9.1.1.
+   - Gradle: 9.3.1.
+   - IDE khuyên dùng: Android Studio Koala / Ladybug hoặc mới hơn.
+
+Các bước thực hiện qua Command Line:
+   1. Mở terminal tại thư mục gốc dự án.
+   2. Tạo file debug.keystore chuẩn (nếu chưa có):
+      keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+   3. Thực hiện lệnh build Debug APK:
+      ./gradlew assembleDebug --stacktrace
+      (hoặc: gradle assembleDebug)
+   4. File APK đầu ra được tạo tại: app/build/outputs/apk/debug/app-debug.apk
+
+--------------------------------------------------------------------------------
+PHẦN 4: MA TRẬN SO SÁNH TÍNH NĂNG GIỮA BẢN APK GỐC VÀ MÃ NGUỒN SAAS
+--------------------------------------------------------------------------------
+Tính năng                                Bản APK gốc (Base)    Bản cập nhật SaaS
+--------------------------------------------------------------------------------
+Quản lý Spa đơn lẻ (Single-Tenant)       ĐÃ TÍCH HỢP           ĐÃ TÍCH HỢP
+Sổ quỹ, Vé, Bảng lương, Lịch             ĐÃ TÍCH HỢP           ĐÃ TÍCH HỢP
+Trợ lý AI Gehihi (Gemini 3.8 Flash)      ĐÃ TÍCH HỢP           ĐÃ TÍCH HỢP
+Tương thích TalkBack người khiếm thị     ĐÃ TÍCH HỢP           ĐÃ TÍCH HỢP
+Phân quyền 4 cấp (SuperAdmin/Owner/Staff) Chưa có              MÃ NGUỒN HOÀN TẤT
+Dev Console Tab 6 & 'Góc nhìn Spa'       Chưa có              MÃ NGUỒN HOÀN TẤT
+Khóa cơ sở từ xa (TenantLockedScreen)    Chưa có              MÃ NGUỒN HOÀN TẤT
+Offline Cache Room SQLite (9 DAOs)       Chưa có              MÃ NGUỒN HOÀN TẤT
+FCM Notification rung đặc thù            Chưa có              MÃ NGUỒN HOÀN TẤT
+Thanh toán VietQR Napas 247 động        Chưa có              MÃ NGUỒN HOÀN TẤT
+================================================================================

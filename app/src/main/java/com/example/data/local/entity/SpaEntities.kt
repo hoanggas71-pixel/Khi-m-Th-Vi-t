@@ -145,7 +145,8 @@ data class PackageSubEntity(
     indices = [
         Index(value = ["tenantId", "ngay"]),
         Index(value = ["tenantId", "daXacNhan"]),
-        Index(value = ["tenantId", "nvId"])
+        Index(value = ["tenantId", "nvId"]),
+        Index(value = ["tenantId", "khId"])
     ]
 )
 data class TicketEntity(

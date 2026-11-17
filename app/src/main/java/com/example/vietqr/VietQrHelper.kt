@@ -57,9 +57,9 @@ object VietQrHelper {
         noiDung: String = "",
         template: String = "compact2"
     ): String {
-        if (soTaiKhoan.isBlank()) return ""
+        val cleanAcc = soTaiKhoan.filter { it.isLetterOrDigit() }
+        if (cleanAcc.isBlank()) return ""
         val cleanBank = bankCode.trim().uppercase()
-        val cleanAcc = soTaiKhoan.trim()
         val encMemo = URLEncoder.encode(noiDung.trim(), StandardCharsets.UTF_8.toString()).replace("+", "%20")
         val encName = URLEncoder.encode(tenChuTaiKhoan.trim().uppercase(), StandardCharsets.UTF_8.toString()).replace("+", "%20")
 
@@ -92,7 +92,7 @@ object VietQrHelper {
      * Sinh nội dung chuyển khoản gia hạn gói dịch vụ cơ sở: GIAHAN_<tenantId>
      */
     fun taoNoiDungGiaHanSaaS(tenantId: String): String {
-        val slug = tenantId.replace("spa_", "").replace("-", "_").take(15).uppercase()
+        val slug = tenantId.replace("spa_", "").replace("-", "_").take(15).trimEnd('_').uppercase()
         return "GIAHAN $slug"
     }
 }

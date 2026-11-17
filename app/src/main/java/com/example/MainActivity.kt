@@ -26,6 +26,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -391,8 +392,8 @@ fun KhiemThiVietApp(store: SpaStore) {
         return
     }
 
-    // Kill-Switch: Nếu tenant bị khóa, hiển thị màn hình khóa thay vì nội dung app (Developer không bị khóa để có thể can thiệp xử lý)
-    if (store.isTenantLocked && !store.taiKhoanHienTai.isDev()) {
+    // Kill-Switch: Nếu tenant bị khóa, hiển thị màn hình khóa thay vì nội dung app (Developer được miễn trừ để điều hành/gỡ khóa)
+    if (store.isTenantLocked && !user.isDev()) {
         TenantLockedScreen(store = store)
         return
     }
@@ -1766,12 +1767,14 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
     val canEditTime = store.currentUser.hasPermission(QuyenHan.CAN_EDIT_TIME)
     var tgktInput by remember { mutableStateOf(nowTimeStr()) }
     var thucThuInput by remember { mutableStateOf(ve.thu.toString()) }
+    var phuongThucThanhToan by remember { mutableStateOf("TIEN_MAT") } // "TIEN_MAT" hoặc "CHUYEN_KHOAN"
+    var tienKhachDuaInput by remember { mutableStateOf("") }
     val hoaHongDuKien = store.tinhHoaHongVe(ve)
     var showVietQrDialog by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Hoàn thành vé (Kết thúc)", fontWeight = FontWeight.Bold) },
+        title = { Text("Hoàn thành vé & Thanh toán", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Dịch vụ: ${store.tenDichVuCuaVe(ve)}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
@@ -1786,28 +1789,88 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
                     )
                 }
                 if (!ve.dungGoi) {
+                    Text("Hình thức thanh toán:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = SpaRosewoodDark)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { phuongThucThanhToan = "TIEN_MAT" },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (phuongThucThanhToan == "TIEN_MAT") Color(0xFF2E7D32) else Color(0xFFE0E0E0)
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).height(42.dp)
+                        ) {
+                            Text(
+                                "💵 Tiền mặt",
+                                fontWeight = FontWeight.Bold,
+                                color = if (phuongThucThanhToan == "TIEN_MAT") Color.White else Color.DarkGray
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                phuongThucThanhToan = "CHUYEN_KHOAN"
+                                showVietQrDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (phuongThucThanhToan == "CHUYEN_KHOAN") Color(0xFF1565C0) else Color(0xFFE0E0E0)
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).height(42.dp)
+                        ) {
+                            Text(
+                                "💳 VietQR CK",
+                                fontWeight = FontWeight.Bold,
+                                color = if (phuongThucThanhToan == "CHUYEN_KHOAN") Color.White else Color.DarkGray
+                            )
+                        }
+                    }
+
                     OutlinedTextField(
                         value = thucThuInput,
                         onValueChange = { thucThuInput = it.filter { c -> c.isDigit() } },
-                        label = { Text("Tiền thực thu khách (Có thể sửa giảm giá / bo)") },
+                        label = { Text("Tiền thực thu khách (VNĐ)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    OutlinedButton(
-                        onClick = { showVietQrDialog = true },
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth().height(48.dp)
-                    ) {
-                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(18.dp), tint = SpaRosewoodDark)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "📲 Quét mã VietQR (${formatVnd(thucThuInput.toLongOrNull() ?: ve.thu)})",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = SpaRosewoodDark
+                    if (phuongThucThanhToan == "TIEN_MAT") {
+                        OutlinedTextField(
+                            value = tienKhachDuaInput,
+                            onValueChange = { tienKhachDuaInput = it.filter { c -> c.isDigit() } },
+                            label = { Text("Tiền khách đưa (tùy chọn)") },
+                            placeholder = { Text("Ví dụ: 300000, 500000...") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
                         )
+                        val tienKhachDua = tienKhachDuaInput.toLongOrNull() ?: 0L
+                        val thucThu = thucThuInput.toLongOrNull() ?: ve.thu
+                        if (tienKhachDua > thucThu && thucThu > 0) {
+                            Text(
+                                "👉 Tiền thối lại khách: ${formatVnd(tienKhachDua - thucThu)}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = Color(0xFF2E7D32)
+                            )
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { showVietQrDialog = true },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                        ) {
+                            Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(18.dp), tint = SpaRosewoodDark)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "📲 Mở lại mã VietQR Napas 247 (${formatVnd(thucThuInput.toLongOrNull() ?: ve.thu)})",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = SpaRosewoodDark
+                            )
+                        }
                     }
                 } else {
                     Text("Vé đi làm Gói (LT): Thu 0 đồng (Đã trả trước lúc đăng ký gói).", fontWeight = FontWeight.SemiBold, color = SpaRosewoodDark)
@@ -7955,7 +8018,12 @@ fun AccountSwitchDialog(
 }
 
 @Composable
-fun TenantLockedScreen(store: SpaStore) {
+fun TenantLockedScreen(
+    store: SpaStore,
+    onDismissDev: (() -> Unit)? = null
+) {
+    val isDev = store.currentUser?.isDev() == true
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -8010,6 +8078,25 @@ fun TenantLockedScreen(store: SpaStore) {
                     )
                 }
             }
+
+            // Thoát góc nhìn cơ sở dành cho Super Admin Developer
+            if (isDev || onDismissDev != null) {
+                Button(
+                    onClick = {
+                        if (onDismissDev != null) {
+                            onDismissDev()
+                        } else {
+                            store.devSwitchTenantContext(null)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Thoát góc nhìn Spa (Về Bàn điều khiển Dev)")
+                }
+            }
+
             OutlinedButton(
                 onClick = { /* Mở Zalo/Call hỗ trợ */ },
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
@@ -8020,15 +8107,24 @@ fun TenantLockedScreen(store: SpaStore) {
                 Text("Liên hệ hỗ trợ")
             }
 
-            if (store.taiKhoanHienTai.isDev()) {
+            if (isDev) {
                 Button(
                     onClick = {
-                        store.devToggleLockTenant(store.currentTenantId, true, "Mở khóa bởi Super Admin")
+                        store.devToggleLockTenant(store.currentTenantId, false, "Mở khóa bởi Super Admin")
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
                 ) {
                     Text("👑 Mở khóa ngay (Quyền Super Admin)", color = Color.White)
                 }
+            }
+
+            TextButton(
+                onClick = { store.logout() },
+                colors = ButtonDefaults.textButtonColors(contentColor = Color.White.copy(alpha = 0.7f))
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Đăng xuất tài khoản")
             }
         }
     }

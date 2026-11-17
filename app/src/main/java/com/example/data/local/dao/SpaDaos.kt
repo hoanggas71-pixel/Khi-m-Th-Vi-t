@@ -218,6 +218,9 @@ interface TicketDao {
     @Query("SELECT * FROM tickets WHERE tenantId = :tenantId ORDER BY ngay DESC, tgbd DESC")
     suspend fun getAllByTenantSync(tenantId: String): List<TicketEntity>
 
+    @Query("SELECT * FROM tickets WHERE tenantId = :tenantId AND khId = :khId ORDER BY ngay DESC, tgbd DESC")
+    suspend fun getByCustomerSync(tenantId: String, khId: String): List<TicketEntity>
+
     @Query("SELECT * FROM tickets WHERE tenantId = :tenantId AND isSynced = 0")
     suspend fun getUnsynced(tenantId: String): List<TicketEntity>
 

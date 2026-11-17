@@ -20,11 +20,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import com.example.data.local.SpaDatabase
 import com.example.data.local.entity.toEntity
+import com.example.data.local.entity.toDomain
 import com.example.fcm.SpaFirebaseMessagingService
 import com.example.vietqr.ThongTinNganHang
 import com.example.vietqr.VietQrHelper
@@ -361,6 +364,13 @@ class SpaStore(context: Context) {
 
     init {
         loadFromPrefs()
+        // Nếu cache SharedPreferences bị trống hoặc lỗi, thử khôi phục từ Room SQLite trước
+        if (taiKhoans.isEmpty()) {
+            val restored = loadFromRoomDbIfEmpty()
+            if (restored) {
+                saveToPrefs() // Đồng bộ ngược dữ liệu Room đã khôi phục vào SharedPreferences
+            }
+        }
         loadGehihiMemoryVault()
         initFcmToken()
         if (taiKhoans.isEmpty()) {
@@ -5802,6 +5812,8 @@ class SpaStore(context: Context) {
         val curGois = gois.toList()
         val curDks = dks.toList()
         val curTks = taiKhoans.toList()
+        val curTenant = tenantInfo
+        val curAllTenants = devAllTenants.toList()
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -5814,8 +5826,120 @@ class SpaStore(context: Context) {
                 db.packageDao().insertAll(curGois.map { it.toEntity(tId) })
                 db.packageSubDao().insertAll(curDks.map { it.toEntity(tId) })
                 db.accountDao().insertAll(curTks.map { it.toEntity(tId) })
+                curTenant?.let { db.tenantDao().insertOrUpdate(it.toEntity()) }
+                if (curAllTenants.isNotEmpty()) {
+                    db.tenantDao().insertAll(curAllTenants.map { it.toEntity() })
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "Room DB persist background warning: ${e.message}")
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // ROOM SQLITE BIDIRECTIONAL LOCAL CACHE RESTORATION
+    // -------------------------------------------------------------------------
+
+    private data class RoomCachedSnapshot(
+        val accounts: List<TaiKhoan>,
+        val staff: List<NV>,
+        val services: List<DV>,
+        val packages: List<Goi>,
+        val customers: List<KH>,
+        val subscriptions: List<DK>,
+        val tickets: List<Luot>,
+        val cashbook: List<TC>,
+        val currentTenant: TenantInfo?,
+        val allTenants: List<TenantInfo>
+    )
+
+    private fun fetchRoomCacheData(tenantId: String): RoomCachedSnapshot? {
+        return try {
+            val db = roomDb
+            val accounts = db.accountDao().getAllByTenantSync(tenantId).map { it.toDomain() }
+            if (accounts.isEmpty()) return null
+            val staff = db.staffDao().getAllByTenantSync(tenantId).map { it.toDomain() }
+            val services = db.serviceDao().getAllByTenantSync(tenantId).map { it.toDomain() }
+            val packages = db.packageDao().getAllByTenantSync(tenantId).map { it.toDomain() }
+            val customers = db.customerDao().getAllByTenantSync(tenantId).map { it.toDomain() }
+            val subscriptions = db.packageSubDao().getAllByTenantSync(tenantId).map { it.toDomain() }
+            val tickets = db.ticketDao().getAllByTenantSync(tenantId).map { it.toDomain() }
+            val cashbook = db.cashbookDao().getAllByTenantSync(tenantId).map { it.toDomain() }
+            val currentTenant = db.tenantDao().getTenantByIdSync(tenantId)?.toDomain()
+            val allTenants = db.tenantDao().getAllTenantsSync().map { it.toDomain() }
+
+            RoomCachedSnapshot(
+                accounts = accounts,
+                staff = staff,
+                services = services,
+                packages = packages,
+                customers = customers,
+                subscriptions = subscriptions,
+                tickets = tickets,
+                cashbook = cashbook,
+                currentTenant = currentTenant,
+                allTenants = allTenants
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi đọc bộ nhớ Room SQLite cache: ${e.message}", e)
+            null
+        }
+    }
+
+    private fun applyRoomCachedSnapshot(data: RoomCachedSnapshot) {
+        taiKhoans.clear(); taiKhoans.addAll(data.accounts)
+        nvs.clear(); nvs.addAll(data.staff)
+        dvs.clear(); dvs.addAll(data.services)
+        gois.clear(); gois.addAll(data.packages)
+        khs.clear(); khs.addAll(data.customers)
+        dks.clear(); dks.addAll(data.subscriptions)
+        luots.clear(); luots.addAll(data.tickets)
+        tcs.clear(); tcs.addAll(data.cashbook)
+        data.currentTenant?.let {
+            tenantInfo = it
+            isTenantLocked = it.isEffectiveLocked
+            tenantLockReason = it.lockedReason
+            tenantLockQrUrl = it.qrPaymentUrl
+        }
+        if (data.allTenants.isNotEmpty()) {
+            devAllTenants.clear()
+            devAllTenants.addAll(data.allTenants)
+        }
+    }
+
+    /**
+     * Nạp dữ liệu từ SQLite Room Database thông qua 9 mappers toDomain() khi bộ nhớ chính bị trống.
+     * Biến Room SQLite thành cache 2 chiều thực thụ (Bidirectional Local Cache).
+     * @return true nếu khôi phục thành công từ Room DB, false nếu Room DB cũng trống.
+     */
+    fun loadFromRoomDbIfEmpty(): Boolean {
+        if (taiKhoans.isNotEmpty()) return false
+        val snapshot = runBlocking(Dispatchers.IO) {
+            fetchRoomCacheData(currentTenantId)
+        } ?: return false
+
+        applyRoomCachedSnapshot(snapshot)
+        Log.i(TAG, "Đã khôi phục thành công từ Room SQLite: ${snapshot.accounts.size} TK, ${snapshot.tickets.size} vé, ${snapshot.services.size} DV")
+        return true
+    }
+
+    /**
+     * Chủ động nạp lại toàn bộ dữ liệu từ Room SQLite cache cho tenant được chỉ định (bất đồng bộ).
+     */
+    fun restoreFromRoomDbAsync(
+        tenantId: String = currentTenantId,
+        onComplete: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val snapshot = fetchRoomCacheData(tenantId)
+            withContext(Dispatchers.Main) {
+                if (snapshot != null && snapshot.accounts.isNotEmpty()) {
+                    applyRoomCachedSnapshot(snapshot)
+                    saveToPrefs()
+                    onComplete(true, "Đã khôi phục ${snapshot.tickets.size} vé và ${snapshot.accounts.size} tài khoản từ Room SQLite.")
+                } else {
+                    onComplete(false, "Không tìm thấy dữ liệu bộ nhớ Room SQLite cho cơ sở $tenantId.")
+                }
             }
         }
     }
