@@ -876,6 +876,82 @@ fun OneTimeLoginScreen(store: SpaStore) {
                     }
                 }
 
+                // Khối Chọn Tài Khoản Test & Đăng Nhập 1 Chạm
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "⚡ Chọn nhanh tài khoản test (${store.taiKhoans.size} TK):",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = SpaRosewoodDark
+                            )
+                            if (store.taiKhoans.any { it.id == ID_TEST_ADMIN }) {
+                                TextButton(
+                                    onClick = {
+                                        store.xoaDuLieuTest()
+                                        phoneInput = ""
+                                        passwordInput = ""
+                                        Toast.makeText(context, "Đã xóa tài khoản Admin Test & dữ liệu mẫu!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("🗑️ Xóa TK Test", fontSize = 11.sp, color = SpaDanger, fontWeight = FontWeight.Bold)
+                                }
+                            } else {
+                                TextButton(
+                                    onClick = {
+                                        store.napLaiTaiKhoanVaDuLieuTest()
+                                        Toast.makeText(context, "Đã tạo tài khoản Admin Test & nạp lại dữ liệu mẫu!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("+ Tạo lại TK Test", fontSize = 11.sp, color = SpaSageGreen, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            store.taiKhoans.forEach { tk ->
+                                val isAdmin = tk.isAdmin()
+                                val isTest = tk.id == ID_TEST_ADMIN
+                                AssistChip(
+                                    onClick = {
+                                        phoneInput = tk.username
+                                        passwordInput = tk.matKhauHienThi.ifBlank { if (isAdmin) DEFAULT_ADMIN_PASS else "1234" }
+                                        errorMessage = ""
+                                        Toast.makeText(
+                                            context,
+                                            "Đã điền ${tk.hoTen} (${tk.username} • MK: $passwordInput). Bấm ĐĂNG NHẬP để vào!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    },
+                                    label = {
+                                        Text(
+                                            text = "${if (isTest) "🧪 " else if (isAdmin) "👑 " else "💆 "}${tk.hoTen}",
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isAdmin) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isTest) SpaRosewoodDark else if (isAdmin) SpaRosewood else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = phoneInput,
                     onValueChange = {
@@ -5951,6 +6027,58 @@ fun TabQuyenHanAdmin(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
                                 )
+                            }
+
+                            // Khối quản lý Tài khoản Admin Test & Dữ liệu Mẫu
+                            Surface(
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        "🧪 Tài khoản Admin Thử Nghiệm (Test Account)",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = SpaRosewoodDark
+                                    )
+                                    Text(
+                                        "• SĐT: $DEFAULT_TEST_ADMIN_PHONE • Mật khẩu/PIN: $DEFAULT_TEST_ADMIN_PASS (Full quyền Chủ Spa).\n" +
+                                            "• Dữ liệu mẫu repo: 3 KTV, 10 Dịch vụ, 3 Gói, 3 Khách hàng, 4 Vé & Sổ quỹ.",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Button(
+                                            onClick = {
+                                                store.napLaiTaiKhoanVaDuLieuTest()
+                                                Toast.makeText(context, "Đã tạo tài khoản Admin Test ($DEFAULT_TEST_ADMIN_PHONE) & nạp dữ liệu mẫu!", Toast.LENGTH_SHORT).show()
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = SpaSageGreen),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f).height(44.dp)
+                                        ) {
+                                            Text("✨ Nạp dữ liệu Test", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Button(
+                                            onClick = {
+                                                store.xoaDuLieuTest()
+                                                Toast.makeText(context, "Đã xóa tài khoản Admin Test ($DEFAULT_TEST_ADMIN_PHONE) và dữ liệu mẫu!", Toast.LENGTH_SHORT).show()
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = SpaDanger),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f).height(44.dp)
+                                        ) {
+                                            Text("🗑️ Xóa TK Test", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
                             }
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))

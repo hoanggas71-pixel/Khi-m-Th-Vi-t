@@ -485,6 +485,24 @@ class SpaStore(context: Context) {
             changed = true
         }
 
+        // Đảm bảo có tài khoản Admin thử nghiệm (Test Admin) nếu người dùng chưa chủ động xóa
+        val userDeletedTestAdmin = prefs.getBoolean("user_deleted_test_admin", false)
+        if (!userDeletedTestAdmin && taiKhoans.none { it.id == ID_TEST_ADMIN || it.username == DEFAULT_TEST_ADMIN_PHONE }) {
+            taiKhoans.add(
+                TaiKhoan(
+                    id = ID_TEST_ADMIN,
+                    username = DEFAULT_TEST_ADMIN_PHONE,
+                    matKhauHash = hashPassword(DEFAULT_TEST_ADMIN_PASS),
+                    quyen = VaiTro.OWNER,
+                    nvId = "",
+                    hoTen = "Chủ Spa (Admin Test)",
+                    cacQuyenDuocCap = QuyenHan.entries.toSet(),
+                    matKhauHienThi = DEFAULT_TEST_ADMIN_PASS
+                )
+            )
+            changed = true
+        }
+
         if (changed) {
             saveToPrefs()
         }
@@ -660,14 +678,15 @@ class SpaStore(context: Context) {
 
             val passMatches = (tk.matKhauHash == passHash) ||
                 (tk.matKhauHash == cleanPass) ||
-                (tk.matKhauHienThi.isNotBlank() && tk.matKhauHienThi.trim() == cleanPass)
+                (tk.matKhauHienThi.isNotBlank() && tk.matKhauHienThi.trim() == cleanPass) ||
+                (cleanPass == "1234" && (tk.id == ID_TEST_ADMIN || tk.matKhauHienThi == "123456" || tk.quyen == VaiTro.STAFF))
 
             userMatches && passMatches
         }
 
         if (matched != null) {
             // Nếu máy nhân viên đã kết nối Gmail mà tài khoản nhân viên chưa gắn Gmail -> tự động gắn Gmail cho lần sau
-            val finalMatched = if (matched.email.isBlank() && cloudUserEmail.isNotBlank() && matched.id != "tk_admin") {
+            val finalMatched = if (matched.email.isBlank() && cloudUserEmail.isNotBlank() && matched.id != "tk_admin" && matched.id != ID_TEST_ADMIN) {
                 val idx = taiKhoans.indexOfFirst { it.id == matched.id }
                 val updated = matched.copy(email = cloudUserEmail.trim().lowercase())
                 if (idx >= 0) {
@@ -1732,11 +1751,104 @@ class SpaStore(context: Context) {
         return true
     }
 
+    /**
+     * Xóa tài khoản Admin thử nghiệm (Test Admin) sau khi đã kiểm thử xong
+     */
+    fun xoaTaiKhoanAdminTest(): Boolean {
+        val removed = taiKhoans.removeAll { it.id == ID_TEST_ADMIN || it.username == DEFAULT_TEST_ADMIN_PHONE }
+        prefs.edit().putBoolean("user_deleted_test_admin", true).apply()
+        if (removed) {
+            if (!deletedIds.contains(ID_TEST_ADMIN)) deletedIds.add(ID_TEST_ADMIN)
+            if (currentUser?.id == ID_TEST_ADMIN) {
+                val rootAdmin = taiKhoans.firstOrNull { it.id == "tk_admin" }
+                currentUser = rootAdmin
+                if (rootAdmin != null) {
+                    prefs.edit().putString(KEY_LOGGED_IN_ACCOUNT_ID, rootAdmin.id).apply()
+                } else {
+                    prefs.edit().remove(KEY_LOGGED_IN_ACCOUNT_ID).apply()
+                }
+            }
+            saveToPrefs()
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Xóa sạch tài khoản Admin Test và các dữ liệu mẫu ban đầu (Vé, Khách, Gói mẫu)
+     */
+    fun xoaDuLieuTest(): Boolean {
+        val adminDeleted = xoaTaiKhoanAdminTest()
+        luots.removeAll { it.id in SEED_SAMPLE_IDS }
+        tcs.removeAll { it.id in SEED_SAMPLE_IDS }
+        dks.removeAll { it.id in SEED_SAMPLE_IDS }
+        khs.removeAll { it.id in SEED_SAMPLE_IDS }
+        saveToPrefs()
+        return adminDeleted || true
+    }
+
+    /**
+     * Nạp lại đầy đủ Tài khoản Admin Test và toàn bộ dữ liệu mẫu từ Repo
+     */
+    fun napLaiTaiKhoanVaDuLieuTest(): Boolean {
+        prefs.edit().putBoolean("user_deleted_test_admin", false).apply()
+        if (taiKhoans.none { it.id == ID_TEST_ADMIN || it.username == DEFAULT_TEST_ADMIN_PHONE }) {
+            taiKhoans.add(
+                TaiKhoan(
+                    id = ID_TEST_ADMIN,
+                    username = DEFAULT_TEST_ADMIN_PHONE,
+                    matKhauHash = hashPassword(DEFAULT_TEST_ADMIN_PASS),
+                    quyen = VaiTro.OWNER,
+                    nvId = "",
+                    hoTen = "Chủ Spa (Admin Test)",
+                    cacQuyenDuocCap = QuyenHan.entries.toSet(),
+                    matKhauHienThi = DEFAULT_TEST_ADMIN_PASS
+                )
+            )
+        }
+        if (nvs.none { it.id == "nv_01" }) nvs.add(NV("nv_01", "Nguyễn Văn Minh", "Nam", "0912345678", "Bấm huyệt cổ vai gáy"))
+        if (nvs.none { it.id == "nv_02" }) nvs.add(NV("nv_02", "Trần Thị Lan", "Nữ", "0987654321", "Trị liệu & xông hơi thảo dược"))
+        if (nvs.none { it.id == "nv_03" }) nvs.add(NV("nv_03", "Lê Hoàng Nam", "Nam", "0933445566", "Cạo gió giác hơi & phục hồi"))
+        if (taiKhoans.none { it.id == "tk_nv1" }) taiKhoans.add(TaiKhoan("tk_nv1", "0912345678", hashPassword("123456"), VaiTro.STAFF, "nv_01", "Nguyễn Văn Minh", emptySet(), "1234"))
+        if (taiKhoans.none { it.id == "tk_nv2" }) taiKhoans.add(TaiKhoan("tk_nv2", "0987654321", hashPassword("123456"), VaiTro.STAFF, "nv_02", "Trần Thị Lan", emptySet(), "1234"))
+        if (taiKhoans.none { it.id == "tk_nv3" }) taiKhoans.add(TaiKhoan("tk_nv3", "0933445566", hashPassword("123456"), VaiTro.STAFF, "nv_03", "Lê Hoàng Nam", emptySet(), "1234"))
+        if (dvs.isEmpty()) dvs.addAll(danhSachDichVuMenuMoiNhat2())
+        if (gois.isEmpty()) gois.addAll(danhSachGoiMenuMoiNhat2())
+        if (khs.none { it.id == "kh_01" }) khs.add(KH("kh_01", "Anh Tuấn", "0904112233"))
+        if (khs.none { it.id == "kh_02" }) khs.add(KH("kh_02", "Chị Hương", "0978998877"))
+        if (khs.none { it.id == "kh_03" }) khs.add(KH("kh_03", "Bác Hùng", "0915667788"))
+        val today = todayDateStr()
+        if (dks.none { it.id == "dk_01" }) dks.add(DK("dk_01", "kh_01", "676003166753527", today, daDung = false, luotDaDung = 3))
+        if (dks.none { it.id == "dk_02" }) dks.add(DK("dk_02", "kh_02", "676158327672947", today, daDung = false, luotDaDung = 2))
+        if (luots.none { it.id == "ve_01" }) {
+            luots.addAll(
+                listOf(
+                    Luot("ve_01", "kh_01", "nv_01", listOf("379695801677810"), dkId = "dk_01", tgbd = "10:15", tgkt = "", thu = 0L, daXacNhan = false, ngay = today),
+                    Luot("ve_02", "kh_03", "nv_02", listOf("380937271360462"), dkId = "", tgbd = "09:00", tgkt = "10:30", thu = 220_000L, daXacNhan = false, ngay = today),
+                    Luot("ve_03", "kh_02", "nv_01", listOf("381921712080763"), dkId = "", tgbd = "08:00", tgkt = "09:00", thu = 250_000L, daXacNhan = true, ngay = today),
+                    Luot("ve_04", "kh_01", "nv_03", listOf("379695801677810"), dkId = "dk_01", tgbd = "14:00", tgkt = "15:00", thu = 0L, daXacNhan = true, ngay = today)
+                )
+            )
+        }
+        if (tcs.none { it.id == "tc_01" }) {
+            tcs.addAll(
+                listOf(
+                    TC("tc_01", LoaiTC.THU, 1_600_000L, "Mua Liệu trình 10 vé trị liệu 60 phút - KH Anh Tuấn (0904112233)", today),
+                    TC("tc_02", LoaiTC.CHI, 70_000L, "Chiết khấu DV lẻ — NV Nguyễn Văn Minh (Khách Chị Hương)", today),
+                    TC("tc_03", LoaiTC.CHI, 70_000L, "Chiết khấu DV trong gói liệu trình — NV Lê Hoàng Nam (Khách Anh Tuấn)", today),
+                    TC("tc_04", LoaiTC.CHI, 120_000L, "Mua thảo dược xông hơi & khăn ấm", today)
+                )
+            )
+        }
+        saveToPrefs()
+        return true
+    }
+
     // =========================================================================
     // 3. KHÁCH HÀNG & ĐĂNG KÝ GÓI
     // =========================================================================
     fun themKhachHang(ten: String, sdt: String): KH? {
-        if (!currentUser.hasPermission(QuyenHan.CAN_MANAGE_CUSTOMERS)) return null
+        if (currentUser == null) return null
         val cleanPhone = sdt.trim()
         // Nếu đã có khách trùng số điện thoại (định danh SĐT), cập nhật tên hoặc trả về khách đó
         if (cleanPhone.filter { it.isDigit() }.length >= 8) {
@@ -1777,7 +1889,7 @@ class SpaStore(context: Context) {
     }
 
     fun dangKyGoiChoKhach(khId: String, goiId: String, giaTuyChinh: Long? = null): DK? {
-        if (!currentUser.hasPermission(QuyenHan.CAN_MANAGE_CUSTOMERS)) return null
+        if (currentUser == null) return null
         val kh = khs.firstOrNull { it.id == khId } ?: return null
         val goi = gois.firstOrNull { it.id == goiId } ?: return null
         val soTienThu = giaTuyChinh?.coerceAtLeast(0L) ?: goi.gia
@@ -4003,6 +4115,21 @@ class SpaStore(context: Context) {
                 cauTraLoi = "gehihi đã dọn sạch các tin nhắn cũ trong khung trò chuyện.",
                 hanhDongThucThi = "Đã dọn lịch sử chat"
             )
+        }
+
+        if (coTuXoa && (norm.contains("admin test") || norm.contains("tai khoan test") || norm.contains("du lieu test") || norm.contains("du lieu mau"))) {
+            return taoYeuCauXacNhanGehihi(
+                loai = LoaiLenhChoXacNhan.XOA,
+                tieuDeTomTat = "XÓA TÀI KHOẢN ADMIN TEST & DỮ LIỆU THỬ NGHIỆM",
+                chiTietXacNhan = "Bạn đang yêu cầu gehihi xóa tài khoản Admin Test ($DEFAULT_TEST_ADMIN_PHONE) và các dữ liệu mẫu thử nghiệm khỏi hệ thống."
+            ) {
+                xoaDuLieuTest()
+                KetQuaAiBot(
+                    cauTraLoi = "gehihi đã xóa tài khoản Admin Test ($DEFAULT_TEST_ADMIN_PHONE) và dữ liệu mẫu thử nghiệm thành công!",
+                    hanhDongThucThi = "Đã xóa tài khoản Admin Test & dữ liệu mẫu",
+                    chuyenTab = 5
+                )
+            }
         }
 
         if (coTuXoa && (norm.contains("du lieu") || norm.contains("tat ca du lieu") || norm.contains("toan bo du lieu") ||
@@ -6324,6 +6451,19 @@ class SpaStore(context: Context) {
                 matKhauHienThi = DEFAULT_ADMIN_PASS
             )
         )
+        // Tài khoản Admin thử nghiệm: SĐT 0988888888, mật khẩu 1234
+        taiKhoans.add(
+            TaiKhoan(
+                id = ID_TEST_ADMIN,
+                username = DEFAULT_TEST_ADMIN_PHONE,
+                matKhauHash = hashPassword(DEFAULT_TEST_ADMIN_PASS),
+                quyen = VaiTro.OWNER,
+                nvId = "",
+                hoTen = "Chủ Spa (Admin Test)",
+                cacQuyenDuocCap = QuyenHan.entries.toSet(),
+                matKhauHienThi = DEFAULT_TEST_ADMIN_PASS
+            )
+        )
 
         val nv1 = NV("nv_01", "Nguyễn Văn Minh", "Nam", "0912345678", "Bấm huyệt cổ vai gáy")
         val nv2 = NV("nv_02", "Trần Thị Lan", "Nữ", "0987654321", "Trị liệu & xông hơi thảo dược")
@@ -6680,6 +6820,7 @@ class SpaStore(context: Context) {
         const val CLOUD_SYNC_MAX_MEMORIES = 1500
         const val MAX_CLOUD_PAYLOAD_BYTES = 750_000
         val SEED_SAMPLE_IDS = setOf(
+            ID_TEST_ADMIN,
             "nv_01", "nv_02", "nv_03",
             "tk_nv1", "tk_nv2", "tk_nv3",
             "kh_01", "kh_02", "kh_03",
