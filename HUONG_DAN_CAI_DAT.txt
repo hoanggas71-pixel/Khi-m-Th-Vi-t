@@ -1,89 +1,280 @@
 ================================================================================
-HƯỚNG DẪN CÀI ĐẶT & TRẢI NGHIỆM ỨNG DỤNG KHIẾM THỊ VIỆT
-(Dự án Quản lý Spa & Trợ lý AI Hỗ trợ Người Khiếm Thị)
+HƯỚNG DẪN CÀI ĐẶT, TRẢI NGHIỆM & KIỂM THỬ TOÀN DIỆN
+DỰ ÁN KHIẾM THỊ VIỆT (SAAS MULTI-TENANT & TRỢ NĂNG TALKBACK)
 ================================================================================
 
-Tài liệu này cung cấp hướng dẫn minh bạch về 3 hình thức trải nghiệm ứng dụng:
-  [PHẦN 1] Cài đặt ngay file APK gốc (Base Build) có sẵn trên điện thoại Android.
-  [PHẦN 2] Cài đặt file APK Debug SaaS mới nhất được biên dịch trực tiếp từ mã nguồn.
-  [PHẦN 3] Quy trình Cloud CI tự động qua GitHub Actions và hướng dẫn biên dịch cục bộ.
+Tài liệu này cung cấp hướng dẫn đầy đủ, minh bạch và chi tiết về 2 bản APK bàn
+giao của dự án "Khiếm Thị Việt", bao gồm thông tin xác thực mã băm SHA-256, quy
+trình cài đặt, các kịch bản kiểm thử tương tác từng bước cho các tính năng SaaS
+mới, và hướng dẫn tự động hóa biên dịch từ mã nguồn.
+
+NỘI DUNG TÀI LIỆU:
+  [PHẦN 1] BÀN GIAO 2 BẢN APK SẢN PHẨM (DUAL-TRACK DELIVERABLES)
+  [PHẦN 2] HƯỚNG DẪN CÀI ĐẶT TRÊN ĐIỆN THOẠI ANDROID & MÁY ẢO
+  [PHẦN 3] HƯỚNG DẪN KIỂM THỬ TƯƠNG TÁC TỪNG BƯỚC CHO CÁC TÍNH NĂNG SAAS MỚI
+           - Kịch bản 1: Developer Super Admin Console (Tab 6, SubTab 3 '👑 Dev Console')
+           - Kịch bản 2: Màn hình khóa cơ sở từ xa (TenantLockedScreen & Kill-Switch)
+           - Kịch bản 3: Hộp thoại thanh toán VietQR Napas 247 động & Trợ năng TalkBack
+           - Kịch bản 4: Cấu hình thông tin tài khoản ngân hàng thụ hưởng (Tab 6, SubTab 1)
+  [PHẦN 4] HƯỚNG DẪN BIÊN DỊCH MÃ NGUỒN CỤC BỘ & QUY TRÌNH CLOUD CI
+  [PHẦN 5] MA TRẬN SO SÁNH TÍNH NĂNG GIỮA 2 BẢN APK
+
+================================================================================
+PHẦN 1: BÀN GIAO 2 BẢN APK SẢN PHẨM (DUAL-TRACK DELIVERABLES)
+================================================================================
+
+Dự án cung cấp 2 file APK với vai trò và mục đích chuyên biệt rõ ràng:
 
 --------------------------------------------------------------------------------
-PHẦN 1: CÀI ĐẶT & TRẢI NGHIỆM FILE APK GỐC (TRACK A - BASE BUILD)
+1. BẢN A: SAAS MULTI-TENANT DEBUG APK (BIÊN DỊCH TỪ MÃ NGUỒN MỚI NHẤT)
 --------------------------------------------------------------------------------
-Ghi chú: Bản APK gốc có sẵn dùng để kiểm tra vận hành spa cốt lõi và chuẩn trợ năng TalkBack trên thiết bị vật lý; để trải nghiệm các tính năng SaaS mới (Dev Console Tab 6, Màn hình khóa cơ sở), sử dụng bản APK ở Phần 2.
-
-File APK có sẵn: KhiemThiViet-CaiDat.apk (hoặc CAI_DAT_APK/KhiemThiViet-CaiDat.apk)
-Dung lượng: 26.56 MB | Mã băm SHA-256: CA485D7225C220FE4C7F527C5F5692C26B2F8444CDEF5F3958FD55318AECE117
-Tương thích: Mọi dòng điện thoại Android 7.0 đến Android 15/16.
-
-1. Các bước cài đặt:
-   - Bước 1: Sao chép file KhiemThiViet-CaiDat.apk vào bộ nhớ điện thoại (qua Zalo,
-     Google Drive, Quick Share hoặc cáp USB).
-   - Bước 2: Chạm vào file APK để mở trình cài đặt Android.
-   - Bước 3: Nếu điện thoại cảnh báo "Nguồn không xác định", chọn "Cài đặt" / 
-     "Cho phép từ nguồn này".
-   - Bước 4: Mở ứng dụng "Khiếm Thị Việt", bấm "Kết nối Đám mây Google".
-
-2. Tài khoản thử nghiệm có sẵn:
-   - Quyền Quản trị viên (Admin): SĐT 0397772963 | Mật khẩu: 247208
-   - Quyền Kỹ thuật viên (Thợ): Chọn danh sách KTV trong ứng dụng.
-
-3. Phạm vi tính năng trên bản APK gốc:
-   - Quản lý danh mục Dịch vụ và Bán gói liệu trình.
-   - Lập vé làm dịch vụ, phân ca cho Kỹ thuật viên.
-   - Sổ quỹ thu chi cân đối và Báo cáo ô lịch doanh thu nguyên bản.
-   - Trợ lý AI Gehihi tích hợp mô hình Gemini 3.8 Flash (tư vấn kinh doanh & khẩu lệnh).
-   - Kiểm tra chuẩn trợ năng TalkBack dành cho người khiếm thị trên thiết bị thật.
+- Đường dẫn file: app/build/outputs/apk/debug/app-debug.apk
+- Dung lượng chính xác: 27,808,429 bytes (~26.52 MB)
+- Mã băm SHA-256: D8A86F7D2199FCC9FE4F952DBF7457655D1936D149E0BF72752B5CEE4CB80848
+- Trạng thái biên dịch: Đã biên dịch sạch (Clean Build) trực tiếp từ mã nguồn qua
+  Gradle 9.3.1 và Adoptium Temurin OpenJDK 17.0.21+9.
+- Bytecode DEX: Gồm 13 file DEX chứa đầy đủ 100% các thành phần SaaS mới:
+  + TenantLockedScreen: Màn hình khóa cơ sở từ xa kèm nút thoát Dev và mở khóa 1-chạm.
+  + DevConsoleSubTab: Bảng điều khiển Developer Super Admin Console tại Tab 6.
+  + VietQrHelper: Trình tạo mã QR động Napas 247 chuẩn compact2 ngân hàng Việt Nam.
+  + VietQrPaymentDialog: Hộp thoại thu tiền vé hỗ trợ TalkBack và nút sao chép STK.
+  + SpaDatabase & 9 Entities/DAOs: Hệ thống SQLite Room Cache lưu trữ offline.
+  + SpaFirebaseMessagingService: Dịch vụ thông báo đẩy FCM với nhịp rung khiếm thị.
+- Mục đích sử dụng: Kiểm tra và đánh giá toàn diện các tính năng SaaS Multi-Tenant,
+  Bảng điều khiển Super Admin, Màn hình khóa cơ sở và thanh toán VietQR Napas 247.
 
 --------------------------------------------------------------------------------
-PHẦN 2: CÀI ĐẶT BẢN APK DEBUG MỚI NHẤT CHỨA TÍNH NĂNG SAAS (TRACK B - SAAS BUILD)
+2. BẢN B: BASE TESTING APK (BẢN DỰNG CƠ SỞ ĐÃ KÝ SẴN CHO MÁY VẬT LÝ)
 --------------------------------------------------------------------------------
-File APK đã được biên dịch thành công từ mã nguồn dự án qua Gradle 9.3.1 và Temurin JDK 17:
-Đường dẫn file: app/build/outputs/apk/debug/app-debug.apk
-Dung lượng: 26.52 MB (27,808,429 bytes)
-Mã băm SHA-256: D8A86F7D2199FCC9FE4F952DBF7457655D1936D149E0BF72752B5CEE4CB80848
-Kiểm tra Bytecode DEX: 13 file DEX, chứa trọn vẹn 100% các class SaaS:
-  - TenantLockedScreen (Màn hình khóa từ xa & nút mở khóa Super Admin)
-  - DevConsoleSubTab (Bảng điều khiển Super Admin quản lý cơ sở tại Tab 6)
-  - SpaDatabase (Cơ sở dữ liệu Room SQLite cục bộ với 9 bảng và 9 DAO)
-  - SpaFirebaseMessagingService (Dịch vụ FCM Push với nhịp rung khiếm thị 450-200-450ms)
-  - VietQrHelper & VietQrPaymentDialog (Hộp thoại thanh toán chuyển khoản Napas 247)
-  - TenantEntity (Mô hình thực thể Multi-Tenant trong Room DB)
+- Đường dẫn file: KhiemThiViet-CaiDat.apk (hoặc CAI_DAT_APK/KhiemThiViet-CaiDat.apk)
+- Dung lượng chính xác: 27,852,467 bytes (~26.56 MB)
+- Mã băm SHA-256: CA485D7225C220FE4C7F527C5F5692C26B2F8444CDEF5F3958FD55318AECE117
+- Trạng thái ký: Đã ký số hoàn chỉnh, cài đặt trực tiếp không báo lỗi phân tích cú pháp.
+- Tương thích thiết bị: Tương thích hoàn hảo từ Android 7.0 (Nougat) đến Android 15/16.
+- Mục đích sử dụng: Dành cho kiểm tra tức thì trên thiết bị di động thật về các quy
+  trình nghiệp vụ spa cốt lõi, bán gói liệu trình, phân ca kỹ thuật viên, sổ quỹ thu
+  chi, và trải nghiệm đọc màn hình bằng bộ trợ năng tiếng Việt Google TalkBack.
 
-Cách cài đặt qua adb:
-   adb install -r app/build/outputs/apk/debug/app-debug.apk
+================================================================================
+PHẦN 2: HƯỚNG DẪN CÀI ĐẶT TRÊN ĐIỆN THOẠI ANDROID & MÁY ẢO
+================================================================================
 
 --------------------------------------------------------------------------------
-PHẦN 3: TỰ ĐỘNG HÓA QUA GITHUB ACTIONS CI & BIÊN DỊCH LẬP TRÌNH VIÊN
+CÁCH 1: CÀI ĐẶT TRỰC TIẾP TRÊN ĐIỆN THOẠI THẬT
 --------------------------------------------------------------------------------
-1. Tự động hóa Cloud CI (.github/workflows/build-apk.yml):
-   - Quy trình đã được cấu hình hoàn chỉnh để tự động build APK trên máy chủ GitHub
-     ngay khi đẩy commit lên nhánh main.
-   - Các bước: Git Push -> GitHub Actions chạy assembleDebug -> Xuất file artifact KhiemThiViet-APK.zip.
-
-2. Biên dịch cục bộ (Local Build) trên máy trạm:
-   - Yêu cầu môi trường: Temurin OpenJDK 17, Android SDK Platform 36 & Build-Tools 36.0.0.
-   - Lệnh chạy kiểm thử:
-       .\gradlew.bat test
-   - Lệnh đóng gói Debug APK:
-       .\gradlew.bat assembleDebug
-   - Script kiểm tra tính toàn vẹn 10 điểm:
-       powershell -ExecutionPolicy Bypass -File .\verify_m2_iter3.ps1
+1. Chuyển file APK vào điện thoại:
+   - Bản A (SaaS Debug): Sao chép app/build/outputs/apk/debug/app-debug.apk
+   - Bản B (Base Build): Sao chép file KhiemThiViet-CaiDat.apk
+   - Có thể gửi qua Zalo, Google Drive, Gmail, cáp USB hoặc Quick Share.
+2. Trên điện thoại, mở ứng dụng quản lý file (Files / Tệp của bạn) và chạm vào file APK.
+3. Nếu hệ điều hành Android hiển thị cảnh báo bảo mật "Nguồn không xác định":
+   - Bấm "Cài đặt" (Settings).
+   - Bật tùy chọn "Cho phép từ nguồn này" (Allow from this source).
+   - Nhấn "Cài đặt" (Install) để hoàn tất.
+4. Mở ứng dụng "Khiếm Thị Việt", tại màn hình chào mừng bấm nút "Kết nối Đám mây Google".
 
 --------------------------------------------------------------------------------
-PHẦN 4: MA TRẬN SO SÁNH TÍNH NĂNG
+CÁCH 2: CÀI ĐẶT NHANH QUA DÒNG LỆNH ADB (DÀNH CHO MÁY ẢO / MÁY TRẠM)
 --------------------------------------------------------------------------------
-Tính năng                                Bản APK gốc (Base)    Bản cập nhật SaaS (app-debug.apk)
+Kết nối thiết bị qua cáp USB (đã bật USB Debugging) hoặc khởi động máy ảo Android:
+- Để cài đặt bản SaaS Debug mới nhất:
+    adb install -r app/build/outputs/apk/debug/app-debug.apk
+- Để cài đặt bản Base Testing:
+    adb install -r KhiemThiViet-CaiDat.apk
+- Khởi động ứng dụng ngay trên thiết bị:
+    adb shell monkey -p com.example.khiemthiviet -c android.intent.category.LAUNCHER 1
+
 --------------------------------------------------------------------------------
-Quản lý Spa đơn lẻ (Single-Tenant)       ĐÃ TÍCH HỢP           ĐÃ TÍCH HỢP
-Sổ quỹ, Vé, Bảng lương, Lịch             ĐÃ TÍCH HỢP           ĐÃ TÍCH HỢP
-Trợ lý AI Gehihi (Gemini 3.8 Flash)      ĐÃ TÍCH HỢP           ĐÃ TÍCH HỢP
-Tương thích TalkBack người khiếm thị     ĐÃ TÍCH HỢP           ĐÃ TÍCH HỢP
-Phân quyền 4 cấp (SuperAdmin/Owner/Staff) Chưa có              ĐÃ BIÊN DỊCH TRONG DEX
-Dev Console Tab 6 & 'Góc nhìn Spa'       Chưa có              ĐÃ BIÊN DỊCH TRONG DEX
-Khóa cơ sở từ xa (TenantLockedScreen)    Chưa có              ĐÃ BIÊN DỊCH TRONG DEX
-Offline Cache Room SQLite (9 DAOs)       Chưa có              ĐÃ BIÊN DỊCH TRONG DEX
-FCM Notification rung đặc thù            Chưa có              ĐÃ BIÊN DỊCH TRONG DEX
-Thanh toán VietQR Napas 247 động        Chưa có              ĐÃ BIÊN DỊCH TRONG DEX
+THÔNG TIN TÀI KHOẢN ĐĂNG NHẬP THỬ NGHIỆM
+--------------------------------------------------------------------------------
+- Tài khoản Quản trị viên & Developer Super Admin:
+  + Số điện thoại đăng nhập: 0397772963
+  + Mật khẩu: 247208
+  + Quyền hạn: Toàn quyền Quản trị tiệm (Owner) và quyền Super Admin Developer (isDev = true).
+- Tài khoản Kỹ thuật viên (Thợ):
+  + Chọn trực tiếp tên KTV trong danh sách hoặc nhập SĐT nhân viên đã tạo.
+
+================================================================================
+PHẦN 3: HƯỚNG DẪN KIỂM THỬ TƯƠNG TÁC TỪNG BƯỚC CHO CÁC TÍNH NĂNG SAAS MỚI
+================================================================================
+
+(Áp dụng trên bản dựng SaaS Debug: app/build/outputs/apk/debug/app-debug.apk)
+
+--------------------------------------------------------------------------------
+KỊCH BẢN 1: BẢNG ĐIỀU KHIỂN DEVELOPER SUPER ADMIN CONSOLE
+--------------------------------------------------------------------------------
+Mục tiêu: Giám sát toàn bộ các cơ sở spa trong hệ thống, thực hiện khóa/mở khóa từ
+xa, gia hạn gói thuê bao và chuyển đổi góc nhìn cơ sở ('Góc nhìn Spa').
+
+Các bước thực hiện:
+1. Đăng nhập vào ứng dụng bằng tài khoản Admin/Dev (SĐT: 0397772963, MK: 247208).
+2. Dưới thanh điều hướng chính (Bottom Navigation Bar), chạm vào Tab 6: "Quyền hạn Admin"
+   (biểu tượng hình chiếc khiên bảo vệ).
+3. Tại thanh Sub-Tabs ở đầu màn hình, bạn sẽ thấy 4 mục:
+   [0: Cấp quyền & TK NV] | [1: TK Admin gốc] | [2: Sao lưu & Khôi phục] | [3: 👑 Dev Console]
+   => Chạm vào mục thứ tư: "👑 Dev Console".
+4. Kiểm tra các thành phần hiển thị trên Bảng điều khiển:
+   a) Thẻ chỉ số tổng quan (Overview Metric Cards):
+      - Ô "TỔNG CƠ SỞ": Hiển thị tổng số lượng tenant trong hệ thống.
+      - Ô "HOẠT ĐỘNG" (màu xanh lá): Hiển thị số cơ sở đang hoạt động bình thường.
+      - Ô "BỊ KHÓA" (màu đỏ): Hiển thị số cơ sở đang bị khóa hoặc hết hạn.
+   b) Hàng nút điều khiển:
+      - Nút "Làm mới": Tải lại danh sách tenant từ máy chủ Firestore/Room Cache.
+      - Nút "Thêm cơ sở mới": Mở hộp thoại tạo cơ sở spa mới với các trường: Mã cơ sở
+        (tenantId), Tên cơ sở, SĐT chủ tiệm, và thời hạn gói cước thuê bao.
+   c) Danh sách các cơ sở (Tenant Cards):
+      - Hiển thị tên từng spa, mã ID, trạng thái ("HOẠT ĐỘNG" hoặc "BỊ KHÓA"), ngày hết hạn.
+      - Nút Khóa / Mở khóa 1-chạm: Chạm để chuyển đổi trạng thái cơ sở ngay lập tức.
+      - Nút "Gia hạn": Mở dialog cộng thêm 30 ngày, 90 ngày hoặc 365 ngày thuê bao.
+      - Nút "Góc nhìn Spa": Bật chế độ thanh tra cơ sở. Khi bật, một banner màu cam xuất
+        hiện ở đỉnh màn hình: "👁️ Chế độ Góc nhìn Spa Đang Bật - Bạn đang quản lý & quan sát
+        dữ liệu cơ sở: [tenantId]" kèm nút "Về mặc định" để thoát bất kỳ lúc nào.
+
+--------------------------------------------------------------------------------
+KỊCH BẢN 2: MÀN HÌNH KHÓA CƠ SỞ TỪ XA (TENANTLOCKEDSCREEN & KILL-SWITCH)
+--------------------------------------------------------------------------------
+Mục tiêu: Đảm bảo cơ chế Kill-Switch chặn hoàn toàn truy cập của tiệm khi bị khóa,
+hiển thị đúng lý do và cho phép Super Admin mở khóa 1-chạm hoặc thoát khẩn cấp.
+
+Các bước thực hiện:
+1. Kích hoạt trạng thái khóa:
+   - Cách A: Tại "👑 Dev Console", tìm cơ sở và nhấn "Khóa cơ sở", nhập lý do (ví dụ:
+     "Hết hạn gói dịch vụ SaaS tháng 11/2026").
+   - Cách B: Sử dụng nút "Góc nhìn Spa" để chuyển ngữ cảnh sang một cơ sở đang bị khóa.
+2. Kiểm tra Màn hình khóa (TenantLockedScreen):
+   - Ứng dụng ngay lập tức hiển thị màn hình nền tối chuyên biệt (#1a1a2e).
+   - Biểu tượng Ổ khóa lớn màu đỏ cảnh báo (#FFFF6B6B).
+   - Tiêu đề in đậm to rõ: "Tài Khoản Tạm Thời Bị Khóa".
+   - Dòng văn bản thông báo lý do màu vàng rực (#FFFFD93D): hiển thị chính xác lý do
+     được nhập từ Dev Console.
+   - Hộp hiển thị liên kết VietQR hỗ trợ quét mã chuyển khoản thanh toán gia hạn nhanh.
+3. Kiểm tra các nút hành động tương tác:
+   - Nút "👑 Mở khóa ngay (Quyền Super Admin)" (màu xanh lá): Chạm 1 lần để mở khóa cơ sở
+     ngay lập tức mà không cần vào lại console.
+   - Nút "Thoát góc nhìn Spa (Về Bàn điều khiển Dev)" (màu xanh dương): Cho phép lập trình
+     viên thoát khỏi góc nhìn của cơ sở bị khóa để trở về Bàn điều khiển quản trị.
+   - Nút "Liên hệ hỗ trợ" (biểu tượng điện thoại): Mở liên hệ tổng đài/Zalo hỗ trợ.
+   - Nút "Đăng xuất tài khoản": Cho phép người dùng đăng xuất sạch sẽ khỏi máy.
+4. Kiểm tra Trợ năng TalkBack:
+   - Bật TalkBack (hoặc chế độ đọc màn hình trợ năng): Màn hình có thuộc tính ngữ nghĩa
+     tự động đọc to: "Tài khoản bị khóa. Vui lòng liên hệ hỗ trợ để gia hạn."
+
+--------------------------------------------------------------------------------
+KỊCH BẢN 3: HỘP THOẠI THANH TOÁN VIETQR NAPAS 247 ĐỘNG & TRỢ NĂNG TALKBACK
+--------------------------------------------------------------------------------
+Mục tiêu: Xác minh khả năng sinh mã QR thanh toán động Napas 247 theo chuẩn ngân hàng
+Việt Nam, tính năng sao chép STK 1-chạm và hỗ trợ TalkBack cho nhân viên khiếm thị.
+
+Các bước thực hiện:
+1. Chuyển đến Tab 0: "Quản lý Vé & Lập Vé" (Tab ngoài cùng bên trái).
+2. Tạo một vé làm dịch vụ mới (hoặc chọn một vé đang phục vụ):
+   - Chọn nhân viên KTV và chọn dịch vụ (ví dụ: "Massage body 60 phút - 150.000 đ").
+   - Nhấn "Tạo vé".
+3. Nhấn vào vé vừa tạo, chọn nút "Hoàn thành vé" để mở hộp thoại hoàn thành.
+4. Trong hộp thoại hoàn thành, bấm nút: "Thanh toán VietQR Napas 247".
+5. Kiểm tra giao diện Hộp thoại VietQrPaymentDialog:
+   a) Thẻ số tiền nổi bật:
+      - Hiển thị số tiền bằng số to rõ (ví dụ: "150.000 đ").
+      - Hiển thị số tiền bằng chữ tiếng Việt chuẩn xác (ví dụ: "Một trăm năm mươi nghìn đồng").
+   b) Thẻ thông tin tài khoản thụ hưởng:
+      - Tên ngân hàng đối tác (MB Bank, Vietcombank, Techcombank, v.v.).
+      - Số tài khoản thụ hưởng của cơ sở.
+      - Tên chủ tài khoản thụ hưởng.
+      - Nội dung chuyển khoản cú pháp chuẩn: SPA_<mã_tenant>_<mã_vé>.
+   c) Tính năng sao chép 1-chạm (1-Tap Copy):
+      - Bấm nút biểu tượng "Sao chép" cạnh Số tài khoản: Ứng dụng đưa STK vào Clipboard
+        và hiển thị Toast thông báo: "Đã sao chép STK".
+      - Bấm nút biểu tượng "Sao chép" cạnh Nội dung CK: Ứng dụng đưa nội dung chuyển
+        khoản vào Clipboard và thông báo: "Đã sao chép nội dung".
+   d) Nút xem ảnh mã QR:
+      - Bấm "Mở ảnh mã QR / Đưa khách quét": Ứng dụng mở ảnh mã VietQR Napas 247 chất
+        lượng cao được sinh động theo cú pháp URL:
+        https://img.vietqr.io/image/<bankCode>-<soTaiKhoan>-compact2.png?amount=<soTien>&addInfo=<noiDung>
+   e) Kiểm tra Trợ năng tiếng Việt TalkBack:
+      - Bật Google TalkBack: Chạm vào vùng thẻ thanh toán, TalkBack đọc toàn bộ thông tin
+        gói gọn tự nhiên: "Thanh toán VietQR Napas 247. Số tiền: Một trăm năm mươi nghìn
+        đồng. Ngân hàng Quân Đội MB, số tài khoản 0987654321, chủ tài khoản NGUYEN VAN A,
+        nội dung SPA_..." giúp kỹ thuật viên khiếm thị hoàn toàn chủ động mà không cần
+        nhìn màn hình.
+   f) Hoàn tất thanh toán:
+      - Nhấn "Khách đã chuyển xong → Hoàn thành": Vé được đóng, tự động ghi nhận vào Sổ
+        quỹ thu chi và cập nhật doanh thu cơ sở.
+
+--------------------------------------------------------------------------------
+KỊCH BẢN 4: CẤU HÌNH THÔNG TIN TÀI KHOẢN NGÂN HÀNG THỤ HƯỞNG (TAB 6, SUBTAB 1)
+--------------------------------------------------------------------------------
+Mục tiêu: Cấu hình thông tin tài khoản ngân hàng của chủ tiệm dùng để tự động tạo mã
+VietQR Napas 247 cho toàn bộ cơ sở.
+
+Các bước thực hiện:
+1. Đăng nhập tài khoản Quản trị viên (Admin/Owner).
+2. Chuyển sang Tab 6: "Quyền hạn Admin".
+3. Chọn SubTab 1: "TK Admin gốc".
+4. Cuộn màn hình xuống dưới, tìm thẻ: "💳 Cấu Hình Ngân Hàng Nhận Tiền VietQR".
+5. Nhập các thông số ngân hàng của cơ sở:
+   - "Mã Ngân hàng": Nhập mã viết tắt ngân hàng (ví dụ: MB, VCB, TCB, VPB, ACB, BIDV...).
+     Ô nhập tự động chuyển đổi chữ hoa.
+   - "Số tài khoản thụ hưởng": Nhập số tài khoản ngân hàng nhận tiền.
+   - "Tên chủ tài khoản": Nhập họ và tên chủ tài khoản (viết hoa không dấu hoặc có dấu).
+6. Thông tin được tự động lưu trữ tức thì vào cấu hình ứng dụng (`store.thongTinNganHang`)
+   và áp dụng ngay cho tất cả các giao dịch thanh toán vé tiếp theo.
+
+================================================================================
+PHẦN 4: HƯỚNG DẪN BIÊN DỊCH MÃ NGUỒN CỤC BỘ & QUY TRÌNH CLOUD CI
+================================================================================
+
+--------------------------------------------------------------------------------
+1. BIÊN DỊCH CỤC BỘ TRÊN MÁY TRẠM (LOCAL BUILD)
+--------------------------------------------------------------------------------
+Yêu cầu môi trường đã cấu hình:
+- Adoptium Temurin OpenJDK 17.0.21+9 (JAVA_HOME)
+- Android SDK Platform 36, Platform 36.1 và Build-Tools 36.0.0 (ANDROID_HOME)
+- Gradle 9.3.1 Wrapper (sử dụng .\gradlew.bat trong thư mục gốc dự án)
+
+Các lệnh thực thi chuẩn:
+1. Kiểm tra môi trường và công cụ:
+     where.exe java; where.exe javac; where.exe gradle; where.exe adb
+2. Chạy toàn bộ Unit Tests của dự án:
+     .\gradlew.bat test --stacktrace
+3. Biên dịch và đóng gói bản SaaS Multi-Tenant Debug APK:
+     .\gradlew.bat assembleDebug --stacktrace
+   File APK đầu ra sẽ nằm tại:
+     app/build/outputs/apk/debug/app-debug.apk
+4. Chạy bộ kiểm thử toàn vẹn 10 điểm (Integrity Audit Suite):
+     powershell -ExecutionPolicy Bypass -File .\verify_m2_iter3.ps1
+
+--------------------------------------------------------------------------------
+2. QUY TRÌNH TỰ ĐỘNG HÓA CLOUD CI QUA GITHUB ACTIONS
+--------------------------------------------------------------------------------
+File cấu hình: .github/workflows/build-apk.yml
+Cơ chế hoạt động:
+- Khi đẩy commit lên nhánh main của GitHub:
+    git push origin main
+- GitHub Actions tự động kích hoạt máy chủ ảo Ubuntu/Windows, nạp JDK 17, thiết lập
+  Android SDK và chạy lệnh `./gradlew assembleDebug`.
+- Tự động đóng gói và phát hành sản phẩm APK thành artifact nén `KhiemThiViet-APK.zip`
+  cho phép tải về trực tiếp từ giao diện GitHub Releases / Actions.
+
+================================================================================
+PHẦN 5: MA TRẬN SO SÁNH TÍNH NĂNG GIỮA 2 BẢN APK
+================================================================================
+
++-------------------------------------------+-------------------+--------------------+
+| Hạng mục Tính năng                        | Bản Base (Track A)| Bản SaaS (Track B) |
+|                                           | (KhiemThiViet.apk)| (app-debug.apk)    |
++-------------------------------------------+-------------------+--------------------+
+| Quản lý Dịch vụ & Bán gói Spa             | ĐÃ TÍCH HỢP       | ĐÃ TÍCH HỢP        |
+| Lập vé làm dịch vụ & Phân ca KTV          | ĐÃ TÍCH HỢP       | ĐÃ TÍCH HỢP        |
+| Sổ quỹ thu chi, Bảng lương, Lịch hẹn      | ĐÃ TÍCH HỢP       | ĐÃ TÍCH HỢP        |
+| Trợ lý AI Gehihi (Gemini 3.8 Flash)       | ĐÃ TÍCH HỢP       | ĐÃ TÍCH HỢP        |
+| Trợ năng TalkBack tiếng Việt chuẩn        | ĐÃ TÍCH HỢP       | ĐÃ TÍCH HỢP        |
+| Phân quyền 4 cấp (SuperAdmin/Owner/Staff) | Chưa hỗ trợ       | ĐÃ BIÊN DỊCH TRONG |
+| Dev Super Admin Console (Tab 6, SubTab 3) | Chưa hỗ trợ       | ĐÃ BIÊN DỊCH TRONG |
+| Màn hình khóa từ xa (TenantLockedScreen)  | Chưa hỗ trợ       | ĐÃ BIÊN DỊCH TRONG |
+| Chế độ 'Góc nhìn Spa' cho Super Admin     | Chưa hỗ trợ       | ĐÃ BIÊN DỊCH TRONG |
+| Bộ nhớ đệm SQLite Room Cache (9 DAOs)     | Chưa hỗ trợ       | ĐÃ BIÊN DỊCH TRONG |
+| Thông báo đẩy FCM nhịp rung đặc thù       | Chưa hỗ trợ       | ĐÃ BIÊN DỊCH TRONG |
+| Thanh toán VietQR Napas 247 động          | Chưa hỗ trợ       | ĐÃ BIÊN DỊCH TRONG |
+| Cấu hình Ngân hàng thụ hưởng VietQR       | Chưa hỗ trợ       | ĐÃ BIÊN DỊCH TRONG |
++-------------------------------------------+-------------------+--------------------+
 ================================================================================
