@@ -5853,7 +5853,7 @@ class SpaStore(context: Context) {
         val allTenants: List<TenantInfo>
     )
 
-    private fun fetchRoomCacheData(tenantId: String): RoomCachedSnapshot? {
+    private suspend fun fetchRoomCacheData(tenantId: String): RoomCachedSnapshot? {
         return try {
             val db = roomDb
             val accounts = db.accountDao().getAllByTenantSync(tenantId).map { it.toDomain() }

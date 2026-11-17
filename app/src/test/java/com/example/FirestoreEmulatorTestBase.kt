@@ -17,9 +17,12 @@ import kotlinx.coroutines.tasks.await
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.robolectric.shadows.ShadowLooper
 import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.net.URL
 
 abstract class FirestoreEmulatorTestBase {
@@ -31,8 +34,22 @@ abstract class FirestoreEmulatorTestBase {
     private val firestorePort = 8085
     private val authPort = 9099
 
+    private fun isEmulatorAvailable(host: String, port: Int): Boolean {
+        return try {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(host, port), 1000)
+                true
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     @Before
     fun setupEmulator() {
+        val emulatorOnline = isEmulatorAvailable(firestoreHost, firestorePort) && isEmulatorAvailable(firestoreHost, authPort)
+        assumeTrue("Firebase local emulators offline at $firestoreHost:$firestorePort - skipping emulator integration test", emulatorOnline)
+
         val context = ApplicationProvider.getApplicationContext<Context>()
         databaseId = context.getString(R.string.firestore_database_id)
         FirebaseApp.clearInstancesForTest()
@@ -60,13 +77,18 @@ abstract class FirestoreEmulatorTestBase {
     @After
     fun tearDownEmulator() {
         runCatching {
-            db.terminate()
+            if (::db.isInitialized) {
+                db.terminate()
+            }
             ShadowLooper.shadowMainLooper().idle()
         }
         FirebaseApp.clearInstancesForTest()
     }
 
     protected fun runEmulatorTest(block: suspend CoroutineScope.() -> Unit) {
+        val emulatorOnline = isEmulatorAvailable(firestoreHost, firestorePort) && isEmulatorAvailable(firestoreHost, authPort)
+        assumeTrue("Firebase local emulators offline at $firestoreHost:$firestorePort - skipping emulator integration test", emulatorOnline)
+
         val scope = CoroutineScope(Dispatchers.IO)
         val deferred = scope.async { block() }
         val mainLooper = ShadowLooper.shadowMainLooper()
@@ -110,28 +132,36 @@ abstract class FirestoreEmulatorTestBase {
     }
 
     private fun clearFirestoreEmulator() {
-        val url = URL("http://$firestoreHost:$firestorePort/emulator/v1/projects/$projectId/databases/$databaseId/documents")
-        (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "DELETE"
-            connectTimeout = 5000
-            readTimeout = 5000
-            check(responseCode in 200..299) {
-                "Failed to clear Firestore emulator (HTTP $responseCode). Is the emulator running on $firestoreHost:$firestorePort?"
+        try {
+            val url = URL("http://$firestoreHost:$firestorePort/emulator/v1/projects/$projectId/databases/$databaseId/documents")
+            (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "DELETE"
+                connectTimeout = 5000
+                readTimeout = 5000
+                check(responseCode in 200..299) {
+                    "Failed to clear Firestore emulator (HTTP $responseCode). Is the emulator running on $firestoreHost:$firestorePort?"
+                }
+                disconnect()
             }
-            disconnect()
+        } catch (e: Exception) {
+            assumeTrue("Failed to connect to Firestore emulator: ${e.message}", false)
         }
     }
 
     private fun clearAuthEmulator() {
-        val url = URL("http://$firestoreHost:$authPort/emulator/v1/projects/$projectId/accounts")
-        (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "DELETE"
-            connectTimeout = 5000
-            readTimeout = 5000
-            check(responseCode in 200..299) {
-                "Failed to clear Auth emulator (HTTP $responseCode). Is the Auth emulator running on $firestoreHost:$authPort?"
+        try {
+            val url = URL("http://$firestoreHost:$authPort/emulator/v1/projects/$projectId/accounts")
+            (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "DELETE"
+                connectTimeout = 5000
+                readTimeout = 5000
+                check(responseCode in 200..299) {
+                    "Failed to clear Auth emulator (HTTP $responseCode). Is the Auth emulator running on $firestoreHost:$authPort?"
+                }
+                disconnect()
             }
-            disconnect()
+        } catch (e: Exception) {
+            assumeTrue("Failed to connect to Auth emulator: ${e.message}", false)
         }
     }
 }

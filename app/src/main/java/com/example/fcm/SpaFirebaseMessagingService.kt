@@ -78,7 +78,7 @@ class SpaFirebaseMessagingService : FirebaseMessagingService() {
             ).apply {
                 description = "Kênh thông báo âm thanh và rung báo mạnh mẽ dành cho KTV và Lễ tân khiếm thị"
                 enableVibration(true)
-                vibrationPattern = vibrationPattern
+                setVibrationPattern(vibrationPattern)
             }
             notificationManager.createNotificationChannel(channel)
         }

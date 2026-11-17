@@ -2,4 +2,5 @@
 <resources>
     <string name="firestore_database_id" translatable="false">ai-studio-android-khimthvi-ef189eaa-cab2-4f58-8d2e-533cd20261f3</string>
     <string name="recaptcha_site_key" translatable="false">6LdC-P8tAAAAAHQFYuvlO99CGz0FK6-tqt4hReGK</string>
+    <string name="default_web_client_id" translatable="false">1234567890-mock.apps.googleusercontent.com</string>
 </resources>
