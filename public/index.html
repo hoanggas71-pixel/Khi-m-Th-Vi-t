@@ -1212,8 +1212,29 @@
     function saveTenants() {
       try {
         localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
+        // Tự động đẩy sang API server nội bộ để máy ảo Android nhận được ngay
+        fetch('/api/tenants', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(tenants)
+        }).catch(() => {});
       } catch (e) {}
     }
+
+    async function syncTenantsWithApi() {
+      try {
+        const res = await fetch('/api/tenants');
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0) {
+            tenants = list;
+            localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
+            renderTable();
+          }
+        }
+      } catch (e) {}
+    }
+    syncTenantsWithApi();
 
     let tenants = loadTenants();
     let isGlobalMaintenance = localStorage.getItem(STORAGE_KEY_MAINTENANCE) === "true";

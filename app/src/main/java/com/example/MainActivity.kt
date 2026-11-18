@@ -702,108 +702,6 @@ fun OneTimeLoginScreen(store: SpaStore) {
                     )
                 }
 
-                // R3. Gợi ý tài khoản đăng nhập mẫu (Chủ Spa & KTV Lan) với chuẩn TalkBack
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics(mergeDescendants = true) {
-                            contentDescription = "Tài khoản đăng nhập mẫu thử nghiệm: Chủ Spa số điện thoại 0397772963, mật khẩu 247208 hoặc 1234. Kỹ thuật viên Lan số điện thoại 0987654321, mã PIN 1234."
-                        }
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Filled.SwitchAccount,
-                                contentDescription = null,
-                                tint = SpaRosewoodDark,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Tài khoản đăng nhập mẫu:",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                color = SpaRosewoodDark
-                            )
-                        }
-
-                        // Chủ Spa: 0397772963 / 247208 (hoặc 1234)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    phoneInput = "0397772963"
-                                    passwordInput = "247208"
-                                    errorMessage = ""
-                                }
-                                .padding(vertical = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = "👑 Chủ Spa:",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp
-                                )
-                                Text(
-                                    text = "SĐT: 0397772963 | Mật khẩu: 247208 (hoặc 1234)",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Text(
-                                text = "Chọn",
-                                fontSize = 11.sp,
-                                color = SpaRosewoodDark,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-
-                        // KTV Lan: 0987654321 / PIN 1234
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    phoneInput = "0987654321"
-                                    passwordInput = "1234"
-                                    errorMessage = ""
-                                }
-                                .padding(vertical = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = "💆 KTV Lan:",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp
-                                )
-                                Text(
-                                    text = "SĐT: 0987654321 | PIN: 1234",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Text(
-                                text = "Chọn",
-                                fontSize = 11.sp,
-                                color = SpaRosewoodDark,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
                 // R2. Nút Đăng nhập có trạng thái chờ ("Đang kiểm tra...") và vô hiệu hóa tương tác
                 Button(
                     onClick = {
@@ -867,70 +765,11 @@ fun OneTimeLoginScreen(store: SpaStore) {
                     }
                 }
 
-                // R4. Tinh gọn nút Google thành liên kết phụ / nút nhỏ gọn gàng
-                TextButton(
-                    onClick = {
-                        if (!cloudBusy && !isLoggingIn) {
-                            cloudBusy = true
-                            errorMessage = ""
-                            scope.launch {
-                                try {
-                                    if (store.isCloudConnected) {
-                                        val ok = store.refreshFromCloudNow()
-                                        Toast.makeText(
-                                            context,
-                                            if (ok) "Đã đồng bộ ${store.taiKhoans.size} tài khoản mới nhất từ đám mây!" else "Không thể tải từ đám mây, vui lòng kiểm tra mạng.",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    } else {
-                                        signInWithGoogleInteractive(
-                                            activityContext = context,
-                                            onSignedIn = {
-                                                store.startRealtimeCloudSync()
-                                                Toast.makeText(
-                                                    context,
-                                                    "Đã kết nối Đám mây! Đang đồng bộ tài khoản & dữ liệu thời gian thực...",
-                                                    Toast.LENGTH_LONG
-                                                ).show()
-                                            },
-                                            onError = { msg ->
-                                                errorMessage = msg
-                                            }
-                                        )
-                                    }
-                                } finally {
-                                    cloudBusy = false
-                                }
-                            }
-                        }
-                    },
-                    enabled = !isLoggingIn,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics {
-                            contentDescription = "Kết nối Đám mây Google để đồng bộ dữ liệu thời gian thực giữa máy Admin và máy Nhân viên"
-                        }
-                        .testTag("btn_connect_google_cloud")
-                ) {
-                    if (cloudBusy) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 1.5.dp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Đang kết nối đám mây...", fontSize = 13.sp)
-                    } else {
-                        Text(
-                            if (store.isCloudConnected) "☁️ Đã kết nối Đám mây Google" else "☁️ Kết nối Đám mây Google (Tùy chọn)",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                 Text(
-                    text = "Lưu ý: Nhân viên chỉ nhập số điện thoại và mật khẩu 1 lần duy nhất. Khi đã kết nối đám mây, mọi vé, khách hàng và gói dịch vụ đều tự động đồng bộ 100% thời gian thực giữa các máy.",
-                    fontSize = 13.sp,
+                    text = "Lưu ý: Chỉ cần nhập số điện thoại và mật khẩu 1 lần duy nhất trên máy này để sử dụng trọn gói.",
+                    fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
