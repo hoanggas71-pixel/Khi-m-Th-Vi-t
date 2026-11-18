@@ -97,6 +97,9 @@ import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.SwitchAccount
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -598,6 +601,7 @@ fun OneTimeLoginScreen(store: SpaStore) {
     var phoneInput by rememberSaveable { mutableStateOf("") }
     var passwordInput by rememberSaveable { mutableStateOf("") }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var rememberMe by rememberSaveable { mutableStateOf(true) }
     var isLoggingIn by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var cloudBusy by remember { mutableStateOf(false) }
@@ -613,6 +617,36 @@ fun OneTimeLoginScreen(store: SpaStore) {
         verticalArrangement = Arrangement.Center
     ) {
         Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+
+        // Thông báo ngắt phiên từ Web Portal / Máy chủ nếu có
+        if (!store.facilityTerminationNotice.isNullOrBlank()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .semantics {
+                        liveRegion = LiveRegionMode.Assertive
+                        contentDescription = "Thông báo ngắt phiên: ${store.facilityTerminationNotice}"
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("⚠️", fontSize = 20.sp)
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = store.facilityTerminationNotice ?: "",
+                        color = Color(0xFFC62828),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+        }
 
         Card(
             shape = RoundedCornerShape(18.dp),
@@ -652,7 +686,7 @@ fun OneTimeLoginScreen(store: SpaStore) {
                         errorMessage = ""
                     },
                     label = { Text("Tên đăng nhập (Số điện thoại hoặc Gmail)") },
-                    placeholder = { Text("Nhập số điện thoại Admin cấp cho bạn") },
+                    placeholder = { Text("VD: 0912345678") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                     modifier = Modifier
@@ -667,7 +701,7 @@ fun OneTimeLoginScreen(store: SpaStore) {
                         errorMessage = ""
                     },
                     label = { Text("Mật khẩu") },
-                    placeholder = { Text("Nhập mật khẩu Admin cấp") },
+                    placeholder = { Text("VD: 123456") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
@@ -690,6 +724,37 @@ fun OneTimeLoginScreen(store: SpaStore) {
                         .testTag("login_password_input")
                 )
 
+                // R1. Checkbox "Ghi nhớ tài khoản / mật khẩu", mặc định checked, đầy đủ TalkBack semantics
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = rememberMe,
+                            role = Role.Checkbox,
+                            onValueChange = { rememberMe = it }
+                        )
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = rememberMe,
+                        onCheckedChange = null,
+                        modifier = Modifier.semantics {
+                            contentDescription = if (rememberMe) {
+                                "Ghi nhớ tài khoản và mật khẩu, đã chọn. Tự động đăng nhập vào các lần mở ứng dụng tiếp theo."
+                            } else {
+                                "Ghi nhớ tài khoản và mật khẩu, chưa chọn. Ứng dụng sẽ không lưu phiên và yêu cầu nhập lại ở lần mở tiếp theo."
+                            }
+                        }.testTag("checkbox_remember_login")
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Ghi nhớ tài khoản / mật khẩu",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
                 if (errorMessage.isNotBlank()) {
                     Text(
                         text = errorMessage,
@@ -711,7 +776,7 @@ fun OneTimeLoginScreen(store: SpaStore) {
                             isLoggingIn = true
                             scope.launch {
                                 try {
-                                    val ok = store.pullLatestFromCloudAndLogin(phoneInput, passwordInput)
+                                    val ok = store.pullLatestFromCloudAndLogin(phoneInput, passwordInput, rememberMe)
                                     if (ok) {
                                         Toast.makeText(
                                             context,
@@ -765,12 +830,39 @@ fun OneTimeLoginScreen(store: SpaStore) {
                     }
                 }
 
+                // R4. Nút Mua / Gia hạn gói dịch vụ điều hướng trực tiếp Zalo
+                OutlinedButton(
+                    onClick = {
+                        runCatching {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://zalo.me/0397772963")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        }.onFailure {
+                            Toast.makeText(context, "Hotline/Zalo tư vấn: 0397772963", Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .semantics {
+                            contentDescription = "Mua hoặc gia hạn gói dịch vụ. Chạm đúp để mở Zalo liên hệ trực tiếp nhà phát triển tư vấn đăng ký."
+                        }
+                        .testTag("btn_login_zalo_consult")
+                ) {
+                    Icon(Icons.Default.Phone, contentDescription = null, tint = SpaRosewood, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("MUA / GIA HẠN GÓI DỊCH VỤ (ZALO)", fontWeight = FontWeight.Bold, color = SpaRosewood, fontSize = 13.sp)
+                }
+
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                 Text(
-                    text = "Lưu ý: Chỉ cần nhập số điện thoại và mật khẩu 1 lần duy nhất trên máy này để sử dụng trọn gói.",
+                    text = "Lưu ý: Chỉ cần nhập số điện thoại và mật khẩu 1 lần duy nhất trên máy này để sử dụng trọn gói. Chưa có tài khoản? Vui lòng liên hệ Zalo (0397772963) để đăng ký.",
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
                 )
             }
         }
@@ -2078,6 +2170,22 @@ fun VietQrPaymentDialog(
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Mở ảnh mã QR / Đưa khách quét", fontSize = 13.sp)
+                    }
+
+                    // Ghi chú nhắc nhở chụp màn hình giao dịch
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+                            contentDescription = "Lưu ý thanh toán: Quý khách vui lòng chụp lại màn hình giao dịch chuyển khoản thành công và liên hệ qua Zalo khi cần hỗ trợ đối soát."
+                        }
+                    ) {
+                        Text(
+                            "📸 Lưu ý: Quý khách vui lòng chụp lại màn hình giao dịch chuyển khoản thành công và liên hệ qua Zalo (0397772963) để được hỗ trợ/đối soát khi cần.",
+                            modifier = Modifier.padding(10.dp),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -4691,6 +4799,7 @@ fun TabQuyenHanAdmin(
     val adminSubTab = store.requestedAdminSubTab
     var showCreateAccountDialog by remember { mutableStateOf(false) }
     var showApkInstallGuideDialog by remember { mutableStateOf(false) }
+    var showTalkBackBackupDialog by remember { mutableStateOf(false) }
     var tkBeingEdited by remember { mutableStateOf<TaiKhoan?>(null) }
     var tkConfirmDelete by remember { mutableStateOf<TaiKhoan?>(null) }
 
@@ -5459,6 +5568,100 @@ fun TabQuyenHanAdmin(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    // R2. Nút & Hộp thoại trợ giúp TalkBack về Cơ chế sao lưu 1 tuần & Zalo
+                    Button(
+                        onClick = { showTalkBackBackupDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = SpaRosewoodDark),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .semantics {
+                                contentDescription = "Hướng dẫn trợ năng TalkBack về cơ chế tự động sao lưu dữ liệu một tuần ra thư mục Documents và chia sẻ Zalo"
+                            }
+                            .testTag("btn_talkback_backup_help")
+                    ) {
+                        Icon(Icons.Default.VolumeUp, contentDescription = null, tint = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "📢 HƯỚNG DẪN TALKBACK: SAO LƯU HÀNG TUẦN & ZALO",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = Color.White
+                        )
+                    }
+
+                    if (showTalkBackBackupDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showTalkBackBackupDialog = false },
+                            title = {
+                                Text(
+                                    "📢 Hướng Dẫn TalkBack: Cơ Chế Sao Lưu Định Kỳ & Zalo",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    color = SpaRosewoodDark
+                                )
+                            },
+                            text = {
+                                Column(
+                                    modifier = Modifier
+                                        .verticalScroll(rememberScrollState())
+                                        .semantics(mergeDescendants = true) {
+                                            contentDescription = "Tính năng Sao lưu dữ liệu hàng tuần. " +
+                                                "Hệ thống Khiếm Thị Việt tự động tạo một bản sao lưu toàn bộ dữ liệu của cơ sở vào thư mục Documents trên điện thoại của bạn, định kỳ mỗi tuần một lần. " +
+                                                "Dữ liệu sao lưu bao gồm: danh sách khách hàng, nhân viên, bảng giá dịch vụ, các vé phục vụ, sổ quỹ thu chi và ký ức trợ lý Gehihi. " +
+                                                "Sau khi tạo file sao lưu, ứng dụng sẽ tự động mở hộp thoại chia sẻ để bạn gửi file trực tiếp sang Zalo. Bạn nên chọn gửi vào mục 'Cloud của tôi' trên Zalo để lưu trữ an toàn vĩnh viễn trên mạng. " +
+                                                "Bất cứ lúc nào, bạn cũng có thể bấm nút 'Xuất file Backup' hoặc 'Chia sẻ Zalo' trong màn hình này để sao lưu ngay lập tức. " +
+                                                "Khi bạn đổi sang điện thoại mới hoặc lỡ xóa ứng dụng, bạn chỉ cần chọn lại file sao lưu từ Zalo để khôi phục lại toàn bộ dữ liệu một trăm phần trăm, không lo mất mát thông tin của tiệm."
+                                        },
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Text(
+                                        "1. Tự động sao lưu định kỳ 1 tuần:",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = SpaRosewood
+                                    )
+                                    Text(
+                                        "Hệ thống Khiếm Thị Việt tự động tạo bản sao lưu toàn bộ cơ sở vào thư mục Documents của điện thoại mỗi tuần 1 lần. File sao lưu định dạng .json chứa đầy đủ: Khách hàng, Nhân viên, Dịch vụ, Vé làm, Sổ quỹ và Ký ức Gehihi.",
+                                        fontSize = 13.sp,
+                                        lineHeight = 18.sp
+                                    )
+                                    Text(
+                                        "2. Chia sẻ file sao lưu qua Zalo:",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = SpaRosewood
+                                    )
+                                    Text(
+                                        "Ứng dụng mở sẵn Intent chia sẻ hệ thống để Chủ Spa gửi file sao lưu vào mục 'Cloud của tôi' trên Zalo để lưu trữ vĩnh viễn trên đám mây an toàn.",
+                                        fontSize = 13.sp,
+                                        lineHeight = 18.sp
+                                    )
+                                    Text(
+                                        "3. Khôi phục nhanh chóng khi đổi máy:",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = SpaRosewood
+                                    )
+                                    Text(
+                                        "Khi đổi điện thoại mới hoặc cài lại ứng dụng, chỉ cần tải file từ Zalo về máy và nhấn 'Nhập dữ liệu từ File Backup' để khôi phục 100% dữ liệu chỉ sau vài giây.",
+                                        fontSize = 13.sp,
+                                        lineHeight = 18.sp
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = { showTalkBackBackupDialog = false },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SpaRosewood)
+                                ) {
+                                    Text("Đã hiểu")
+                                }
+                            }
+                        )
+                    }
+
                     Card(
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -7992,6 +8195,7 @@ fun AccountSwitchDialog(
                     value = phoneInput,
                     onValueChange = { phoneInput = it },
                     label = { Text("Số điện thoại đăng nhập") },
+                    placeholder = { Text("VD: 0912345678") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -8000,6 +8204,7 @@ fun AccountSwitchDialog(
                     value = passwordInput,
                     onValueChange = { passwordInput = it },
                     label = { Text("Mật khẩu") },
+                    placeholder = { Text("VD: 123456") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -8193,6 +8398,7 @@ fun TenantLockedScreen(
     store: SpaStore,
     onDismissDev: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
     val isDev = store.currentUser?.isDev() == true
 
     Box(
@@ -8250,6 +8456,25 @@ fun TenantLockedScreen(
                 }
             }
 
+            // Ghi chú nhắc nhở chụp màn hình thanh toán
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2C2C4E)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+                    contentDescription = "Lưu ý sau khi thanh toán: Quý khách vui lòng chụp lại màn hình giao dịch chuyển khoản thành công và liên hệ nhà phát triển qua Zalo để được kích hoạt sử dụng tức thì."
+                }
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("📸 LƯU Ý SAU KHI THANH TOÁN:", color = Color(0xFFFFD93D), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(
+                        "Quý khách vui lòng chụp lại màn hình giao dịch chuyển khoản thành công và liên hệ nhà phát triển qua Zalo (0397772963) để được xác nhận và kích hoạt ngày dùng tức thì!",
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+
             // Thoát góc nhìn cơ sở dành cho Super Admin Developer
             if (isDev || onDismissDev != null) {
                 Button(
@@ -8269,13 +8494,25 @@ fun TenantLockedScreen(
             }
 
             OutlinedButton(
-                onClick = { /* Mở Zalo/Call hỗ trợ */ },
+                onClick = {
+                    runCatching {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://zalo.me/0397772963")).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    }.onFailure {
+                        Toast.makeText(context, "Hotline/Zalo hỗ trợ: 0397772963", Toast.LENGTH_LONG).show()
+                    }
+                },
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
+                modifier = Modifier.semantics {
+                    contentDescription = "Liên hệ hỗ trợ qua Zalo nhà phát triển"
+                }
             ) {
                 Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Liên hệ hỗ trợ")
+                Text("Liên hệ hỗ trợ (Zalo)")
             }
 
             if (isDev) {

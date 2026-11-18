@@ -48,7 +48,7 @@ if (-not $hasJdk) {
 # --- TEST 2: Build Outputs Directory Integrity Audit (Anti-Masquerading Guard) ---
 Write-Host "`n=== TEST 2: Build Outputs Directory Integrity Audit ==="
 $outputApkDir = Join-Path $projectRoot "app\build\outputs\apk\debug"
-$legacyHash = "CA485D7225C220FE4C7F527C5F5692C26B2F8444CDEF5F3958FD55318AECE117"
+$legacyHash = "49C8ACAEA696CCF3F34A1BCE78826BF5E07C90AD714ACEC7C7EF7170E6C7FD27"
 
 if (Test-Path $outputApkDir) {
     $apksInOutput = Get-ChildItem -Path $outputApkDir -Filter "*.apk" -File

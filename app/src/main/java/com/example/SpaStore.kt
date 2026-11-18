@@ -224,6 +224,7 @@ class SpaStore(context: Context) {
         private set
     var tenantLockQrUrl by mutableStateOf("")
         private set
+    var facilityTerminationNotice by mutableStateOf<String?>(null)
     private var tenantStatusListener: ListenerRegistration? = null
     private var globalMaintenanceListener: ListenerRegistration? = null
     var isGlobalMaintenance by mutableStateOf(false)
@@ -656,7 +657,7 @@ class SpaStore(context: Context) {
         )
     )
 
-    fun login(phoneOrUsername: String, rawPassword: String): Boolean {
+    fun login(phoneOrUsername: String, rawPassword: String, rememberMe: Boolean = true): Boolean {
         val cleanInput = phoneOrUsername.trim()
         val cleanLower = cleanInput.replace(" ", "").replace(".", "").lowercase()
         val normDigits = normalizePhoneDigits(cleanInput)
@@ -696,7 +697,12 @@ class SpaStore(context: Context) {
                 matched
             }
             currentUser = finalMatched
-            prefs.edit().putString(KEY_LOGGED_IN_ACCOUNT_ID, finalMatched.id).apply()
+            if (rememberMe) {
+                prefs.edit().putString(KEY_LOGGED_IN_ACCOUNT_ID, finalMatched.id).apply()
+            } else {
+                prefs.edit().remove(KEY_LOGGED_IN_ACCOUNT_ID).apply()
+            }
+            facilityTerminationNotice = null
             syncCurrentUserProfileToCloud()
             startTenantStatusListener()
             return true
@@ -732,7 +738,8 @@ class SpaStore(context: Context) {
         pass: String,
         planId: String = "VIP 1 Năm",
         daysLeft: Int = 365,
-        expiryDate: String = ""
+        expiryDate: String = "",
+        rememberMe: Boolean = true
     ): Boolean {
         val cleanPhone = normalizePhoneDigits(ownerPhone)
         val tkId = "tk_owner_$cleanPhone"
@@ -765,7 +772,7 @@ class SpaStore(context: Context) {
         )
 
         saveToPrefs()
-        val ok = login(cleanPhone, pass)
+        val ok = login(cleanPhone, pass, rememberMe = rememberMe)
         if (ok) {
             startTenantStatusListener()
         }
@@ -778,8 +785,8 @@ class SpaStore(context: Context) {
      * 2. Tra cứu qua Firestore Cloud Database (hỗ trợ online thật khi triển khai ra Internet)
      * 3. Tự động cấp quyền khởi tạo tài khoản Owner và mở app ngay lập tức!
      */
-    suspend fun pullLatestFromCloudAndLogin(phoneOrUsername: String, rawPassword: String): Boolean = withContext(Dispatchers.IO) {
-        if (login(phoneOrUsername, rawPassword)) return@withContext true
+    suspend fun pullLatestFromCloudAndLogin(phoneOrUsername: String, rawPassword: String, rememberMe: Boolean = true): Boolean = withContext(Dispatchers.IO) {
+        if (login(phoneOrUsername, rawPassword, rememberMe = rememberMe)) return@withContext true
 
         val cleanPhone = normalizePhoneDigits(phoneOrUsername)
         val cleanPass = rawPassword.trim()
@@ -816,7 +823,8 @@ class SpaStore(context: Context) {
                                 pass = cleanPass,
                                 planId = plan,
                                 daysLeft = days,
-                                expiryDate = exp
+                                expiryDate = exp,
+                                rememberMe = rememberMe
                             )
                         }
                     }
@@ -836,6 +844,9 @@ class SpaStore(context: Context) {
                     val status = doc.getString("status") ?: "ACTIVE"
                     val isLocked = doc.getBoolean("isLocked") ?: false
                     val pin = doc.getString("tempPin") ?: "247208"
+                    if (status == "DELETED" || status == "DISABLED" || status == "INACTIVE") {
+                        return@withContext false
+                    }
                     if (!isLocked && status == "ACTIVE" && (cleanPass == pin || cleanPass == "247208" || cleanPass == "1234")) {
                         return@withContext provisionAndLoginTenantOwner(
                             tenantId = docId,
@@ -844,7 +855,8 @@ class SpaStore(context: Context) {
                             pass = cleanPass,
                             planId = doc.getString("planId") ?: "VIP 1 Năm",
                             daysLeft = doc.getLong("daysLeft")?.toInt() ?: 365,
-                            expiryDate = doc.getString("expiryDate") ?: ""
+                            expiryDate = doc.getString("expiryDate") ?: "",
+                            rememberMe = rememberMe
                         )
                     }
                 }
@@ -864,7 +876,7 @@ class SpaStore(context: Context) {
                         pushToCloudWorkspace()
                     }
                 }
-                return@withContext login(phoneOrUsername, rawPassword)
+                return@withContext login(phoneOrUsername, rawPassword, rememberMe = rememberMe)
             } catch (e: Exception) {
                 Log.e(TAG, "pullLatestFromCloudAndLogin fallback error", e)
             }
@@ -998,11 +1010,23 @@ class SpaStore(context: Context) {
         tenantStatusListener = db.collection("tenants")
             .document(currentTenantId)
             .addSnapshotListener { snap, err ->
-                if (err != null || snap == null || !snap.exists()) return@addSnapshotListener
+                if (err != null) return@addSnapshotListener
+                if (snap == null || !snap.exists()) {
+                    facilityTerminationNotice = "Cơ sở này đã bị xóa khỏi hệ sinh thái Khiếm Thị Việt trên Web Portal. Phiên làm việc đã kết thúc."
+                    logout()
+                    return@addSnapshotListener
+                }
                 val status = snap.getString("status") ?: "ACTIVE"
                 val isLocked = snap.getBoolean("isLocked") ?: false
                 val lockedReason = snap.getString("lockedReason") ?: ""
                 val qrUrl = snap.getString("qrPaymentUrl") ?: snap.getString("lockDetails.qrPaymentUrl") ?: ""
+
+                if (status == "DELETED" || status == "DISABLED" || status == "INACTIVE" || status == "CANCELLED") {
+                    facilityTerminationNotice = "Cơ sở này đã bị vô hiệu hóa hoặc ngừng hoạt động trên Web Portal. Phiên làm việc đã kết thúc."
+                    logout()
+                    return@addSnapshotListener
+                }
+
                 isTenantLocked = (status != "ACTIVE" || isLocked)
                 tenantLockReason = if (isTenantLocked) lockedReason.ifBlank { "Tài khoản đã bị tạm khóa. Vui lòng liên hệ hỗ trợ." } else ""
                 tenantLockQrUrl = qrUrl

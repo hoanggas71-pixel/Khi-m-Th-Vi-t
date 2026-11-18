@@ -581,7 +581,7 @@
       </div>
 
       <div class="space-y-3">
-        <input type="password" id="dev-pin-input" maxlength="10" placeholder="Nhập PIN (Mặc định: 247208)" 
+        <input type="password" id="dev-pin-input" maxlength="10" placeholder="Nhập mã PIN Dev (VD: 123456)" 
                onkeydown="if(event.key==='Enter') verifyDevPin()"
                class="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 text-center text-lg font-mono tracking-widest text-white focus:outline-none focus:border-indigo-500 transition">
         <div id="dev-pin-error" class="text-xs text-rose-400 hidden font-medium">⚠️ Mã PIN không đúng! Thử lại.</div>
@@ -827,7 +827,7 @@
           </div>
           <div>
             <label class="font-medium text-slate-400 block mb-1">Số tài khoản:</label>
-            <input type="text" id="cfg-bank-account" placeholder="VD: 0397772963" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono font-bold">
+            <input type="text" id="cfg-bank-account" placeholder="VD: 0912345678" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono font-bold">
           </div>
           <div>
             <label class="font-medium text-slate-400 block mb-1">Tên chủ tài khoản:</label>
@@ -957,6 +957,15 @@
             <a id="btn-open-zalo-web-invoice" href="#" target="_blank" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition" title="Đăng nhập Zalo trên trình duyệt Web">
               <span>🌐</span> Web
             </a>
+          </div>
+        </div>
+
+        <!-- Lưu ý sau khi thanh toán VietQR -->
+        <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 leading-relaxed text-left flex items-start gap-2.5 mt-2">
+          <span class="text-base shrink-0">📸</span>
+          <div>
+            <strong class="text-white">Lưu ý sau khi thanh toán:</strong><br>
+            Quý khách vui lòng <span class="text-amber-200 font-bold underline">chụp lại màn hình giao dịch chuyển khoản thành công</span> và liên hệ gửi cho Dev qua Zalo (<a href="https://zalo.me/0397772963" target="_blank" class="text-emerald-400 font-mono font-bold underline">0397772963</a>) để được xác nhận và kích hoạt ngày dùng tức thì!
           </div>
         </div>
       </div>
