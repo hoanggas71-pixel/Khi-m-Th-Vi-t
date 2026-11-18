@@ -326,9 +326,6 @@ data class LenhChoXacNhanGehihi(
  */
 const val DEFAULT_ADMIN_PHONE = "0397772963"
 const val DEFAULT_ADMIN_PASS = "247208"
-const val DEFAULT_TEST_ADMIN_PHONE = "0988888888"
-const val DEFAULT_TEST_ADMIN_PASS = "1234"
-const val ID_TEST_ADMIN = "tk_admin_test"
 
 fun TaiKhoan?.isAdmin(): Boolean = this?.quyen == VaiTro.OWNER
 fun TaiKhoan?.isOwner(): Boolean = isAdmin()

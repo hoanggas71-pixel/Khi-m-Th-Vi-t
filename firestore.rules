@@ -213,5 +213,11 @@ service cloud.firestore {
                     && incoming().workspaceId == existing().workspaceId;
       allow delete: if false; // Tuyệt đối bảo vệ, không cho xóa không gian chung
     }
+
+    // --- TẦNG BẢO TRÌ HỆ THỐNG TOÀN CỤC (Global Maintenance Status) ---
+    match /system_status/{docId} {
+      allow read: if true;
+      allow write: if isDev();
+    }
   }
 }

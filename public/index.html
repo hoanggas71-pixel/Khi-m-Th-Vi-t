@@ -105,6 +105,27 @@
       </div>
     </div>
 
+    <!-- Global Maintenance Control Panel -->
+    <div class="bg-gradient-to-r from-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🚨</span>
+          <h3 class="text-sm font-bold text-white">Chế Độ Bảo Trì Toàn Hệ Thống (Global Maintenance)</h3>
+          <span id="maintenance-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+            🟢 Bình Thường (Sẵn Sàng)
+          </span>
+        </div>
+        <p class="text-xs text-slate-400 max-w-3xl leading-relaxed">
+          Khi kích hoạt, <strong class="text-slate-200">tất cả ứng dụng Khiếm Thị Việt (toàn bộ KTV và Chủ Spa)</strong> sẽ nhận tín hiệu và hiển thị màn hình khóa bảo trì ngay lập tức. KTV được nhắc liên hệ Chủ Spa, Chủ Spa có nút TalkBack liên hệ Kỹ thuật Dev qua Zalo (<strong class="text-emerald-400 font-mono">0397772963</strong>). Khi tắt bảo trì, mọi app tự động mở lại bình thường không cần đăng nhập lại.
+        </p>
+      </div>
+      <div class="flex items-center gap-3 shrink-0">
+        <button id="btn-toggle-maintenance" onclick="toggleGlobalMaintenance()" class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">
+          <span>🛠️</span> <span id="btn-maintenance-label">Bật Chế Độ Bảo Trì</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Tenant Spa Management Table -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
       <div class="p-4 sm:px-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -189,12 +210,12 @@
     </div>
   </div>
 
-  <!-- Modal: Thêm cơ sở Spa mới -->
+  <!-- Modal: Thêm cơ sở Spa mới (Onboarding) -->
   <div id="create-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <span>🏢</span> Thêm Cơ Sở Spa Thuê Mới
+          <span>🏢</span> Thêm Cơ Sở Spa Thuê Mới (Onboarding)
         </h3>
         <button onclick="closeCreateModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
       </div>
@@ -209,6 +230,15 @@
           <input type="text" id="new-owner-phone" placeholder="VD: 0988123456" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono">
         </div>
         <div>
+          <label class="font-medium text-slate-300 block mb-1">Mật khẩu tạm / Mã PIN đăng nhập:</label>
+          <div class="flex gap-2">
+            <input type="text" id="new-temp-pin" placeholder="VD: 123456" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono">
+            <button type="button" onclick="generateRandomPin('new-temp-pin')" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 shrink-0">
+              🎲 Tạo PIN ngẫu nhiên
+            </button>
+          </div>
+        </div>
+        <div>
           <label class="font-medium text-slate-300 block mb-1">Gói thuê bao ban đầu:</label>
           <select id="new-plan" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
             <option value="1_month">Gói 1 Tháng (500.000 đ)</option>
@@ -220,7 +250,105 @@
 
       <div class="flex justify-end gap-2 pt-2">
         <button onclick="closeCreateModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Hủy</button>
-        <button onclick="saveNewTenant()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Tạo Cơ Sở & Kích Hoạt</button>
+        <button onclick="saveNewTenant()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Tạo Cơ Sở & Xuất Tin Zalo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Tin nhắn Zalo chào mừng khách mới -->
+  <div id="zalo-welcome-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🎉</span>
+          <h3 class="text-sm font-bold text-white">Tin Nhắn Chào Mừng & Bàn Giao Zalo</h3>
+        </div>
+        <button onclick="closeZaloWelcomeModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div class="text-xs text-slate-400">
+        Mẫu tin nhắn chuẩn hóa chứa thông tin kích hoạt, link tải APK và hotline hỗ trợ. Hãy bấm nút sao chép bên dưới để gửi ngay cho Chủ Spa qua Zalo.
+      </div>
+
+      <div class="relative">
+        <textarea id="zalo-welcome-text" readonly rows="12" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono leading-relaxed resize-none focus:outline-none"></textarea>
+      </div>
+
+      <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+        <button onclick="closeZaloWelcomeModal()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+          Đóng
+        </button>
+        <button id="btn-copy-zalo-welcome" onclick="copyZaloWelcomeMessage()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-1.5 transition">
+          <span>📋</span> <span id="copy-welcome-btn-text">Sao Chép Tin Nhắn Zalo</span>
+        </button>
+        <a id="btn-open-zalo-welcome" href="#" target="_blank" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-950/40 flex items-center justify-center gap-1.5 transition">
+          <span>💬</span> Mở Zalo Gửi Ngay
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Đổi Mật Khẩu Hỗ Trợ Từ Xa -->
+  <div id="reset-password-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>🔑</span> Đổi Mật Khẩu Hỗ Trợ Từ Xa
+        </h3>
+        <button onclick="closeResetPasswordModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div class="text-xs text-slate-300 space-y-1">
+        <div>Cơ sở: <strong id="reset-spa-name" class="text-white"></strong></div>
+        <div>SĐT Chủ Quán: <span id="reset-owner-phone" class="font-mono text-indigo-400 font-semibold"></span></div>
+      </div>
+
+      <div class="space-y-2 text-xs">
+        <label class="font-medium text-slate-300 block">Mật khẩu PIN mới cho Chủ Spa:</label>
+        <div class="flex gap-2">
+          <input type="text" id="reset-new-pin" placeholder="Nhập PIN 6 số mới" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono">
+          <button type="button" onclick="generateRandomPin('reset-new-pin')" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 shrink-0">
+            🎲 Tạo ngẫu nhiên
+          </button>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeResetPasswordModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Hủy</button>
+        <button onclick="confirmResetPassword()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Cập Nhật & Tạo Tin Zalo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Tin nhắn Zalo đặt lại mật khẩu -->
+  <div id="zalo-reset-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🔑</span>
+          <h3 class="text-sm font-bold text-white">Tin Nhắn Zalo Cấp Mật Khẩu Mới</h3>
+        </div>
+        <button onclick="closeZaloResetModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div class="text-xs text-slate-400">
+        Mẫu tin thông báo mật khẩu mới cho Chủ Spa. Hãy bấm nút sao chép để gửi ngay qua Zalo.
+      </div>
+
+      <div class="relative">
+        <textarea id="zalo-reset-text" readonly rows="10" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono leading-relaxed resize-none focus:outline-none"></textarea>
+      </div>
+
+      <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+        <button onclick="closeZaloResetModal()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+          Đóng
+        </button>
+        <button id="btn-copy-zalo-reset" onclick="copyZaloResetMessage()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-1.5 transition">
+          <span>📋</span> <span id="copy-reset-btn-text">Sao Chép Tin Nhắn Zalo</span>
+        </button>
+        <a id="btn-open-zalo-reset" href="#" target="_blank" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-950/40 flex items-center justify-center gap-1.5 transition">
+          <span>💬</span> Mở Zalo Gửi Ngay
+        </a>
       </div>
     </div>
   </div>
@@ -239,10 +367,11 @@
         name: "Spa Khiếm Thị Việt (Cơ sở 1)",
         ownerPhone: "0397772963",
         plan: "VIP 1 Năm",
-        expiryDate: "17/11/2027",
+        expiryDate: "18/11/2027",
         daysLeft: 365,
         isActive: true,
-        monthlyFee: 500000
+        monthlyFee: 500000,
+        tempPin: "247208"
       },
       {
         id: "spa_huong_sen",
@@ -252,7 +381,8 @@
         expiryDate: "15/01/2027",
         daysLeft: 59,
         isActive: true,
-        monthlyFee: 500000
+        monthlyFee: 500000,
+        tempPin: "686868"
       },
       {
         id: "spa_hoa_ban",
@@ -262,9 +392,50 @@
         expiryDate: "10/11/2026",
         daysLeft: -7,
         isActive: false,
-        monthlyFee: 500000
+        monthlyFee: 500000,
+        tempPin: "123456"
       }
     ];
+
+    // Global Maintenance state
+    let isGlobalMaintenance = localStorage.getItem("dev_global_maintenance") === "true";
+
+    function updateMaintenanceUI() {
+      const badge = document.getElementById("maintenance-badge");
+      const btn = document.getElementById("btn-toggle-maintenance");
+      const btnLabel = document.getElementById("btn-maintenance-label");
+
+      if (isGlobalMaintenance) {
+        badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 status-pulse";
+        badge.innerHTML = "🔴 ĐANG BẢO TRÌ TOÀN HỆ THỐNG";
+        btn.className = "px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg bg-emerald-600 hover:bg-emerald-500 text-white";
+        btnLabel.innerText = "Tắt Bảo Trì (Mở Lại App)";
+      } else {
+        badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30";
+        badge.innerHTML = "🟢 Bình Thường (Sẵn Sàng)";
+        btn.className = "px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700";
+        btnLabel.innerText = "Bật Chế Độ Bảo Trì";
+      }
+    }
+
+    function toggleGlobalMaintenance() {
+      isGlobalMaintenance = !isGlobalMaintenance;
+      localStorage.setItem("dev_global_maintenance", isGlobalMaintenance ? "true" : "false");
+      updateMaintenanceUI();
+      if (isGlobalMaintenance) {
+        showToast("🚨 Đã BẬT BẢO TRÌ TOÀN DIỆN! Tất cả máy KTV & Chủ Spa sẽ hiển thị màn hình bảo trì.");
+      } else {
+        showToast("🟢 Đã TẮT BẢO TRÌ! Tất cả ứng dụng tự động hoạt động bình thường trở lại.");
+      }
+    }
+
+    // PIN Generator Helper (6-digit numeric PIN)
+    function generateRandomPin(targetInputId) {
+      const pin = Math.floor(100000 + Math.random() * 900000).toString();
+      const el = document.getElementById(targetInputId);
+      if (el) el.value = pin;
+      return pin;
+    }
 
     function renderTable() {
       const tbody = document.getElementById("tenant-tbody");
@@ -312,7 +483,10 @@
               <span>${t.isActive ? '🟢 Mở' : '🔴 Khóa'}</span>
             </button>
           </td>
-          <td class="py-3 px-4 text-right space-x-1.5">
+          <td class="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+            <button onclick="openResetPasswordModal(${idx})" class="px-2.5 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold transition" title="Đổi mật khẩu hỗ trợ từ xa">
+              🔑 Đổi MK
+            </button>
             <button onclick="openExtendModal(${idx})" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition">
               ➕ Gia Hạn
             </button>
@@ -367,34 +541,192 @@
       }
     }
 
-    // Create Modal
+    // Create Modal & Onboarding
     function openCreateModal() {
+      document.getElementById("new-spa-name").value = "";
+      document.getElementById("new-owner-phone").value = "";
+      generateRandomPin("new-temp-pin");
       document.getElementById("create-modal").classList.remove("hidden");
     }
+
     function closeCreateModal() {
       document.getElementById("create-modal").classList.add("hidden");
     }
+
     function saveNewTenant() {
       const name = document.getElementById("new-spa-name").value.trim();
       const phone = document.getElementById("new-owner-phone").value.trim();
+      let pin = document.getElementById("new-temp-pin").value.trim();
+      const planVal = document.getElementById("new-plan").value;
+
       if (!name || !phone) {
         alert("Vui lòng nhập đầy đủ tên Spa và SĐT Chủ Quán!");
         return;
       }
+      if (!pin) {
+        pin = generateRandomPin("new-temp-pin");
+      }
+
+      let planName = "Gói 1 Năm";
+      let days = 365;
+      let fee = 500000;
+      if (planVal === "1_month") {
+        planName = "Gói 1 Tháng";
+        days = 30;
+      } else if (planVal === "3_months") {
+        planName = "Gói 3 Tháng";
+        days = 90;
+      }
+
       const newId = "spa_" + phone.slice(-4);
-      tenants.push({
+      const newTenant = {
         id: newId,
         name: name,
         ownerPhone: phone,
-        plan: "Gói 1 Năm",
-        expiryDate: "17/11/2027",
-        daysLeft: 365,
+        plan: planName,
+        expiryDate: "18/11/2027",
+        daysLeft: days,
         isActive: true,
-        monthlyFee: 500000
-      });
+        monthlyFee: fee,
+        tempPin: pin
+      };
+
+      tenants.push(newTenant);
       closeCreateModal();
       renderTable();
-      showToast("🏢 Đã thêm cơ sở Spa mới thành công cho chủ quán " + phone);
+      showToast("🏢 Đã tạo cơ sở " + name + " thành công!");
+
+      // Tự động mở modal Zalo Welcome Message
+      openZaloWelcomeModal(newTenant, pin);
+    }
+
+    // Zalo Welcome Message Modal
+    function openZaloWelcomeModal(tenant, pin) {
+      const msg = `🎉 CHÀO MỪNG QUÝ CƠ SỞ ĐẾN VỚI KHIẾM THỊ VIỆT SAAS!
+
+Kính gửi Chủ Spa: ${tenant.name}
+Hệ thống quản lý Khiếm Thị Việt đã được khởi tạo và kích hoạt thành công cho cơ sở của bạn!
+
+📱 THÔNG TIN ĐĂNG NHẬP DÀNH CHO CHỦ SPA:
+• Số điện thoại đăng nhập: ${tenant.ownerPhone}
+• Mật khẩu / Mã PIN tạm thời: ${pin}
+• Gói dịch vụ: ${tenant.plan}
+• Quyền hạn: CHỦ SPA (Full quyền quản lý nhân sự, dịch vụ, doanh thu & sổ quỹ)
+
+📥 LINK TẢI ỨNG DỤNG ANDROID (APK CHÍNH THỨC):
+👉 https://khiemthiviet.vn/KhiemThiViet-CaiDat.apk
+
+♿ HƯỚNG DẪN DÀNH CHO NGƯỜI KHIẾM THỊ (TALKBACK):
+• Ứng dụng được tối ưu 100% chuẩn Accessibility TalkBack với giọng đọc tiếng Việt rõ ràng.
+• Khi mở app lần đầu, chỉ cần nhập Số điện thoại và Mật khẩu PIN ở trên một lần duy nhất.
+
+📞 HỖ TRỢ KỸ THUẬT DEV 24/7 QUA ZALO:
+• Kỹ thuật viên phụ trách: 0397772963 (Zalo / Hotline)
+• Link chat hỗ trợ nhanh: https://zalo.me/0397772963
+
+Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu quả!`;
+
+      document.getElementById("zalo-welcome-text").value = msg;
+      document.getElementById("btn-open-zalo-welcome").href = `https://zalo.me/${tenant.ownerPhone}`;
+      document.getElementById("copy-welcome-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
+      document.getElementById("zalo-welcome-modal").classList.remove("hidden");
+    }
+
+    function closeZaloWelcomeModal() {
+      document.getElementById("zalo-welcome-modal").classList.add("hidden");
+    }
+
+    function copyZaloWelcomeMessage() {
+      const text = document.getElementById("zalo-welcome-text").value;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          document.getElementById("copy-welcome-btn-text").innerText = "✅ Đã Sao Chép!";
+          showToast("📋 Đã sao chép tin nhắn Zalo chào mừng vào bộ nhớ tạm!");
+          setTimeout(() => {
+            document.getElementById("copy-welcome-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
+          }, 3000);
+        }).catch(() => {
+          document.getElementById("zalo-welcome-text").select();
+          document.execCommand("copy");
+          showToast("📋 Đã sao chép tin nhắn Zalo!");
+        });
+      } else {
+        document.getElementById("zalo-welcome-text").select();
+        document.execCommand("copy");
+        showToast("📋 Đã sao chép tin nhắn Zalo!");
+      }
+    }
+
+    // Remote Password Reset Modal
+    let resetTenantIdx = null;
+    function openResetPasswordModal(idx) {
+      resetTenantIdx = idx;
+      const t = tenants[idx];
+      document.getElementById("reset-spa-name").innerText = t.name;
+      document.getElementById("reset-owner-phone").innerText = t.ownerPhone;
+      generateRandomPin("reset-new-pin");
+      document.getElementById("reset-password-modal").classList.remove("hidden");
+    }
+
+    function closeResetPasswordModal() {
+      document.getElementById("reset-password-modal").classList.add("hidden");
+    }
+
+    function confirmResetPassword() {
+      if (resetTenantIdx === null) return;
+      const t = tenants[resetTenantIdx];
+      const newPin = document.getElementById("reset-new-pin").value.trim();
+      if (!newPin) {
+        alert("Vui lòng nhập hoặc tạo mã PIN mới!");
+        return;
+      }
+      t.tempPin = newPin;
+      closeResetPasswordModal();
+      showToast("🔑 Đã cập nhật mật khẩu mới cho " + t.name);
+
+      // Open Zalo Reset Modal
+      const msg = `🔑 THÔNG BÁO ĐẶT LẠI MẬT KHẨU TÀI KHOẢN CHỦ SPA
+
+Kính gửi: ${t.name}
+Yêu cầu hỗ trợ đặt lại mật khẩu từ xa cho tài khoản Chủ Spa đã được xử lý thành công!
+
+📱 THÔNG TIN ĐĂNG NHẬP MỚI:
+• Số điện thoại: ${t.ownerPhone}
+• Mật khẩu / Mã PIN mới: ${newPin}
+• Link tải/cập nhật app: https://khiemthiviet.vn/KhiemThiViet-CaiDat.apk
+
+Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật khẩu mới này một lần duy nhất.
+📞 Hỗ trợ kỹ thuật Dev qua Zalo: 0397772963 (https://zalo.me/0397772963)`;
+
+      document.getElementById("zalo-reset-text").value = msg;
+      document.getElementById("btn-open-zalo-reset").href = `https://zalo.me/${t.ownerPhone}`;
+      document.getElementById("copy-reset-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
+      document.getElementById("zalo-reset-modal").classList.remove("hidden");
+    }
+
+    function closeZaloResetModal() {
+      document.getElementById("zalo-reset-modal").classList.add("hidden");
+    }
+
+    function copyZaloResetMessage() {
+      const text = document.getElementById("zalo-reset-text").value;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          document.getElementById("copy-reset-btn-text").innerText = "✅ Đã Sao Chép!";
+          showToast("📋 Đã sao chép tin nhắn Zalo đổi mật khẩu vào bộ nhớ tạm!");
+          setTimeout(() => {
+            document.getElementById("copy-reset-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
+          }, 3000);
+        }).catch(() => {
+          document.getElementById("zalo-reset-text").select();
+          document.execCommand("copy");
+          showToast("📋 Đã sao chép tin nhắn Zalo!");
+        });
+      } else {
+        document.getElementById("zalo-reset-text").select();
+        document.execCommand("copy");
+        showToast("📋 Đã sao chép tin nhắn Zalo!");
+      }
     }
 
     // Toast
@@ -410,6 +742,7 @@
     }
 
     // Initial render
+    updateMaintenanceUI();
     renderTable();
   </script>
 </body>

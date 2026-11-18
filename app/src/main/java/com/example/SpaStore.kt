@@ -225,6 +225,11 @@ class SpaStore(context: Context) {
     var tenantLockQrUrl by mutableStateOf("")
         private set
     private var tenantStatusListener: ListenerRegistration? = null
+    private var globalMaintenanceListener: ListenerRegistration? = null
+    var isGlobalMaintenance by mutableStateOf(false)
+        private set
+    var globalMaintenanceMessage by mutableStateOf("")
+        private set
 
     val roomDb by lazy {
         SpaDatabase.getInstance(appContext)
@@ -326,11 +331,11 @@ class SpaStore(context: Context) {
 
     // Trợ lý AI gehihi: Khởi tạo lazy theo chuẩn Firebase AI Logic
     private val geminiFlashModel by lazy {
-        Firebase.ai.generativeModel(modelName = "gemini-3.8-flash")
+        Firebase.ai.generativeModel(modelName = "gemini-1.5-flash")
     }
 
     private val geminiLiteModel by lazy {
-        Firebase.ai.generativeModel(modelName = "gemini-3.5-flash-lite")
+        Firebase.ai.generativeModel(modelName = "gemini-2.0-flash")
     }
 
     // Trạng thái Đồng bộ Đám mây Thời gian thực (Firebase Cloud Firestore)
@@ -416,6 +421,11 @@ class SpaStore(context: Context) {
                 startRealtimeCloudSync()
             }
         }
+
+        // Tự động lắng nghe trạng thái bảo trì toàn hệ thống từ Firestore
+        runCatching {
+            startGlobalMaintenanceListener()
+        }
     }
 
     /**
@@ -485,21 +495,9 @@ class SpaStore(context: Context) {
             changed = true
         }
 
-        // Đảm bảo có tài khoản Admin thử nghiệm (Test Admin) nếu người dùng chưa chủ động xóa
-        val userDeletedTestAdmin = prefs.getBoolean("user_deleted_test_admin", false)
-        if (!userDeletedTestAdmin && taiKhoans.none { it.id == ID_TEST_ADMIN || it.username == DEFAULT_TEST_ADMIN_PHONE }) {
-            taiKhoans.add(
-                TaiKhoan(
-                    id = ID_TEST_ADMIN,
-                    username = DEFAULT_TEST_ADMIN_PHONE,
-                    matKhauHash = hashPassword(DEFAULT_TEST_ADMIN_PASS),
-                    quyen = VaiTro.OWNER,
-                    nvId = "",
-                    hoTen = "Chủ Spa (Admin Test)",
-                    cacQuyenDuocCap = QuyenHan.entries.toSet(),
-                    matKhauHienThi = DEFAULT_TEST_ADMIN_PASS
-                )
-            )
+        // Tự động dọn dẹp triệt để tài khoản test cũ nếu còn tồn dư trên máy
+        val removedTest = taiKhoans.removeAll { it.id == "tk_admin_test" || it.username == "0988888888" }
+        if (removedTest) {
             changed = true
         }
 
@@ -679,14 +677,14 @@ class SpaStore(context: Context) {
             val passMatches = (tk.matKhauHash == passHash) ||
                 (tk.matKhauHash == cleanPass) ||
                 (tk.matKhauHienThi.isNotBlank() && tk.matKhauHienThi.trim() == cleanPass) ||
-                (cleanPass == "1234" && (tk.id == ID_TEST_ADMIN || tk.matKhauHienThi == "123456" || tk.quyen == VaiTro.STAFF))
+                (cleanPass == "1234" && (tk.matKhauHienThi == "123456" || tk.quyen == VaiTro.STAFF))
 
             userMatches && passMatches
         }
 
         if (matched != null) {
             // Nếu máy nhân viên đã kết nối Gmail mà tài khoản nhân viên chưa gắn Gmail -> tự động gắn Gmail cho lần sau
-            val finalMatched = if (matched.email.isBlank() && cloudUserEmail.isNotBlank() && matched.id != "tk_admin" && matched.id != ID_TEST_ADMIN) {
+            val finalMatched = if (matched.email.isBlank() && cloudUserEmail.isNotBlank() && matched.id != "tk_admin") {
                 val idx = taiKhoans.indexOfFirst { it.id == matched.id }
                 val updated = matched.copy(email = cloudUserEmail.trim().lowercase())
                 if (idx >= 0) {
@@ -723,6 +721,7 @@ class SpaStore(context: Context) {
         prefs.edit().putString(KEY_LOGGED_IN_ACCOUNT_ID, tk.id).apply()
         syncCurrentUserProfileToCloud()
         startTenantStatusListener()
+        startGlobalMaintenanceListener()
         return true
     }
 
@@ -825,6 +824,7 @@ class SpaStore(context: Context) {
 
         syncCurrentUserProfileToCloud()
         startTenantStatusListener()
+        startGlobalMaintenanceListener()
 
         workspaceListener?.remove()
         val docRef = db.collection(SpaCloudRepository.WORKSPACE_COLLECTION)
@@ -898,6 +898,20 @@ class SpaStore(context: Context) {
                     customersCount = snap.getLong("customersCount")?.toInt() ?: 0,
                     createdAt = snap.getString("createdAt") ?: ""
                 )
+            }
+    }
+
+    fun startGlobalMaintenanceListener() {
+        val db = firestoreDb ?: return
+        globalMaintenanceListener?.remove()
+        globalMaintenanceListener = db.collection("system_status")
+            .document("global")
+            .addSnapshotListener { snap, err ->
+                if (err != null || snap == null || !snap.exists()) return@addSnapshotListener
+                val maintenance = snap.getBoolean("globalMaintenance") ?: false
+                val msg = snap.getString("message") ?: ""
+                isGlobalMaintenance = maintenance
+                globalMaintenanceMessage = msg
             }
     }
 
@@ -1747,99 +1761,6 @@ class SpaStore(context: Context) {
             nvs.removeAll { it.id == target.nvId }
         }
         taiKhoans.removeAll { it.id == tkId }
-        saveToPrefs()
-        return true
-    }
-
-    /**
-     * Xóa tài khoản Admin thử nghiệm (Test Admin) sau khi đã kiểm thử xong
-     */
-    fun xoaTaiKhoanAdminTest(): Boolean {
-        val removed = taiKhoans.removeAll { it.id == ID_TEST_ADMIN || it.username == DEFAULT_TEST_ADMIN_PHONE }
-        prefs.edit().putBoolean("user_deleted_test_admin", true).apply()
-        if (removed) {
-            if (!deletedIds.contains(ID_TEST_ADMIN)) deletedIds.add(ID_TEST_ADMIN)
-            if (currentUser?.id == ID_TEST_ADMIN) {
-                val rootAdmin = taiKhoans.firstOrNull { it.id == "tk_admin" }
-                currentUser = rootAdmin
-                if (rootAdmin != null) {
-                    prefs.edit().putString(KEY_LOGGED_IN_ACCOUNT_ID, rootAdmin.id).apply()
-                } else {
-                    prefs.edit().remove(KEY_LOGGED_IN_ACCOUNT_ID).apply()
-                }
-            }
-            saveToPrefs()
-            return true
-        }
-        return false
-    }
-
-    /**
-     * Xóa sạch tài khoản Admin Test và các dữ liệu mẫu ban đầu (Vé, Khách, Gói mẫu)
-     */
-    fun xoaDuLieuTest(): Boolean {
-        val adminDeleted = xoaTaiKhoanAdminTest()
-        luots.removeAll { it.id in SEED_SAMPLE_IDS }
-        tcs.removeAll { it.id in SEED_SAMPLE_IDS }
-        dks.removeAll { it.id in SEED_SAMPLE_IDS }
-        khs.removeAll { it.id in SEED_SAMPLE_IDS }
-        saveToPrefs()
-        return adminDeleted || true
-    }
-
-    /**
-     * Nạp lại đầy đủ Tài khoản Admin Test và toàn bộ dữ liệu mẫu từ Repo
-     */
-    fun napLaiTaiKhoanVaDuLieuTest(): Boolean {
-        prefs.edit().putBoolean("user_deleted_test_admin", false).apply()
-        if (taiKhoans.none { it.id == ID_TEST_ADMIN || it.username == DEFAULT_TEST_ADMIN_PHONE }) {
-            taiKhoans.add(
-                TaiKhoan(
-                    id = ID_TEST_ADMIN,
-                    username = DEFAULT_TEST_ADMIN_PHONE,
-                    matKhauHash = hashPassword(DEFAULT_TEST_ADMIN_PASS),
-                    quyen = VaiTro.OWNER,
-                    nvId = "",
-                    hoTen = "Chủ Spa (Admin Test)",
-                    cacQuyenDuocCap = QuyenHan.entries.toSet(),
-                    matKhauHienThi = DEFAULT_TEST_ADMIN_PASS
-                )
-            )
-        }
-        if (nvs.none { it.id == "nv_01" }) nvs.add(NV("nv_01", "Nguyễn Văn Minh", "Nam", "0912345678", "Bấm huyệt cổ vai gáy"))
-        if (nvs.none { it.id == "nv_02" }) nvs.add(NV("nv_02", "Trần Thị Lan", "Nữ", "0987654321", "Trị liệu & xông hơi thảo dược"))
-        if (nvs.none { it.id == "nv_03" }) nvs.add(NV("nv_03", "Lê Hoàng Nam", "Nam", "0933445566", "Cạo gió giác hơi & phục hồi"))
-        if (taiKhoans.none { it.id == "tk_nv1" }) taiKhoans.add(TaiKhoan("tk_nv1", "0912345678", hashPassword("123456"), VaiTro.STAFF, "nv_01", "Nguyễn Văn Minh", emptySet(), "1234"))
-        if (taiKhoans.none { it.id == "tk_nv2" }) taiKhoans.add(TaiKhoan("tk_nv2", "0987654321", hashPassword("123456"), VaiTro.STAFF, "nv_02", "Trần Thị Lan", emptySet(), "1234"))
-        if (taiKhoans.none { it.id == "tk_nv3" }) taiKhoans.add(TaiKhoan("tk_nv3", "0933445566", hashPassword("123456"), VaiTro.STAFF, "nv_03", "Lê Hoàng Nam", emptySet(), "1234"))
-        if (dvs.isEmpty()) dvs.addAll(danhSachDichVuMenuMoiNhat2())
-        if (gois.isEmpty()) gois.addAll(danhSachGoiMenuMoiNhat2())
-        if (khs.none { it.id == "kh_01" }) khs.add(KH("kh_01", "Anh Tuấn", "0904112233"))
-        if (khs.none { it.id == "kh_02" }) khs.add(KH("kh_02", "Chị Hương", "0978998877"))
-        if (khs.none { it.id == "kh_03" }) khs.add(KH("kh_03", "Bác Hùng", "0915667788"))
-        val today = todayDateStr()
-        if (dks.none { it.id == "dk_01" }) dks.add(DK("dk_01", "kh_01", "676003166753527", today, daDung = false, luotDaDung = 3))
-        if (dks.none { it.id == "dk_02" }) dks.add(DK("dk_02", "kh_02", "676158327672947", today, daDung = false, luotDaDung = 2))
-        if (luots.none { it.id == "ve_01" }) {
-            luots.addAll(
-                listOf(
-                    Luot("ve_01", "kh_01", "nv_01", listOf("379695801677810"), dkId = "dk_01", tgbd = "10:15", tgkt = "", thu = 0L, daXacNhan = false, ngay = today),
-                    Luot("ve_02", "kh_03", "nv_02", listOf("380937271360462"), dkId = "", tgbd = "09:00", tgkt = "10:30", thu = 220_000L, daXacNhan = false, ngay = today),
-                    Luot("ve_03", "kh_02", "nv_01", listOf("381921712080763"), dkId = "", tgbd = "08:00", tgkt = "09:00", thu = 250_000L, daXacNhan = true, ngay = today),
-                    Luot("ve_04", "kh_01", "nv_03", listOf("379695801677810"), dkId = "dk_01", tgbd = "14:00", tgkt = "15:00", thu = 0L, daXacNhan = true, ngay = today)
-                )
-            )
-        }
-        if (tcs.none { it.id == "tc_01" }) {
-            tcs.addAll(
-                listOf(
-                    TC("tc_01", LoaiTC.THU, 1_600_000L, "Mua Liệu trình 10 vé trị liệu 60 phút - KH Anh Tuấn (0904112233)", today),
-                    TC("tc_02", LoaiTC.CHI, 70_000L, "Chiết khấu DV lẻ — NV Nguyễn Văn Minh (Khách Chị Hương)", today),
-                    TC("tc_03", LoaiTC.CHI, 70_000L, "Chiết khấu DV trong gói liệu trình — NV Lê Hoàng Nam (Khách Anh Tuấn)", today),
-                    TC("tc_04", LoaiTC.CHI, 120_000L, "Mua thảo dược xông hơi & khăn ấm", today)
-                )
-            )
-        }
         saveToPrefs()
         return true
     }
@@ -3232,9 +3153,118 @@ class SpaStore(context: Context) {
         kq.moChiTietLuongNvId?.let { onInspectStaffPayroll(it) }
     }
 
+    fun layGeminiApiKey(): String {
+        // 1. Thử lấy từ BuildConfig (do Secrets Gradle Plugin sinh ra từ .env / .env.example)
+        val buildKey = runCatching {
+            val field = BuildConfig::class.java.getField("GEMINI_API_KEY")
+            field.get(null) as? String
+        }.getOrNull().orEmpty().trim()
+
+        if (buildKey.isNotBlank() && buildKey != "YOUR_GEMINI_API_KEY") {
+            return buildKey
+        }
+
+        // 2. Thử lấy từ biến môi trường của hệ thống
+        val envKey = runCatching { System.getenv("GEMINI_API_KEY") }.getOrNull().orEmpty().trim()
+        if (envKey.isNotBlank() && envKey != "YOUR_GEMINI_API_KEY") {
+            return envKey
+        }
+
+        // 3. Thử lấy từ SharedPreferences cục bộ của ứng dụng
+        val prefKey = prefs.getString("gemini_api_key", "").orEmpty().trim()
+        if (prefKey.isNotBlank() && prefKey != "YOUR_GEMINI_API_KEY") {
+            return prefKey
+        }
+
+        return ""
+    }
+
+    private suspend fun goiGeminiApiDirect(
+        prompt: String,
+        bitmap: Bitmap? = null,
+        modelName: String = "gemini-1.5-flash"
+    ): String? = withContext(Dispatchers.IO) {
+        val apiKey = layGeminiApiKey()
+        if (apiKey.isBlank()) {
+            return@withContext null
+        }
+
+        var conn: java.net.HttpURLConnection? = null
+        try {
+            val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
+            val url = java.net.URL(endpoint)
+            conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                requestMethod = "POST"
+                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                connectTimeout = 15_000
+                readTimeout = 25_000
+                doOutput = true
+                doInput = true
+            }
+
+            val payload = JSONObject().apply {
+                val parts = JSONArray().apply {
+                    put(JSONObject().apply { put("text", prompt) })
+                    if (bitmap != null) {
+                        val stream = java.io.ByteArrayOutputStream()
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+                        val base64 = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
+                        put(JSONObject().apply {
+                            put("inline_data", JSONObject().apply {
+                                put("mime_type", "image/jpeg")
+                                put("data", base64)
+                            })
+                        })
+                    }
+                }
+                val contents = JSONArray().apply {
+                    put(JSONObject().apply { put("parts", parts) })
+                }
+                put("contents", contents)
+            }
+
+            conn.outputStream.use { os ->
+                os.write(payload.toString().toByteArray(Charsets.UTF_8))
+                os.flush()
+            }
+
+            val code = conn.responseCode
+            if (code == 200) {
+                val resp = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                val json = JSONObject(resp)
+                val candidate = json.optJSONArray("candidates")?.optJSONObject(0)
+                val content = candidate?.optJSONObject("content")
+                val partsArr = content?.optJSONArray("parts")
+                partsArr?.optJSONObject(0)?.optString("text")?.takeIf { it.isNotBlank() }
+            } else {
+                val err = conn.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                Log.w(TAG, "Gemini REST API ($modelName) returned code $code: $err")
+                null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Gemini REST API call failed ($modelName): ${e.message}")
+            null
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
     private suspend fun goiGeminiVoiDuPhong(prompt: String, bitmap: Bitmap? = null): String? {
+        // 1. Thử gọi trực tiếp REST Gemini 1.5 Flash (Primary)
+        val resFlash = goiGeminiApiDirect(prompt, bitmap, "gemini-1.5-flash")
+        if (!resFlash.isNullOrBlank()) {
+            return resFlash
+        }
+
+        // 2. Thử gọi dự phòng REST Gemini 2.0 Flash (Secondary)
+        val res2Flash = goiGeminiApiDirect(prompt, bitmap, "gemini-2.0-flash")
+        if (!res2Flash.isNullOrBlank()) {
+            return res2Flash
+        }
+
+        // 3. Dự phòng qua Firebase Vertex AI nếu có App Check & Firebase AI SDK
         return try {
-            withTimeout(35_000L) {
+            withTimeout(20_000L) {
                 if (bitmap != null) {
                     val inputContent = content {
                         image(bitmap)
@@ -3249,9 +3279,8 @@ class SpaStore(context: Context) {
             if (e !is TimeoutCancellationException) throw e
             null
         } catch (e1: Exception) {
-            Log.w(TAG, "gemini-3.8-flash failed, trying gemini-3.5-flash-lite", e1)
             try {
-                withTimeout(25_000L) {
+                withTimeout(15_000L) {
                     if (bitmap != null) {
                         val inputContent = content {
                             image(bitmap)
@@ -3266,7 +3295,7 @@ class SpaStore(context: Context) {
                 if (e2 !is TimeoutCancellationException) throw e2
                 null
             } catch (e2: Exception) {
-                Log.e(TAG, "Both Gemini models failed", e2)
+                Log.w(TAG, "All Gemini invocation methods completed with no response", e2)
                 null
             }
         }
@@ -4115,21 +4144,6 @@ class SpaStore(context: Context) {
                 cauTraLoi = "gehihi đã dọn sạch các tin nhắn cũ trong khung trò chuyện.",
                 hanhDongThucThi = "Đã dọn lịch sử chat"
             )
-        }
-
-        if (coTuXoa && (norm.contains("admin test") || norm.contains("tai khoan test") || norm.contains("du lieu test") || norm.contains("du lieu mau"))) {
-            return taoYeuCauXacNhanGehihi(
-                loai = LoaiLenhChoXacNhan.XOA,
-                tieuDeTomTat = "XÓA TÀI KHOẢN ADMIN TEST & DỮ LIỆU THỬ NGHIỆM",
-                chiTietXacNhan = "Bạn đang yêu cầu gehihi xóa tài khoản Admin Test ($DEFAULT_TEST_ADMIN_PHONE) và các dữ liệu mẫu thử nghiệm khỏi hệ thống."
-            ) {
-                xoaDuLieuTest()
-                KetQuaAiBot(
-                    cauTraLoi = "gehihi đã xóa tài khoản Admin Test ($DEFAULT_TEST_ADMIN_PHONE) và dữ liệu mẫu thử nghiệm thành công!",
-                    hanhDongThucThi = "Đã xóa tài khoản Admin Test & dữ liệu mẫu",
-                    chuyenTab = 5
-                )
-            }
         }
 
         if (coTuXoa && (norm.contains("du lieu") || norm.contains("tat ca du lieu") || norm.contains("toan bo du lieu") ||
@@ -5520,9 +5534,18 @@ class SpaStore(context: Context) {
             traLoiCauHoiThoiGianVaLich(prompt, norm)?.let { return it }
             tinhBieuThucToanHoc(prompt)?.let { return KetQuaAiBot(cauTraLoi = it) }
 
-            return KetQuaAiBot(
-                cauTraLoi = "Chào bạn ${user?.hoTen ?: "KTV"}! Hiện tại máy đang ở chế độ ngoại tuyến nên gehihi chỉ có thể đọc dữ liệu vé, dịch vụ và hoa hồng cá nhân của bạn trên máy. Khi có kết nối mạng Internet, gehihi sẽ hỗ trợ trả lời mọi câu hỏi kiến thức và chuyên môn của bạn nhé!"
-            )
+            if (norm == "chao" || norm.contains("xin chao") || norm.contains("hello") || norm.contains("hi") || norm == "chao ban") {
+                return KetQuaAiBot(
+                    cauTraLoi = "Chào bạn ${user?.hoTen ?: "KTV"}! Chúc bạn một ngày làm việc vui vẻ, phục vụ khách chu đáo và đạt nhiều hoa hồng!"
+                )
+            }
+            val apiKey = layGeminiApiKey()
+            val ktvExplanation = if (apiKey.isBlank()) {
+                "Chào bạn ${user?.hoTen ?: "KTV"}! Hiện tại trợ lý Gehihi cần được cấu hình GEMINI_API_KEY để tra cứu câu hỏi kiến thức mở trực tuyến. Mọi dữ liệu vé, bảng giá dịch vụ và hoa hồng cá nhân của bạn vẫn hoạt động đầy đủ trên máy."
+            } else {
+                "Chào bạn ${user?.hoTen ?: "KTV"}! Thiết bị hiện đang ở chế độ ngoại tuyến nên Gehihi chỉ có thể đọc dữ liệu vé, dịch vụ và hoa hồng cá nhân của bạn trên máy. Khi có kết nối mạng Internet, Gehihi sẽ hỗ trợ giải đáp mọi câu hỏi kiến thức và chuyên môn cho bạn nhé!"
+            }
+            return KetQuaAiBot(cauTraLoi = ktvExplanation)
         }
 
         // 0. BỘ THỰC THI LỆNH TRỰC TIẾP (Xóa, Sửa, Thêm, Điều hướng, Mở vé, Sổ quỹ...):
@@ -5665,18 +5688,22 @@ class SpaStore(context: Context) {
             )
         }
 
-        // 8. Chào hỏi hoặc câu hỏi mở
-        val nowCal = Calendar.getInstance()
-        val thuHomNay = tenThuTiengViet(nowCal.get(Calendar.DAY_OF_WEEK))
-        val ngayHomNay = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(nowCal.time)
-        return KetQuaAiBot(
-            cauTraLoi = "Chào Admin! Hôm nay là $thuHomNay ($ngayHomNay, ${nowTimeStr()}).\n" +
-                "• Hiện quán có ${luots.count { it.dangLam }} vé đang làm, ${luots.count { it.choChot }} vé chờ chốt.\n" +
-                "• Bạn có thể hỏi lịch/doanh thu hoặc ra lệnh trực tiếp như:\n" +
-                "  - \"Sửa mail admin thành ten@gmail.com\"\n" +
-                "  - \"Sửa dịch vụ chườm đá nóng giá 80k hoa hồng 30k\"\n" +
-                "  - \"Sửa vé khách Tuấn giá 200k hoa hồng 80k\""
-        )
+        // 8. Chào hỏi thông minh hoặc phản hồi lịch sự khi câu hỏi mở ngoại tuyến / chưa có API key
+        if (norm == "chao" || norm.contains("xin chao") || norm.contains("hello") || norm.contains("hi gehihi") || norm == "chao ban" || norm == "hi") {
+            val userGreeting = user?.hoTen?.let { " $it" }.orEmpty()
+            return KetQuaAiBot(
+                cauTraLoi = "Chào bạn$userGreeting! Gehihi là trợ lý AI thông minh của Khiếm Thị Việt, luôn sẵn sàng hỗ trợ bạn quản lý lịch hẹn, tạo vé, tra cứu doanh thu và giải đáp nghiệp vụ tiệm."
+            )
+        }
+
+        val apiKey = layGeminiApiKey()
+        val isMissingKey = apiKey.isBlank()
+        val cauTraLoiThongMinh = if (isMissingKey) {
+            "Hiện tại Gehihi cần được cài đặt khóa GEMINI_API_KEY để tra cứu trực tuyến các câu hỏi kiến thức mở từ Google Gemini AI. Bạn hoặc Quản trị viên vui lòng thêm GEMINI_API_KEY vào cấu hình file .env của ứng dụng nhé!\n\nToàn bộ nghiệp vụ tạo vé, tính hoa hồng, bảng lương và báo cáo doanh thu của quán vẫn hoạt động bình thường 100% trên máy."
+        } else {
+            "Thiết bị hiện đang ở chế độ ngoại tuyến hoặc kết nối mạng không ổn định, nên Gehihi chưa thể kết nối tới Google Gemini để tra cứu câu hỏi này. Bạn hãy kiểm tra kết nối Wi-Fi hoặc 4G để tra cứu nhé!\n\nToàn bộ nghiệp vụ quản lý tiệm, mở vé, hoa hồng và sổ quỹ vẫn hoạt động đầy đủ trên máy."
+        }
+        return KetQuaAiBot(cauTraLoi = cauTraLoiThongMinh)
     }
 
     private fun timVeTheoTenTrongCau(danhSach: List<Luot>, normPrompt: String): Luot? {
@@ -6451,19 +6478,6 @@ class SpaStore(context: Context) {
                 matKhauHienThi = DEFAULT_ADMIN_PASS
             )
         )
-        // Tài khoản Admin thử nghiệm: SĐT 0988888888, mật khẩu 1234
-        taiKhoans.add(
-            TaiKhoan(
-                id = ID_TEST_ADMIN,
-                username = DEFAULT_TEST_ADMIN_PHONE,
-                matKhauHash = hashPassword(DEFAULT_TEST_ADMIN_PASS),
-                quyen = VaiTro.OWNER,
-                nvId = "",
-                hoTen = "Chủ Spa (Admin Test)",
-                cacQuyenDuocCap = QuyenHan.entries.toSet(),
-                matKhauHienThi = DEFAULT_TEST_ADMIN_PASS
-            )
-        )
 
         val nv1 = NV("nv_01", "Nguyễn Văn Minh", "Nam", "0912345678", "Bấm huyệt cổ vai gáy")
         val nv2 = NV("nv_02", "Trần Thị Lan", "Nữ", "0987654321", "Trị liệu & xông hơi thảo dược")
@@ -6820,7 +6834,6 @@ class SpaStore(context: Context) {
         const val CLOUD_SYNC_MAX_MEMORIES = 1500
         const val MAX_CLOUD_PAYLOAD_BYTES = 750_000
         val SEED_SAMPLE_IDS = setOf(
-            ID_TEST_ADMIN,
             "nv_01", "nv_02", "nv_03",
             "tk_nv1", "tk_nv2", "tk_nv3",
             "kh_01", "kh_02", "kh_03",

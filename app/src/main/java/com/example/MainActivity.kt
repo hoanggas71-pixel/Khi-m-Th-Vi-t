@@ -57,6 +57,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -386,6 +387,12 @@ fun KhiemThiVietApp(store: SpaStore) {
         }
     }
 
+    // Bảo trì toàn hệ thống (Global Maintenance): Developer được miễn trừ để hỗ trợ điều hành
+    if (store.isGlobalMaintenance && user?.isDev() != true) {
+        GlobalMaintenanceScreen(store = store, user = user)
+        return
+    }
+
     // Khi cài APK lần đầu hoặc khi đã đăng xuất -> Bắt buộc qua màn hình Đăng nhập 1 lần duy nhất
     if (user == null) {
         OneTimeLoginScreen(store = store)
@@ -593,6 +600,7 @@ fun OneTimeLoginScreen(store: SpaStore) {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -631,327 +639,6 @@ fun OneTimeLoginScreen(store: SpaStore) {
                     )
                 }
 
-                // Khối Kết nối Đồng bộ Đám mây Thời gian thực giữa máy Admin và các máy Nhân viên
-                Surface(
-                    color = if (store.isCloudConnected) {
-                        SpaSageGreen.copy(alpha = 0.14f)
-                    } else {
-                        SpaChampagne.copy(alpha = 0.20f)
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(
-                        1.dp,
-                        if (store.isCloudConnected) SpaSageGreen else SpaRosewood
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics(mergeDescendants = true) {
-                            liveRegion = LiveRegionMode.Polite
-                            contentDescription = if (store.isCloudConnected) {
-                                "Đã kết nối đám mây thời gian thực. ${store.cloudSyncStatus}"
-                            } else {
-                                "Chưa kết nối đám mây Google. Nếu đây là máy phụ hoặc máy nhân viên mới cài, hãy bấm nút Kết nối Đám mây Google để tự động đồng bộ tài khoản, khách hàng và vé từ máy Admin."
-                            }
-                        }
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = if (store.isCloudConnected) {
-                                "☁️ ĐÃ ĐỒNG BỘ ĐÁM MÂY THỜI GIAN THỰC"
-                            } else {
-                                "☁️ ĐỒNG BỘ DỮ LIỆU GIỮA MÁY ADMIN & MÁY NHÂN VIÊN"
-                            },
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 13.sp,
-                            color = if (store.isCloudConnected) SpaSageGreen else SpaRosewoodDark
-                        )
-                        Text(
-                            text = if (store.isCloudConnected) {
-                                "${store.cloudSyncStatus}${if (store.cloudUserEmail.isNotBlank()) " (${store.cloudUserEmail})" else ""}"
-                            } else {
-                                "Máy nhân viên mới cài APK chỉ cần bấm \"Kết nối Đám mây Google\" 1 lần bên dưới để tự động nhận toàn bộ Tài khoản SĐT, Khách hàng, Vé và Gói dịch vụ từ máy Admin theo thời gian thực."
-                            },
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (!store.isCloudConnected) {
-                            OutlinedButton(
-                                onClick = {
-                                    if (!cloudBusy) {
-                                        cloudBusy = true
-                                        errorMessage = ""
-                                        scope.launch {
-                                            signInWithGoogleInteractive(
-                                                activityContext = context,
-                                                onSignedIn = {
-                                                    cloudBusy = false
-                                                    store.startRealtimeCloudSync()
-                                                    Toast.makeText(
-                                                        context,
-                                                        "Đã kết nối Đám mây! Đang đồng bộ tài khoản & dữ liệu thời gian thực...",
-                                                        Toast.LENGTH_LONG
-                                                    ).show()
-                                                },
-                                                onError = { msg ->
-                                                    cloudBusy = false
-                                                    errorMessage = msg
-                                                }
-                                            )
-                                        }
-                                    }
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                                    .semantics {
-                                        contentDescription = "Kết nối Đám mây Google để đồng bộ dữ liệu thời gian thực giữa máy Admin và máy Nhân viên"
-                                    }
-                                    .testTag("btn_connect_google_cloud")
-                            ) {
-                                if (cloudBusy) {
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Đang kết nối đám mây...", fontWeight = FontWeight.Bold)
-                                } else {
-                                    Text("KẾT NỐI ĐÁM MÂY GOOGLE (ĐỒNG BỘ MỌI MÁY)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                }
-                            }
-                        } else {
-                            // Khi đã kết nối đám mây: Hiển thị nút tải lại + nhận diện Gmail + danh sách tài khoản đã đồng bộ từ máy Admin
-                            val matchedByEmail = store.timTaiKhoanTheoGoogleEmail()
-                            if (matchedByEmail != null) {
-                                Surface(
-                                    color = SpaSageGreen.copy(alpha = 0.22f),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(10.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text(
-                                            text = "✨ Đã nhận diện Gmail của: ${matchedByEmail.hoTen} (SĐT: ${matchedByEmail.username})",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp,
-                                            color = SpaRosewoodDark
-                                        )
-                                        Button(
-                                            onClick = {
-                                                store.loginBangTaiKhoanDaGanEmail(matchedByEmail)
-                                                Toast.makeText(
-                                                    context,
-                                                    "Đăng nhập tự động qua Gmail: ${matchedByEmail.hoTen}",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = SpaSageGreen),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(48.dp)
-                                                .testTag("btn_quick_login_by_gmail")
-                                        ) {
-                                            Text(
-                                                "VÀO NGAY TÀI KHOẢN: ${matchedByEmail.hoTen.uppercase()}",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            Text(
-                                text = "Danh sách Tài khoản đã đồng bộ từ máy Admin (${store.taiKhoans.size} TK) — Chạm tên bạn để điền nhanh SĐT:",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = SpaRosewoodDark
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                store.taiKhoans.forEach { tk ->
-                                    AssistChip(
-                                        onClick = {
-                                            phoneInput = tk.username
-                                            errorMessage = ""
-                                            Toast.makeText(
-                                                context,
-                                                "Đã chọn ${tk.hoTen} (${tk.username}). Hãy nhập mật khẩu Admin cấp cho bạn!",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        },
-                                        label = {
-                                            Text(
-                                                "${tk.hoTen} (${tk.username})",
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        },
-                                        modifier = Modifier.testTag("chip_synced_account_${tk.id}")
-                                    )
-                                }
-                            }
-
-                            OutlinedButton(
-                                onClick = {
-                                    if (!cloudBusy) {
-                                        cloudBusy = true
-                                        errorMessage = ""
-                                        scope.launch {
-                                            val ok = store.refreshFromCloudNow()
-                                            cloudBusy = false
-                                            Toast.makeText(
-                                                context,
-                                                if (ok) "Đã tải danh sách ${store.taiKhoans.size} tài khoản mới nhất từ đám mây!" else "Không thể tải từ đám mây, vui lòng kiểm tra mạng.",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    }
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(44.dp)
-                                    .testTag("btn_refresh_cloud_accounts")
-                            ) {
-                                Text(
-                                    if (cloudBusy) "Đang tải từ đám mây..." else "🔄 TẢI LẠI TÀI KHOẢN MỚI NHẤT TỪ MÁY ADMIN",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
-                            }
-
-                            OutlinedButton(
-                                onClick = {
-                                    if (!cloudBusy) {
-                                        cloudBusy = true
-                                        errorMessage = ""
-                                        scope.launch {
-                                            store.disconnectGoogleCloudForSwitch()
-                                            signInWithGoogleInteractive(
-                                                activityContext = context,
-                                                forceAccountPicker = true,
-                                                onSignedIn = {
-                                                    store.startRealtimeCloudSync()
-                                                    cloudBusy = false
-                                                    Toast.makeText(
-                                                        context,
-                                                        "Đã đổi sang Gmail ${store.cloudUserEmail} và giữ nguyên 100% dữ liệu tiệm!",
-                                                        Toast.LENGTH_LONG
-                                                    ).show()
-                                                },
-                                                onError = { msg ->
-                                                    cloudBusy = false
-                                                    errorMessage = msg
-                                                }
-                                            )
-                                        }
-                                    }
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(44.dp)
-                                    .semantics {
-                                        contentDescription = "Đổi sang tài khoản Google Gmail khác mà vẫn giữ nguyên toàn bộ dữ liệu tiệm"
-                                    }
-                                    .testTag("btn_switch_cloud_google_login")
-                            ) {
-                                Text(
-                                    "🔁 ĐỔI TÀI KHOẢN GOOGLE (GMAIL) KHÁC",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    color = SpaRosewoodDark
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Khối Chọn Tài Khoản Test & Đăng Nhập 1 Chạm
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "⚡ Chọn nhanh tài khoản test (${store.taiKhoans.size} TK):",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = SpaRosewoodDark
-                            )
-                            if (store.taiKhoans.any { it.id == ID_TEST_ADMIN }) {
-                                TextButton(
-                                    onClick = {
-                                        store.xoaDuLieuTest()
-                                        phoneInput = ""
-                                        passwordInput = ""
-                                        Toast.makeText(context, "Đã xóa tài khoản Admin Test & dữ liệu mẫu!", Toast.LENGTH_SHORT).show()
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text("🗑️ Xóa TK Test", fontSize = 11.sp, color = SpaDanger, fontWeight = FontWeight.Bold)
-                                }
-                            } else {
-                                TextButton(
-                                    onClick = {
-                                        store.napLaiTaiKhoanVaDuLieuTest()
-                                        Toast.makeText(context, "Đã tạo tài khoản Admin Test & nạp lại dữ liệu mẫu!", Toast.LENGTH_SHORT).show()
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text("+ Tạo lại TK Test", fontSize = 11.sp, color = SpaSageGreen, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            store.taiKhoans.forEach { tk ->
-                                val isAdmin = tk.isAdmin()
-                                val isTest = tk.id == ID_TEST_ADMIN
-                                AssistChip(
-                                    onClick = {
-                                        phoneInput = tk.username
-                                        passwordInput = tk.matKhauHienThi.ifBlank { if (isAdmin) DEFAULT_ADMIN_PASS else "1234" }
-                                        errorMessage = ""
-                                        Toast.makeText(
-                                            context,
-                                            "Đã điền ${tk.hoTen} (${tk.username} • MK: $passwordInput). Bấm ĐĂNG NHẬP để vào!",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    },
-                                    label = {
-                                        Text(
-                                            text = "${if (isTest) "🧪 " else if (isAdmin) "👑 " else "💆 "}${tk.hoTen}",
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isAdmin) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isTest) SpaRosewoodDark else if (isAdmin) SpaRosewood else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
                 OutlinedTextField(
                     value = phoneInput,
                     onValueChange = {
@@ -974,7 +661,8 @@ fun OneTimeLoginScreen(store: SpaStore) {
                         errorMessage = ""
                     },
                     label = { Text("Mật khẩu") },
-                    placeholder = { Text("Nhập mật khẩu Admin cấp (mặc định: 123456)") },
+                    placeholder = { Text("Nhập mật khẩu Admin cấp") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1010,9 +698,9 @@ fun OneTimeLoginScreen(store: SpaStore) {
                                     ).show()
                                 } else {
                                     errorMessage = if (!store.isCloudConnected) {
-                                        "Sai số điện thoại hoặc mật khẩu! Nếu tài khoản vừa được Admin tạo trên máy chính, hãy bấm nút 'KẾT NỐI ĐÁM MÂY GOOGLE' phía trên để tải tài khoản mới về máy này."
+                                        "Sai số điện thoại hoặc mật khẩu! Bấm 'KẾT NỐI ĐÁM MÂY GOOGLE' bên dưới để đồng bộ tài khoản mới từ máy Admin."
                                     } else {
-                                        "Sai số điện thoại hoặc mật khẩu! Hãy kiểm tra trên máy Admin xem máy Admin đã bấm 'Kết nối Đám mây Google' để đẩy tài khoản mới lên đám mây chưa, hoặc chạm vào tên bạn trong danh sách phía trên rồi nhập lại mật khẩu."
+                                        "Sai số điện thoại hoặc mật khẩu! Vui lòng kiểm tra lại thông tin Admin cấp."
                                     }
                                 }
                             }
@@ -1022,13 +710,70 @@ fun OneTimeLoginScreen(store: SpaStore) {
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp)
+                        .height(52.dp)
                         .semantics {
                             contentDescription = "Đăng nhập và ghi nhớ tài khoản trên máy này"
                         }
                         .testTag("btn_login_submit")
                 ) {
                     Text("ĐĂNG NHẬP (GHI NHỚ 1 LẦN)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        if (!cloudBusy) {
+                            cloudBusy = true
+                            errorMessage = ""
+                            scope.launch {
+                                if (store.isCloudConnected) {
+                                    val ok = store.refreshFromCloudNow()
+                                    cloudBusy = false
+                                    Toast.makeText(
+                                        context,
+                                        if (ok) "Đã đồng bộ ${store.taiKhoans.size} tài khoản mới nhất từ đám mây!" else "Không thể tải từ đám mây, vui lòng kiểm tra mạng.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } else {
+                                    signInWithGoogleInteractive(
+                                        activityContext = context,
+                                        onSignedIn = {
+                                            cloudBusy = false
+                                            store.startRealtimeCloudSync()
+                                            Toast.makeText(
+                                                context,
+                                                "Đã kết nối Đám mây! Đang đồng bộ tài khoản & dữ liệu thời gian thực...",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        },
+                                        onError = { msg ->
+                                            cloudBusy = false
+                                            errorMessage = msg
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .semantics {
+                            contentDescription = "Kết nối Đám mây Google để đồng bộ dữ liệu thời gian thực giữa máy Admin và máy Nhân viên"
+                        }
+                        .testTag("btn_connect_google_cloud")
+                ) {
+                    if (cloudBusy) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Đang kết nối đám mây...", fontWeight = FontWeight.Bold)
+                    } else {
+                        Text(
+                            if (store.isCloudConnected) "☁️ ĐÃ KẾT NỐI ĐÁM MÂY GOOGLE" else "☁️ KẾT NỐI ĐÁM MÂY GOOGLE",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
 
                 HorizontalDivider()
@@ -6029,58 +5774,6 @@ fun TabQuyenHanAdmin(
                                 )
                             }
 
-                            // Khối quản lý Tài khoản Admin Test & Dữ liệu Mẫu
-                            Surface(
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        "🧪 Tài khoản Admin Thử Nghiệm (Test Account)",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = SpaRosewoodDark
-                                    )
-                                    Text(
-                                        "• SĐT: $DEFAULT_TEST_ADMIN_PHONE • Mật khẩu/PIN: $DEFAULT_TEST_ADMIN_PASS (Full quyền Chủ Spa).\n" +
-                                            "• Dữ liệu mẫu repo: 3 KTV, 10 Dịch vụ, 3 Gói, 3 Khách hàng, 4 Vé & Sổ quỹ.",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Button(
-                                            onClick = {
-                                                store.napLaiTaiKhoanVaDuLieuTest()
-                                                Toast.makeText(context, "Đã tạo tài khoản Admin Test ($DEFAULT_TEST_ADMIN_PHONE) & nạp dữ liệu mẫu!", Toast.LENGTH_SHORT).show()
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = SpaSageGreen),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.weight(1f).height(44.dp)
-                                        ) {
-                                            Text("✨ Nạp dữ liệu Test", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                        Button(
-                                            onClick = {
-                                                store.xoaDuLieuTest()
-                                                Toast.makeText(context, "Đã xóa tài khoản Admin Test ($DEFAULT_TEST_ADMIN_PHONE) và dữ liệu mẫu!", Toast.LENGTH_SHORT).show()
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = SpaDanger),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.weight(1f).height(44.dp)
-                                        ) {
-                                            Text("🗑️ Xóa TK Test", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
-                            }
-
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                             Text(
@@ -8370,6 +8063,140 @@ fun AccountSwitchDialog(
             }
         }
     )
+}
+
+@Composable
+fun GlobalMaintenanceScreen(
+    store: SpaStore,
+    user: TaiKhoan?
+) {
+    val context = LocalContext.current
+    val isOwnerOrAdmin = user?.isAdmin() == true || user?.isOwner() == true
+    val maintenanceMsg = store.globalMaintenanceMessage.ifBlank {
+        "Hệ thống đang bảo trì nâng cấp kỹ thuật định kỳ để nâng cao chất lượng dịch vụ."
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1A1A2E))
+            .imePadding()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp)
+            .semantics(mergeDescendants = true) {
+                heading()
+                contentDescription = if (isOwnerOrAdmin) {
+                    "Hệ thống đang bảo trì toàn diện. $maintenanceMsg. Bạn có thể bấm nút Liên hệ Kỹ thuật Dev qua Zalo để được hỗ trợ trực tiếp."
+                } else {
+                    "Hệ thống đang bảo trì, vui lòng liên hệ Chủ Spa."
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Surface(
+                    color = Color(0xFFFF9800).copy(alpha = 0.15f),
+                    shape = CircleShape,
+                    modifier = Modifier.size(72.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("🛠️", fontSize = 36.sp)
+                    }
+                }
+
+                Text(
+                    text = "HỆ THỐNG ĐANG BẢO TRÌ",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = SpaRosewoodDark,
+                    textAlign = TextAlign.Center
+                )
+
+                if (isOwnerOrAdmin) {
+                    // Màn hình dành cho Chủ Spa / Admin
+                    Text(
+                        text = maintenanceMsg,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp
+                    )
+
+                    Surface(
+                        color = SpaChampagne.copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "💡 Khi kỹ thuật viên Dev hoàn tất bảo trì trên hệ thống, ứng dụng sẽ tự động mở lại bình thường mà không cần đăng nhập lại.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SpaRosewood,
+                            modifier = Modifier.padding(12.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://zalo.me/0397772963")).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            }.onFailure {
+                                Toast.makeText(context, "Hotline/Zalo Kỹ thuật Dev: 0397772963", Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = SpaRosewood),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .semantics {
+                                contentDescription = "Liên hệ Kỹ thuật Dev qua Zalo"
+                            }
+                            .testTag("btn_contact_dev_zalo")
+                    ) {
+                        Text("💬 LIÊN HỆ KỸ THUẬT DEV QUA ZALO", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                } else {
+                    // Màn hình dành cho Kỹ thuật viên (KTV)
+                    Text(
+                        text = "Hệ thống đang bảo trì, vui lòng liên hệ Chủ Spa.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 24.sp
+                    )
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Ứng dụng sẽ tự động mở lại ngay khi Chủ Spa và hệ thống kết thúc thời gian bảo trì định kỳ.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(12.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
