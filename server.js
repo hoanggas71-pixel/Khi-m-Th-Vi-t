@@ -173,16 +173,32 @@ const server = http.createServer((req, res) => {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-  fs.readFile(filePath, (err, content) => {
-    if (err) {
-      res.writeHead(500, { 'Content-Type': 'text/plain; charset=UTF-8' });
-      res.end('Lỗi máy chủ cục bộ: ' + err.message);
-    } else {
-      res.writeHead(200, {
-        'Content-Type': contentType
-      });
-      res.end(content);
+  fs.stat(filePath, (err, stats) => {
+    if (err || !stats.isFile()) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=UTF-8' });
+      res.end('Không tìm thấy tệp yêu cầu');
+      return;
     }
+
+    const headers = {
+      'Content-Type': contentType,
+      'Content-Length': stats.size,
+      'Accept-Ranges': 'bytes'
+    };
+
+    if (ext === '.apk') {
+      headers['Content-Disposition'] = 'attachment; filename="KhiemThiViet-CaiDat.apk"';
+    }
+
+    if (req.method === 'HEAD') {
+      res.writeHead(200, headers);
+      res.end();
+      return;
+    }
+
+    res.writeHead(200, headers);
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
   });
 });
 

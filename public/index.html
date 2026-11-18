@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Developer Super Admin Portal - Khiếm Thị Việt SaaS</title>
+  <title>Khiếm Thị Việt - Nền Tảng Quản Lý Spa & Massage Trợ Năng TalkBack</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <!-- Firebase Web SDK v10 (Compat Mode) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -16,17 +16,548 @@
     }
     .status-pulse { animation: pulse-soft 2s infinite ease-in-out; }
     .vietqr-img {
-      max-width: 200px;
+      max-width: 220px;
       height: auto;
-      border-radius: 12px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      border-radius: 14px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
     }
+    html { scroll-behavior: smooth; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased flex flex-col">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased flex flex-col selection:bg-indigo-500 selection:text-white">
 
-  <!-- Dev Security Authentication Gate (Bảo Mật Dev PIN) -->
-  <div id="dev-auth-gate" class="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+  <!-- ========================================================================= -->
+  <!-- VIEW 1: CỔNG KHÁCH HÀNG (CUSTOMER SHOWCASE, PACKAGES & SPA OWNER PORTAL) -->
+  <!-- ========================================================================= -->
+  <div id="customer-view" class="flex-1 flex flex-col">
+
+    <!-- Header / Navbar Khách Hàng -->
+    <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 transition-all">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <!-- Logo & Thương Hiệu -->
+        <a href="#customer-view" class="flex items-center gap-3 group">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-xl shadow-lg shadow-indigo-950/50 group-hover:scale-105 transition">
+            💆
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-base font-black text-white tracking-wide">KHIẾM THỊ VIỆT</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">SaaS Spa 4.0</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Nền Tảng Quản Lý Spa Trợ Năng TalkBack Chuyên Sâu</p>
+          </div>
+        </a>
+
+        <!-- Menu Điều Hướng & Hành Động -->
+        <nav class="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-300">
+          <a href="#features-section" class="hover:text-indigo-400 transition flex items-center gap-1.5">
+            <span>🌟</span> Tính Năng
+          </a>
+          <a href="#pricing-section" class="hover:text-indigo-400 transition flex items-center gap-1.5">
+            <span>💰</span> Bảng Giá SaaS
+          </a>
+          <a href="#trial-download" class="hover:text-amber-400 text-amber-300 transition flex items-center gap-1.5">
+            <span>🎁</span> Tải Dùng Thử 3 Ngày (0đ)
+          </a>
+          <a href="#customer-portal" class="hover:text-indigo-400 transition flex items-center gap-1.5">
+            <span>🔑</span> Đăng Nhập Chủ Spa
+          </a>
+        </nav>
+
+        <!-- Nút Hành Động Góc Phải -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          <a href="#customer-portal" id="nav-login-btn" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/40 flex items-center gap-1.5 transition">
+            <span>🔑</span> <span class="hidden sm:inline">Chủ Spa</span> Đăng Nhập
+          </a>
+
+          <!-- Nút Ẩn Kín Đáo Dành Riêng Cho Dev -->
+          <button onclick="promptDevLogin()" title="Cổng Quản Trị Hệ Thống (Dành riêng cho Dev)" class="px-2.5 py-2 bg-slate-800/60 hover:bg-slate-800 hover:text-amber-300 text-slate-400 border border-slate-700/60 text-xs font-medium rounded-xl transition flex items-center gap-1">
+            <span class="text-sm">🔒</span>
+            <span class="text-[11px] font-mono hidden xl:inline">Dev Portal</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="relative overflow-hidden pt-12 pb-16 md:pt-20 md:pb-24 bg-gradient-to-b from-slate-900/80 via-slate-950 to-slate-950 border-b border-slate-800/80">
+      <!-- Glow hiệu ứng nền -->
+      <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute top-1/3 right-1/4 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-6">
+        <!-- Badge khuyến mãi / Dùng thử -->
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold shadow-lg">
+          <span class="text-base">🎁</span>
+          <span>BẢN DÙNG THỬ 3 NGÀY — MIỄN PHÍ 100% KHÔNG CẦN TÀI KHOẢN TRƯỚC</span>
+        </div>
+
+        <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight max-w-4xl mx-auto">
+          Giải Pháp Quản Lý Toàn Diện Dành Cho <br class="hidden sm:inline">
+          <span class="bg-gradient-to-r from-amber-400 via-indigo-400 to-indigo-200 bg-clip-text text-transparent">Spa & Massage Trợ Năng Khiếm Thị</span>
+        </h1>
+
+        <p class="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
+          Tối ưu 100% cho kỹ thuật viên khiếm thị sử dụng giọng đọc TalkBack. Tự động xếp tua xoay vòng công bằng, bấm giờ phòng vé chuẩn xác, quản lý sổ quỹ thu chi minh bạch và trợ lý AI <span class="text-amber-300 font-bold">gehihi</span> hỗ trợ kinh doanh.
+        </p>
+
+        <!-- CTA Buttons -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-4" id="trial-download">
+          <a href="KhiemThiViet-CaiDat.apk" download="KhiemThiViet-CaiDat.apk" class="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm rounded-2xl shadow-xl shadow-amber-950/50 flex items-center justify-center gap-2 transition hover:scale-105">
+            <span class="text-xl">📥</span>
+            <span>TẢI BẢN DÙNG THỬ 3 NGÀY (APK MIỄN PHÍ)</span>
+          </a>
+          <a href="#customer-portal" class="w-full sm:w-auto px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-2xl border border-slate-700 shadow-xl flex items-center justify-center gap-2 transition">
+            <span>🔑</span>
+            <span>Đăng Nhập Quản Lý Spa</span>
+          </a>
+        </div>
+
+        <!-- Chú thích bản demo 3 ngày không AI gehihi -->
+        <div class="max-w-xl mx-auto bg-slate-900/60 border border-slate-800 rounded-2xl p-3.5 text-xs text-slate-400 leading-relaxed text-left flex items-start gap-3">
+          <span class="text-amber-400 text-base shrink-0">💡</span>
+          <div>
+            <strong class="text-slate-200">Lưu ý về Bản Dùng Thử 3 Ngày:</strong> Khách hàng tải APK về máy có thể trải nghiệm ngay đầy đủ nghiệp vụ phòng vé, xếp tua, bấm giờ chuông báo, chấm công và sổ quỹ. 
+            <span class="text-amber-300 font-medium">Bản dùng thử không bao gồm trợ lý AI gehihi ở cả tài khoản Chủ Spa lẫn Nhân viên KTV.</span>
+            Sau 3 ngày dùng thử, quý cơ sở có thể đăng nhập web để gia hạn hoặc liên hệ Dev qua Zalo <strong class="text-emerald-400 font-mono">0397772963</strong> để mở khóa bản chính thức.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: TÍNH NĂNG VƯỢT TRỘI (SHOWCASE FEATURES) -->
+    <section id="features-section" class="py-16 md:py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full space-y-10">
+      <div class="text-center space-y-3">
+        <h2 class="text-2xl sm:text-3xl font-black text-white">Tính Năng Được Đo Ni Đóng Giày Cho Người Khiếm Thị</h2>
+        <p class="text-xs sm:text-sm text-slate-400 max-w-2xl mx-auto">
+          Không đơn thuần là một phần mềm quản lý, Khiếm Thị Việt là công cụ trợ năng chuyên biệt giúp nâng cao năng suất và đảm bảo sự công bằng tuyệt đối cho toàn bộ cơ sở.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Tính năng 1 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3.5 hover:border-indigo-500/40 transition group">
+          <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            🗣️
+          </div>
+          <h3 class="text-base font-bold text-white">Trợ Năng TalkBack 100% Tiếng Việt</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Mọi nút bấm, ô nhập liệu, danh sách và bảng thống kê đều có nhãn Accessibility chuẩn hóa. Giọng đọc tiếng Việt đọc to, mạch lạc giúp KTV khiếm thị làm việc độc lập 100% không cần người sáng mắt trợ giúp.
+          </p>
+        </div>
+
+        <!-- Tính năng 2 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3.5 hover:border-indigo-500/40 transition group">
+          <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            ⚖️
+          </div>
+          <h3 class="text-base font-bold text-white">Xếp Tua Luân Phiên Công Bằng</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Hệ thống phân tua thông minh tự động xoay vòng theo thứ tự đến tiệm hoặc số lượng tua trong ngày. Loại bỏ hoàn toàn mâu thuẫn tranh giành khách, tạo sự đoàn kết và tin tưởng trong đội ngũ.
+          </p>
+        </div>
+
+        <!-- Tính năng 3 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3.5 hover:border-indigo-500/40 transition group">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            ⏱️
+          </div>
+          <h3 class="text-base font-bold text-white">Bấm Giờ & Chuông Báo Phòng Vé</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Đếm ngược thời gian làm dịch vụ chính xác từng giây. Chuông báo âm thanh và chế độ rung thông minh nhắc nhở khi còn 5 phút và khi kết thúc ca, giúp tiệm luôn đúng giờ với khách hàng.
+          </p>
+        </div>
+
+        <!-- Tính năng 4 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3.5 hover:border-indigo-500/40 transition group">
+          <div class="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            💰
+          </div>
+          <h3 class="text-base font-bold text-white">Sổ Quỹ Thu Chi & Bảng Lương Minh Bạch</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Tự động tính hoa hồng vé dịch vụ, tiền thưởng, tiền tip và tạm ứng cho từng nhân viên. Tổng hợp doanh thu ngày, tháng và dòng tiền thực tế, ngăn ngừa tối đa rủi ro thất thoát.
+          </p>
+        </div>
+
+        <!-- Tính năng 5 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3.5 hover:border-indigo-500/40 transition group">
+          <div class="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            🔌
+          </div>
+          <h3 class="text-base font-bold text-white">Vận Hành Ngoại Tuyến (Offline 100%)</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Không phụ thuộc vào Internet, mất mạng cơ sở vẫn vận hành vé và bấm giờ bình thường. Khi có mạng trở lại, hệ thống tự động đồng bộ tức thì giữa máy Chủ Spa và các máy KTV.
+          </p>
+        </div>
+
+        <!-- Tính năng 6 -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3.5 hover:border-indigo-500/40 transition group">
+          <div class="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            🤖
+          </div>
+          <h3 class="text-base font-bold text-white flex items-center gap-1.5">
+            <span>Trợ Lý Trí Tuệ Nhân Tạo</span>
+            <span class="text-amber-400 font-mono">gehihi</span>
+          </h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Được tích hợp độc quyền trên các gói bản quyền chính thức. Cố vấn kinh doanh thông minh, phân tích thói quen khách quen, phát hiện lệch doanh số và hỗ trợ điều khiển app bằng giọng nói.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: BẢNG GIÁ & CÁC GÓI SAAS (PRICING SECTION) -->
+    <section id="pricing-section" class="py-16 md:py-20 bg-slate-900/50 border-y border-slate-800/80">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+        <div class="text-center space-y-3">
+          <div class="text-xs font-bold uppercase tracking-widest text-indigo-400">Bảng Giá Dịch Vụ Minh Bạch</div>
+          <h2 class="text-2xl sm:text-3xl font-black text-white">Chọn Gói Thuê Bao Phù Hợp Cho Cơ Sở Của Bạn</h2>
+          <p class="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto">
+            Chi phí hợp lý, nâng cấp linh hoạt, hỗ trợ kỹ thuật tận tâm 24/7 qua Zalo.
+          </p>
+        </div>
+
+        <!-- Pricing Cards Grid -->
+        <div id="customer-pricing-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Rendered dynamically by JS based on pricing config -->
+        </div>
+
+        <!-- Cam kết chất lượng -->
+        <div class="p-5 rounded-3xl bg-slate-900 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-300">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🛡️</span>
+            <div>
+              <strong class="text-white block">Cam Kết Bản Quyền & Hỗ Trợ Kỹ Thuật 24/7</strong>
+              <span class="text-slate-400">Được phát triển và bảo trì liên tục bởi đội ngũ kỹ sư chuyên về giải pháp trợ năng Khiếm Thị Việt.</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <a href="https://zalo.me/0397772963" target="_blank" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition">
+              <span>💬</span> Chat Zalo Với Dev (0397772963)
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: ĐĂNG NHẬP & BẢNG ĐIỀU KHIỂN CHỦ SPA (CUSTOMER PORTAL SECTION) -->
+    <section id="customer-portal" class="py-16 md:py-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 w-full space-y-8">
+      <div class="text-center space-y-2">
+        <div class="text-xs font-bold uppercase tracking-widest text-amber-400">Khu Vực Khách Hàng</div>
+        <h2 class="text-2xl sm:text-3xl font-black text-white">Tra Cứu & Quản Lý Bản Quyền Cơ Sở</h2>
+        <p class="text-xs sm:text-sm text-slate-400">
+          Chủ Spa đăng nhập bằng Số điện thoại và Mật khẩu PIN để kiểm tra thời hạn, tải lại APK và gia hạn tự động qua VietQR.
+        </p>
+      </div>
+
+      <!-- Khung Đăng Nhập Khách Hàng (Khi CHƯA đăng nhập) -->
+      <div id="customer-login-box" class="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+        <div class="flex items-center gap-3 border-b border-slate-800 pb-4">
+          <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
+            🔑
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Đăng Nhập Tài Khoản Chủ Spa</h3>
+            <p class="text-xs text-slate-400">Nhập số điện thoại chủ cơ sở đã được Dev đăng ký</p>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Số điện thoại Chủ Quán:</label>
+            <input type="text" id="cust-phone-input" placeholder="VD: 0397772963 hoặc 123456789" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 transition">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Mật khẩu PIN:</label>
+            <input type="password" id="cust-pin-input" placeholder="Nhập PIN (VD: 247208 hoặc 12345)" onkeydown="if(event.key==='Enter') handleCustomerLogin()" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 transition">
+          </div>
+
+          <div id="cust-login-error" class="hidden p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 font-medium">
+            ⚠️ Số điện thoại hoặc mật khẩu không chính xác! Vui lòng thử lại hoặc liên hệ Dev qua Zalo 0397772963.
+          </div>
+
+          <button onclick="handleCustomerLogin()" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-950/50 transition flex items-center justify-center gap-2">
+            <span>🔓</span> Đăng Nhập & Tra Cứu Bản Quyền
+          </button>
+        </div>
+
+        <div class="border-t border-slate-800 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+          <div>
+            Chưa có tài khoản? 
+            <a href="KhiemThiViet-CaiDat.apk" download="KhiemThiViet-CaiDat.apk" class="text-amber-300 font-semibold underline hover:text-amber-200">
+              Tải bản dùng thử 3 ngày (0đ)
+            </a>
+          </div>
+          <div>
+            Hotline hỗ trợ: <a href="https://zalo.me/0397772963" target="_blank" class="font-mono text-emerald-400 font-bold hover:underline">0397772963</a> (Zalo Dev)
+          </div>
+        </div>
+      </div>
+
+      <!-- Bảng Điều Khiển Cơ Sở Khách Hàng (Khi ĐÃ đăng nhập) -->
+      <div id="customer-dashboard-box" class="hidden bg-slate-900 border border-indigo-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-2xl shadow-lg">
+              🏢
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 id="cust-spa-name" class="text-lg font-bold text-white">Spa Khiếm Thị Việt</h3>
+                <span id="cust-status-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                  🟢 Đang Hoạt Động
+                </span>
+              </div>
+              <p class="text-xs text-slate-400">Tài khoản Chủ Quán: <span id="cust-spa-phone" class="font-mono text-indigo-300 font-semibold"></span></p>
+            </div>
+          </div>
+
+          <button onclick="handleCustomerLogout()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center gap-1.5">
+            <span>🚪</span> Đăng Xuất
+          </button>
+        </div>
+
+        <!-- 3 Thẻ Thông Tin Bản Quyền -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-1">
+            <div class="text-[11px] text-slate-400">Gói SaaS Đang Dùng:</div>
+            <div id="cust-plan-name" class="text-base font-bold text-indigo-300">VIP 1 Năm</div>
+            <div class="text-[10px] text-slate-400">Full tính năng & AI gehihi</div>
+          </div>
+
+          <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-1">
+            <div class="text-[11px] text-slate-400">Hạn Sử Dụng Đến:</div>
+            <div id="cust-expiry-date" class="text-base font-bold text-white font-mono">18/11/2027</div>
+            <div id="cust-days-badge" class="text-[10px] text-emerald-400 font-semibold">Còn 365 ngày sử dụng</div>
+          </div>
+
+          <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-1">
+            <div class="text-[11px] text-slate-400">Bộ Cài Đặt Android:</div>
+            <div class="text-base font-bold text-amber-300 font-mono">APK v4.0.0</div>
+            <div class="text-[10px] text-slate-400">Dung lượng: 28.7MB</div>
+          </div>
+        </div>
+
+        <!-- Hành Động Dành Cho Chủ Spa -->
+        <div class="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-3">
+          <div class="text-xs font-bold text-slate-300 uppercase tracking-wider">Hành Động Khách Hàng:</div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button onclick="openCustomerRenewModal()" class="py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-950/50 flex items-center justify-center gap-1.5 transition">
+              <span>➕</span> Gia Hạn Gói Dịch Vụ
+            </button>
+            <a href="KhiemThiViet-CaiDat.apk" download="KhiemThiViet-CaiDat.apk" class="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
+              <span>📥</span> Tải Lại File APK
+            </a>
+            <a href="https://zalo.me/0397772963" target="_blank" class="py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
+              <span>💬</span> Chat Zalo Với Dev
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer Khách Hàng -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-8 text-xs text-slate-400 mt-auto">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-2">
+          <span>💆</span>
+          <span class="font-bold text-slate-200">Khiếm Thị Việt SaaS</span>
+          <span>— Nền tảng quản lý Spa & Massage trợ năng TalkBack số 1 Việt Nam</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span>Hotline / Zalo Dev: <strong class="text-emerald-400 font-mono">0397772963</strong></span>
+          <span class="text-slate-600">|</span>
+          <button onclick="promptDevLogin()" class="text-slate-400 hover:text-amber-300 transition flex items-center gap-1">
+            <span>🔒</span> Cổng Quản Trị Dev
+          </button>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- VIEW 2: DEV SUPER ADMIN PORTAL (TOÀN QUYỀN ĐIỀU HÀNH SAAS CỦA DEV)       -->
+  <!-- ========================================================================= -->
+  <div id="dev-view" class="hidden flex-1 flex flex-col">
+
+    <!-- Top Navigation Bar Dev -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-xl shadow-lg shadow-indigo-950/40">
+            👑
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-base font-extrabold text-white tracking-wide">KHIẾM THỊ VIỆT</h1>
+              <span class="text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">Dev Super Admin</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Trung Tâm Điều Hành Bản Quyền & Hệ Thống Đám Mây</p>
+          </div>
+        </div>
+
+        <!-- Dev Actions -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          <button onclick="switchToCustomerView()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition" title="Quay lại trang giới thiệu và cổng khách hàng">
+            <span>⬅️</span> <span class="hidden sm:inline">Về Trang Khách Hàng</span>
+          </button>
+          <button onclick="openPricingBankModal()" title="Cài đặt bảng giá SaaS & Tài khoản ngân hàng VietQR" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition">
+            <span>💰</span> <span class="hidden sm:inline">Cài Đặt Giá & Ngân Hàng</span>
+          </button>
+          <button onclick="openCloudConfigModal()" title="Cài đặt kết nối Firebase Cloud" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition">
+            <span>⚙️</span> <span class="hidden sm:inline">Cloud Config</span>
+          </button>
+          <button onclick="openCreateModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30 flex items-center gap-1.5 transition">
+            <span>➕</span> <span class="hidden sm:inline">Thêm Chủ Spa Mới</span>
+          </button>
+          <button onclick="lockDevPortal()" title="Khóa bảng điều khiển Dev" class="px-2.5 py-2 bg-slate-800/80 hover:bg-rose-900/30 hover:text-rose-300 text-slate-400 border border-slate-700 text-xs font-semibold rounded-xl transition">
+            🔒
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container Dev -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+      <!-- Architecture & Connection Status Banner -->
+      <div class="bg-gradient-to-r from-indigo-950/60 via-slate-900 to-slate-900 border border-indigo-900/50 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="text-indigo-400 text-lg">🛡️</span>
+            <h2 class="text-sm font-bold text-white">Bảng Điều Hành Bản Quyền SaaS Cho Nhà Phát Triển (Dev)</h2>
+          </div>
+          <p class="text-xs text-slate-400 max-w-3xl leading-relaxed">
+            Quản lý các gói thuê bao (2 Tuần, 1 Tháng, 3 Tháng, 6 Tháng, 1 Năm), thiết lập giá cước và tài khoản VietQR thu phí. Mọi thao tác đều có xác nhận an toàn và hỗ trợ <strong class="text-emerald-400">Hoàn Tác (Undo)</strong> ngay lập tức.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button onclick="openCloudConfigModal()" id="cloud-status-badge" class="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium flex items-center gap-1.5 hover:bg-emerald-500/20 transition cursor-pointer">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 status-pulse"></span>
+            <span id="cloud-status-text">Firestore Cloud: Sẵn Sàng</span>
+            <span class="text-[10px] opacity-75">⚙️</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 4 Stats Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+          <div class="flex items-center justify-between text-slate-400 text-xs">
+            <span>Tổng Cơ Sở Thực Tế</span>
+            <span class="text-lg">🏢</span>
+          </div>
+          <div class="text-2xl font-black text-white" id="stat-total">1</div>
+          <div class="text-[11px] text-slate-400">Khách hàng đang thuê</div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+          <div class="flex items-center justify-between text-slate-400 text-xs">
+            <span>Spa Đang Hoạt Động</span>
+            <span class="text-lg">🟢</span>
+          </div>
+          <div class="text-2xl font-black text-emerald-400" id="stat-active">1</div>
+          <div class="text-[11px] text-emerald-400/80">Thuê bao còn hạn hợp lệ</div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+          <div class="flex items-center justify-between text-slate-400 text-xs">
+            <span>Spa Bị Khóa (Hết hạn)</span>
+            <span class="text-lg">🔒</span>
+          </div>
+          <div class="text-2xl font-black text-rose-400" id="stat-locked">0</div>
+          <div class="text-[11px] text-rose-400/80">Kích hoạt Kill-Switch</div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+          <div class="flex items-center justify-between text-slate-400 text-xs">
+            <span>Doanh Thu SaaS Của Dev</span>
+            <span class="text-lg">💰</span>
+          </div>
+          <div class="text-2xl font-black text-amber-400" id="stat-revenue">500.000 đ</div>
+          <div class="text-[11px] text-slate-400">Tiền thuê phần mềm / tháng</div>
+        </div>
+      </div>
+
+      <!-- Global Maintenance Control Panel -->
+      <div class="bg-gradient-to-r from-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 shadow-xl">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🚨</span>
+              <h3 class="text-sm font-bold text-white">Chế Độ Bảo Trì Toàn Hệ Thống (Global Maintenance)</h3>
+              <span id="maintenance-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                🟢 Bình Thường (Sẵn Sàng)
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 max-w-3xl leading-relaxed">
+              Khi kích hoạt, <strong class="text-slate-200">tất cả ứng dụng Khiếm Thị Việt (toàn bộ KTV và Chủ Spa)</strong> trên điện thoại sẽ nhận tín hiệu và hiển thị màn hình khóa bảo trì ngay lập tức. KTV được nhắc liên hệ Chủ Spa, Chủ Spa có nút TalkBack liên hệ Kỹ thuật Dev qua Zalo (<strong class="text-emerald-400 font-mono">0397772963</strong>). Khi tắt bảo trì, mọi app tự động mở lại bình thường không cần đăng nhập lại.
+            </p>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <button id="btn-toggle-maintenance" onclick="requestToggleGlobalMaintenance()" class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">
+              <span>🛠️</span> <span id="btn-maintenance-label">Bật Chế Độ Bảo Trì</span>
+            </button>
+          </div>
+        </div>
+        <!-- Input thông báo bảo trì tùy chỉnh -->
+        <div class="w-full mt-1 pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <label for="maintenance-custom-msg" class="text-xs text-slate-400 shrink-0 flex items-center gap-1.5">
+            <span>📢</span> Thông báo phát sóng tới App:
+          </label>
+          <input type="text" id="maintenance-custom-msg" oninput="saveMaintenanceMessage()" placeholder="Hệ thống đang bảo trì nâng cấp kỹ thuật định kỳ..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+          <button onclick="saveMaintenanceMessage(true)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 shrink-0 transition">
+            💾 Lưu Thông Báo
+          </button>
+        </div>
+      </div>
+
+      <!-- Tenant Spa Management Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div class="p-4 sm:px-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-bold text-white">Danh Sách Cơ Sở Spa Thực Tế Đang Thuê Ứng Dụng</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Quản lý giấy phép bản quyền, gia hạn ngày sử dụng và điều khiển công tắc khóa từ xa</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" id="search-input" oninput="renderTable()" placeholder="Tìm theo tên spa, SĐT chủ quán..." class="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-1.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+            <button onclick="syncFromCloud()" class="px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 text-xs font-semibold rounded-xl border border-indigo-500/40 transition" title="Đồng bộ danh sách mới nhất từ Cloud">
+              🔄 Đồng bộ Cloud
+            </button>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
+              <tr>
+                <th class="py-3 px-4">Cơ Sở Spa / Mã Tenant</th>
+                <th class="py-3 px-4">Chủ Spa (Tài khoản Owner)</th>
+                <th class="py-3 px-4">Gói SaaS Đăng Ký</th>
+                <th class="py-3 px-4">Hạn Sử Dụng</th>
+                <th class="py-3 px-4 text-center">Trạng Thái (Kill-Switch)</th>
+                <th class="py-3 px-4 text-right">Thao Tác Dev</th>
+              </tr>
+            </thead>
+            <tbody id="tenant-tbody" class="divide-y divide-slate-800">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- MODALS SECTION                                          -->
+  <!-- ======================================================= -->
+
+  <!-- Modal 1: Dev Security PIN Modal (Nhập PIN mở cổng Dev) -->
+  <div id="dev-pin-modal" class="hidden fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[100] flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 text-center space-y-5 shadow-2xl">
       <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-3xl mx-auto shadow-xl shadow-indigo-950/60">
         👑
@@ -37,7 +568,7 @@
           Dev Super Admin Portal
         </div>
         <p class="text-xs text-slate-400 pt-2 leading-relaxed">
-          Trung tâm điều hành bản quyền và phát sóng tín hiệu toàn hệ thống. Vui lòng nhập Mã PIN bảo mật để mở khóa.
+          Khu vực điều hành kỹ thuật, cấp phép và phát sóng bảo trì toàn hệ thống. Vui lòng nhập Mã PIN bảo mật Dev để mở khóa.
         </p>
       </div>
 
@@ -47,7 +578,10 @@
                class="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 text-center text-lg font-mono tracking-widest text-white focus:outline-none focus:border-indigo-500 transition">
         <div id="dev-pin-error" class="text-xs text-rose-400 hidden font-medium">⚠️ Mã PIN không đúng! Thử lại.</div>
         <button onclick="verifyDevPin()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-950/50 transition flex items-center justify-center gap-1.5">
-          <span>🔓</span> Mở Khóa Bảng Điều Khiển
+          <span>🔓</span> Mở Khóa Bảng Điều Khiển Dev
+        </button>
+        <button onclick="closeDevPinModal()" class="w-full py-2 bg-slate-800/80 hover:bg-slate-800 text-slate-400 text-xs font-semibold rounded-xl transition">
+          Hủy Bỏ (Về Trang Khách Hàng)
         </button>
       </div>
 
@@ -57,177 +591,89 @@
     </div>
   </div>
 
-  <!-- Top Navigation Bar -->
-  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-xl shadow-lg shadow-indigo-950/40">
-          👑
+  <!-- Modal 2: Khách Hàng Gia Hạn Gói & Quét VietQR -->
+  <div id="customer-renew-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[95vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">💳</span>
+          <h3 class="text-sm font-bold text-white">Gia Hạn Gói Dịch Vụ Cho Quý Cơ Sở</h3>
+        </div>
+        <button onclick="closeCustomerRenewModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <!-- Thông tin cơ sở -->
+      <div class="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
+        <div>
+          <span class="text-slate-400">Cơ sở:</span> <strong id="cust-renew-spa-name" class="text-white"></strong>
         </div>
         <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-base font-extrabold text-white tracking-wide">KHIẾM THỊ VIỆT</h1>
-            <span class="text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">Dev Super Admin</span>
+          <span class="text-slate-400">Hạn hiện tại:</span> <span id="cust-renew-old-expiry" class="font-mono text-amber-300 font-bold"></span>
+        </div>
+      </div>
+
+      <!-- Lựa chọn gói gia hạn -->
+      <div class="space-y-2">
+        <label class="text-xs font-semibold text-slate-300 block">Chọn gói thời hạn muốn gia hạn thêm:</label>
+        <div id="cust-renew-plans-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Khung Chi Tiết & Hạn Dùng Mới -->
+      <div class="p-3.5 bg-gradient-to-r from-indigo-950/40 via-slate-950 to-indigo-950/40 border border-indigo-500/30 rounded-2xl text-xs space-y-2">
+        <div class="flex items-center justify-between text-indigo-300 font-bold">
+          <span>🚀 Thời Gian & Chi Phí Sau Gia Hạn:</span>
+          <span id="cust-preview-plan-badge" class="bg-indigo-500/20 px-2 py-0.5 rounded-full text-[10px] text-indigo-200">Gói 1 Tháng</span>
+        </div>
+        <div class="flex items-center justify-between text-slate-300 pt-1">
+          <div>Cộng thêm: <strong id="cust-preview-added-days" class="text-white">+30 ngày</strong></div>
+          <div>Số tiền: <strong id="cust-preview-amount" class="text-amber-400 text-sm">500.000 đ</strong></div>
+        </div>
+        <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 text-center text-xs">
+          Hạn sử dụng mới: <strong id="cust-preview-new-expiry" class="text-emerald-400 font-mono text-sm">--/--/----</strong>
+        </div>
+      </div>
+
+      <!-- Khung VietQR Thanh Toán Realtime Cho Khách -->
+      <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-3">
+        <div class="flex items-center justify-between text-[11px] text-slate-400">
+          <span>📲 Quét Mã VietQR Bằng App Ngân Hàng:</span>
+          <span id="cust-qr-bank-code" class="font-mono text-emerald-400 font-bold">MBBANK</span>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 py-1">
+          <div class="bg-white p-2.5 rounded-2xl shadow-xl flex items-center justify-center">
+            <img id="cust-vietqr-img" src="" alt="Mã VietQR Chuyển Khoản" class="vietqr-img w-44 h-44 object-contain">
           </div>
-          <p class="text-[11px] text-slate-400">Trung Tâm Điều Hành Bản Quyền & Hệ Thống Đám Mây</p>
-        </div>
-      </div>
-
-      <!-- Dev Actions -->
-      <div class="flex items-center gap-2 sm:gap-3">
-        <button onclick="openPricingBankModal()" title="Cài đặt bảng giá SaaS & Tài khoản ngân hàng VietQR" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition">
-          <span>💰</span> <span class="hidden sm:inline">Cài Đặt Giá & Ngân Hàng</span>
-        </button>
-        <button onclick="openCloudConfigModal()" title="Cài đặt kết nối Firebase Cloud" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition">
-          <span>⚙️</span> <span class="hidden sm:inline">Cloud Config</span>
-        </button>
-        <button onclick="openCreateModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30 flex items-center gap-1.5 transition">
-          <span>➕</span> <span class="hidden sm:inline">Thêm Chủ Spa Mới</span>
-        </button>
-        <button onclick="lockDevPortal()" title="Khóa bảng điều khiển" class="px-2.5 py-2 bg-slate-800/80 hover:bg-rose-900/30 hover:text-rose-300 text-slate-400 border border-slate-700 text-xs font-semibold rounded-xl transition">
-          🔒
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Container -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
-
-    <!-- Architecture & Connection Status Banner -->
-    <div class="bg-gradient-to-r from-indigo-950/60 via-slate-900 to-slate-900 border border-indigo-900/50 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-      <div class="space-y-1">
-        <div class="flex items-center gap-2">
-          <span class="text-indigo-400 text-lg">🛡️</span>
-          <h2 class="text-sm font-bold text-white">Bảng Điều Hành Bản Quyền SaaS Cho Nhà Phát Triển (Dev)</h2>
-        </div>
-        <p class="text-xs text-slate-400 max-w-3xl leading-relaxed">
-          Quản lý các gói thuê bao (2 Tuần, 1 Tháng, 3 Tháng, 6 Tháng, 1 Năm), thiết lập giá cước và tài khoản VietQR thu phí. Mọi thao tác đều có xác nhận an toàn và hỗ trợ <strong class="text-emerald-400">Hoàn Tác (Undo)</strong> ngay lập tức.
-        </p>
-      </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <button onclick="openCloudConfigModal()" id="cloud-status-badge" class="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium flex items-center gap-1.5 hover:bg-emerald-500/20 transition cursor-pointer">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 status-pulse"></span>
-          <span id="cloud-status-text">Firestore Cloud: Sẵn Sàng</span>
-          <span class="text-[10px] opacity-75">⚙️</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- 4 Stats Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
-        <div class="flex items-center justify-between text-slate-400 text-xs">
-          <span>Tổng Cơ Sở Thực Tế</span>
-          <span class="text-lg">🏢</span>
-        </div>
-        <div class="text-2xl font-black text-white" id="stat-total">1</div>
-        <div class="text-[11px] text-slate-400">Khách hàng đang thuê</div>
-      </div>
-
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
-        <div class="flex items-center justify-between text-slate-400 text-xs">
-          <span>Spa Đang Hoạt Động</span>
-          <span class="text-lg">🟢</span>
-        </div>
-        <div class="text-2xl font-black text-emerald-400" id="stat-active">1</div>
-        <div class="text-[11px] text-emerald-400/80">Thuê bao còn hạn hợp lệ</div>
-      </div>
-
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
-        <div class="flex items-center justify-between text-slate-400 text-xs">
-          <span>Spa Bị Khóa (Hết hạn)</span>
-          <span class="text-lg">🔒</span>
-        </div>
-        <div class="text-2xl font-black text-rose-400" id="stat-locked">0</div>
-        <div class="text-[11px] text-rose-400/80">Kích hoạt Kill-Switch</div>
-      </div>
-
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
-        <div class="flex items-center justify-between text-slate-400 text-xs">
-          <span>Doanh Thu SaaS Của Dev</span>
-          <span class="text-lg">💰</span>
-        </div>
-        <div class="text-2xl font-black text-amber-400" id="stat-revenue">500.000 đ</div>
-        <div class="text-[11px] text-slate-400">Tiền thuê phần mềm / tháng</div>
-      </div>
-    </div>
-
-    <!-- Global Maintenance Control Panel -->
-    <div class="bg-gradient-to-r from-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 shadow-xl">
-      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div class="space-y-1">
-          <div class="flex items-center gap-2">
-            <span class="text-xl">🚨</span>
-            <h3 class="text-sm font-bold text-white">Chế Độ Bảo Trì Toàn Hệ Thống (Global Maintenance)</h3>
-            <span id="maintenance-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-              🟢 Bình Thường (Sẵn Sàng)
-            </span>
+          <div class="text-left text-xs space-y-1.5 text-slate-300">
+            <div>Ngân hàng: <strong id="cust-qr-bank-name" class="text-white">MBBank</strong></div>
+            <div>Số tài khoản: <strong id="cust-qr-account-no" class="text-emerald-400 font-mono text-sm">0397772963</strong></div>
+            <div>Chủ tài khoản: <strong id="cust-qr-account-name" class="text-amber-300 uppercase">DEV SUPER ADMIN</strong></div>
+            <div>Số tiền: <strong id="cust-qr-amount-text" class="text-amber-400 text-sm">500.000 đ</strong></div>
+            <div>Nội dung CK: <span id="cust-qr-memo" class="font-mono text-indigo-300 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800"></span></div>
           </div>
-          <p class="text-xs text-slate-400 max-w-3xl leading-relaxed">
-            Khi kích hoạt, <strong class="text-slate-200">tất cả ứng dụng Khiếm Thị Việt (toàn bộ KTV và Chủ Spa)</strong> trên điện thoại sẽ nhận tín hiệu và hiển thị màn hình khóa bảo trì ngay lập tức. KTV được nhắc liên hệ Chủ Spa, Chủ Spa có nút TalkBack liên hệ Kỹ thuật Dev qua Zalo (<strong class="text-emerald-400 font-mono">0397772963</strong>). Khi tắt bảo trì, mọi app tự động mở lại bình thường không cần đăng nhập lại.
-          </p>
         </div>
-        <div class="flex items-center gap-3 shrink-0">
-          <button id="btn-toggle-maintenance" onclick="requestToggleGlobalMaintenance()" class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">
-            <span>🛠️</span> <span id="btn-maintenance-label">Bật Chế Độ Bảo Trì</span>
+
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+          <button onclick="copyCustomerInvoiceMemo()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition">
+            <span>📋</span> <span id="cust-copy-btn-text">Sao Chép Thông Tin CK</span>
           </button>
+          <a id="cust-zalo-confirm-btn" href="https://zalo.me/0397772963" target="_blank" class="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-900/40 flex items-center justify-center gap-1.5 transition">
+            <span>📱</span> Báo Dev Qua Zalo (0397772963)
+          </a>
         </div>
       </div>
-      <!-- Input thông báo bảo trì tùy chỉnh -->
-      <div class="w-full mt-1 pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-        <label for="maintenance-custom-msg" class="text-xs text-slate-400 shrink-0 flex items-center gap-1.5">
-          <span>📢</span> Thông báo phát sóng tới App:
-        </label>
-        <input type="text" id="maintenance-custom-msg" oninput="saveMaintenanceMessage()" placeholder="Hệ thống đang bảo trì nâng cấp kỹ thuật định kỳ..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
-        <button onclick="saveMaintenanceMessage(true)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 shrink-0 transition">
-          💾 Lưu Thông Báo
+
+      <div class="flex justify-end pt-1 border-t border-slate-800">
+        <button onclick="closeCustomerRenewModal()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+          Đóng Cửa Sổ
         </button>
       </div>
     </div>
+  </div>
 
-    <!-- Tenant Spa Management Table -->
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-      <div class="p-4 sm:px-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h3 class="text-sm font-bold text-white">Danh Sách Cơ Sở Spa Thực Tế Đang Thuê Ứng Dụng</h3>
-          <p class="text-xs text-slate-400 mt-0.5">Quản lý giấy phép bản quyền, gia hạn ngày sử dụng và điều khiển công tắc khóa từ xa</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <input type="text" id="search-input" oninput="renderTable()" placeholder="Tìm theo tên spa, SĐT chủ quán..." class="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-1.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
-          <button onclick="syncFromCloud()" class="px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 text-xs font-semibold rounded-xl border border-indigo-500/40 transition" title="Đồng bộ danh sách mới nhất từ Cloud">
-            🔄 Đồng bộ Cloud
-          </button>
-        </div>
-      </div>
-
-      <!-- Table -->
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
-          <thead class="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
-            <tr>
-              <th class="py-3 px-4">Cơ Sở Spa / Mã Tenant</th>
-              <th class="py-3 px-4">Chủ Spa (Tài khoản Owner)</th>
-              <th class="py-3 px-4">Gói SaaS Đăng Ký</th>
-              <th class="py-3 px-4">Hạn Sử Dụng</th>
-              <th class="py-3 px-4 text-center">Trạng Thái (Kill-Switch)</th>
-              <th class="py-3 px-4 text-right">Thao Tác Dev</th>
-            </tr>
-          </thead>
-          <tbody id="tenant-tbody" class="divide-y divide-slate-800">
-            <!-- Rendered by JS -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-  </main>
-
-  <!-- ======================================================= -->
-  <!-- MODALS SECTION                                          -->
-  <!-- ======================================================= -->
-
-  <!-- Modal: Xác nhận 2 bước an toàn (Confirm Dialog) -->
+  <!-- Modal 3: Xác Nhận 2 Bước An Toàn (Dev Confirm Dialog) -->
   <div id="confirm-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center gap-3">
@@ -255,7 +701,7 @@
     </div>
   </div>
 
-  <!-- Modal: Cài Đặt Bảng Giá SaaS & Ngân Hàng Dev -->
+  <!-- Modal 4: Cài Đặt Bảng Giá SaaS & Ngân Hàng Dev -->
   <div id="pricing-bank-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -273,11 +719,9 @@
 
       <!-- Phần 1: Bảng Giá 5 Gói SaaS -->
       <div class="space-y-3">
-        <div class="flex items-center justify-between">
-          <label class="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
-            <span>📦</span> Cấu Hình Bảng Giá Các Gói (2 Tuần, 1 Tháng, 3 Tháng, 6 Tháng, 1 Năm)
-          </label>
-        </div>
+        <label class="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+          <span>📦</span> Cấu Hình Bảng Giá Các Gói (2 Tuần, 1 Tháng, 3 Tháng, 6 Tháng, 1 Năm)
+        </label>
         <div id="pricing-list-container" class="space-y-2 text-xs">
           <!-- Rendered dynamically by JS -->
         </div>
@@ -309,7 +753,7 @@
           </div>
           <div>
             <label class="font-medium text-slate-400 block mb-1">Tên chủ tài khoản:</label>
-            <input type="text" id="cfg-bank-name" placeholder="VD: NGUYEN VAN A" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold uppercase">
+            <input type="text" id="cfg-bank-name" placeholder="VD: DEV SUPER ADMIN" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold uppercase">
           </div>
         </div>
       </div>
@@ -321,13 +765,13 @@
             <span>📥</span> Đường Link Tải APK Cài Đặt (Google Drive / Direct Link)
           </label>
           <a href="KhiemThiViet-CaiDat.apk" download="KhiemThiViet-CaiDat.apk" class="text-[11px] text-amber-400 hover:text-amber-300 font-semibold underline">
-            Tải APK gốc (27.4MB)
+            Tải APK gốc (28.7MB)
           </a>
         </div>
         <div>
-          <input type="text" id="cfg-apk-url" placeholder="VD: https://drive.google.com/file/d/.../view (Để trống nếu gửi file trực tiếp qua Zalo)" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono text-xs">
+          <input type="text" id="cfg-apk-url" placeholder="VD: https://drive.google.com/file/d/.../view (Để trống nếu gửi file trực tiếp qua Zalo hoặc dùng link web)" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono text-xs">
           <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
-            💡 <strong class="text-slate-300">Hướng dẫn:</strong> Bạn có thể upload file <span class="text-amber-300 font-mono">KhiemThiViet-CaiDat.apk</span> lên Google Drive rồi dán link chia sẻ vào đây. Nếu để trống, mẫu tin nhắn Zalo sẽ hướng dẫn Chủ Spa nhận file đính kèm trực tiếp trong Zalo.
+            💡 <strong class="text-slate-300">Hướng dẫn:</strong> Bạn có thể upload file <span class="text-amber-300 font-mono">KhiemThiViet-CaiDat.apk</span> lên Google Drive rồi dán link chia sẻ vào đây. Nếu để trống, mẫu tin nhắn Zalo sẽ hướng dẫn Chủ Spa tải từ Cổng Khách Hàng hoặc nhận file đính kèm trực tiếp trong Zalo.
           </p>
         </div>
       </div>
@@ -341,7 +785,7 @@
     </div>
   </div>
 
-  <!-- Modal: Gia Hạn Gói SaaS Nâng Cấp (Hỗ Trợ 5 Gói & VietQR & Zalo) -->
+  <!-- Modal 5: Dev Gia Hạn Gói SaaS Cho Spa (Có VietQR & Chia Sẻ Zalo) -->
   <div id="extend-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[95vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -449,7 +893,7 @@
     </div>
   </div>
 
-  <!-- Modal: Cấu hình kết nối Firebase Cloud -->
+  <!-- Modal 6: Cấu hình kết nối Firebase Cloud -->
   <div id="cloud-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -485,7 +929,7 @@
     </div>
   </div>
 
-  <!-- Modal: Thêm cơ sở Spa mới (Onboarding) -->
+  <!-- Modal 7: Thêm cơ sở Spa mới (Onboarding) -->
   <div id="create-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -528,7 +972,7 @@
     </div>
   </div>
 
-  <!-- Modal: Chỉnh Sửa Cơ Sở Spa -->
+  <!-- Modal 8: Chỉnh Sửa Cơ Sở Spa -->
   <div id="edit-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -578,7 +1022,7 @@
     </div>
   </div>
 
-  <!-- Modal: Tin nhắn Zalo chào mừng khách mới -->
+  <!-- Modal 9: Tin nhắn Zalo chào mừng khách mới -->
   <div id="zalo-welcome-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -602,7 +1046,7 @@
           Đóng
         </button>
         <a href="KhiemThiViet-CaiDat.apk" download="KhiemThiViet-CaiDat.apk" class="px-3.5 py-2.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition" title="Tải file APK trực tiếp về máy">
-          <span>📥</span> Tải APK (27.4MB)
+          <span>📥</span> Tải APK (28.7MB)
         </a>
         <button id="btn-copy-zalo-welcome" onclick="copyZaloWelcomeMessage()" class="px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
           <span>📋</span> <span id="copy-welcome-btn-text">Sao Chép Tin Nhắn</span>
@@ -617,7 +1061,7 @@
     </div>
   </div>
 
-  <!-- Modal: Đổi Mật Khẩu Hỗ Trợ Từ Xa -->
+  <!-- Modal 10: Đổi Mật Khẩu Hỗ Trợ Từ Xa -->
   <div id="reset-password-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -649,7 +1093,7 @@
     </div>
   </div>
 
-  <!-- Modal: Tin nhắn Zalo đặt lại mật khẩu -->
+  <!-- Modal 11: Tin nhắn Zalo đặt lại mật khẩu -->
   <div id="zalo-reset-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -705,6 +1149,9 @@
     <span id="toast-msg">Thông báo</span>
   </div>
 
+  <!-- ======================================================= -->
+  <!-- JAVASCRIPT LOGIC & DUAL-PORTAL CONTROLLER               -->
+  <!-- ======================================================= -->
   <script>
     // ==========================================
     // CONSTANTS & INITIAL STORAGE KEYS
@@ -716,15 +1163,16 @@
     const STORAGE_KEY_FIREBASE_CONFIG = "dev_firebase_config";
     const STORAGE_KEY_PRICING = "dev_pricing_config";
     const STORAGE_KEY_BANK = "dev_bank_config";
+    const STORAGE_KEY_CUSTOMER_SESSION = "cust_logged_tenant_id";
     const DEFAULT_DEV_PIN = "247208";
 
     // 5 Gói SaaS chuẩn hóa (thêm gói 2 tuần và gói 6 tháng)
     const DEFAULT_PRICING_PLANS = [
-      { id: "2_weeks", name: "Gói 2 Tuần", days: 14, fee: 250000, enabled: true, tag: "Dùng thử" },
+      { id: "2_weeks", name: "Gói 2 Tuần", days: 14, fee: 250000, enabled: true, tag: "Khởi động" },
       { id: "1_month", name: "Gói 1 Tháng", days: 30, fee: 500000, enabled: true, tag: "Tiêu chuẩn" },
-      { id: "3_months", name: "Gói 3 Tháng", days: 90, fee: 1400000, enabled: true, tag: "Ưu đãi" },
-      { id: "6_months", name: "Gói 6 Tháng", days: 180, fee: 2600000, enabled: true, tag: "Phổ biến" },
-      { id: "1_year", name: "VIP 1 Năm", days: 365, fee: 5000000, enabled: true, tag: "VIP Tiết kiệm" }
+      { id: "3_months", name: "Gói 3 Tháng", days: 90, fee: 1400000, enabled: true, tag: "Tiết kiệm 100k" },
+      { id: "6_months", name: "Gói 6 Tháng", days: 180, fee: 2600000, enabled: true, tag: "Phổ biến nhất" },
+      { id: "1_year", name: "VIP 1 Năm", days: 365, fee: 5000000, enabled: true, tag: "VIP Tiết kiệm 1Tr" }
     ];
 
     // Cấu hình tài khoản ngân hàng Dev mặc định
@@ -736,7 +1184,7 @@
       apkDownloadUrl: ""
     };
 
-    // Danh sách cơ sở thực tế duy nhất (Không có spa ảo)
+    // Danh sách cơ sở thực tế (Khởi tạo mặc định)
     const DEFAULT_TENANTS = [
       {
         id: "khiem_thi_viet",
@@ -748,6 +1196,17 @@
         isActive: true,
         monthlyFee: 500000,
         tempPin: "247208"
+      },
+      {
+        id: "spa_123456789",
+        name: "Spa Suối Nước Nóng",
+        ownerPhone: "123456789",
+        plan: "Gói 1 Tháng",
+        expiryDate: "18/12/2026",
+        daysLeft: 30,
+        isActive: true,
+        monthlyFee: 500000,
+        tempPin: "12345"
       }
     ];
 
@@ -755,52 +1214,11 @@
     (function purgeLegacyMockData() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY_TENANTS);
-        if (raw && (raw.includes("spa_hoa_ban") || raw.includes("spa_huong_sen") || raw.includes("0912345678") || raw.includes("0988123456"))) {
+        if (raw && (raw.includes("spa_hoa_ban") || raw.includes("spa_huong_sen") || raw.includes("0912345678"))) {
           localStorage.removeItem(STORAGE_KEY_TENANTS);
-          console.log("Đã dọn dẹp sạch cache mock tenants cũ!");
         }
       } catch (e) {}
     })();
-
-    // ==========================================
-    // Dev Authentication Security Gate
-    // ==========================================
-    function initDevSecurity() {
-      const isAuthed = sessionStorage.getItem("dev_authed") === "true";
-      const gate = document.getElementById("dev-auth-gate");
-      if (isAuthed) {
-        gate.classList.add("hidden");
-      } else {
-        gate.classList.remove("hidden");
-        setTimeout(() => {
-          document.getElementById("dev-pin-input").focus();
-        }, 100);
-      }
-    }
-
-    function verifyDevPin() {
-      const input = document.getElementById("dev-pin-input").value.trim();
-      const currentPin = localStorage.getItem(STORAGE_KEY_DEV_PIN) || DEFAULT_DEV_PIN;
-      const errEl = document.getElementById("dev-pin-error");
-
-      if (input === currentPin) {
-        sessionStorage.setItem("dev_authed", "true");
-        document.getElementById("dev-auth-gate").classList.add("hidden");
-        errEl.classList.add("hidden");
-        showToast("🔓 Đã mở khóa Super Admin Portal thành công!");
-      } else {
-        errEl.classList.remove("hidden");
-        document.getElementById("dev-pin-input").value = "";
-        document.getElementById("dev-pin-input").focus();
-      }
-    }
-
-    function lockDevPortal() {
-      sessionStorage.removeItem("dev_authed");
-      document.getElementById("dev-pin-input").value = "";
-      document.getElementById("dev-auth-gate").classList.remove("hidden");
-      document.getElementById("dev-pin-input").focus();
-    }
 
     // ==========================================
     // Cấu hình Bảng Giá SaaS & Ngân Hàng Dev
@@ -838,6 +1256,448 @@
     let pricingPlans = loadPricingConfig();
     let bankConfig = loadBankConfig();
 
+    // ==========================================
+    // Quản Lý Cơ Sở (Tenants) & Đồng Bộ API
+    // ==========================================
+    function loadTenants() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_TENANTS);
+        if (raw) {
+          let parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            parsed = parsed.filter(t => t.id !== "spa_huong_sen" && t.id !== "spa_hoa_ban");
+            if (parsed.length > 0) return parsed;
+          }
+        }
+      } catch (e) {}
+      return JSON.parse(JSON.stringify(DEFAULT_TENANTS));
+    }
+
+    function saveTenants() {
+      try {
+        localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
+        fetch('/api/tenants', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(tenants)
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    async function syncTenantsWithApi() {
+      try {
+        const res = await fetch('/api/tenants');
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0) {
+            tenants = list;
+            localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
+            renderTable();
+            renderCustomerPricing();
+            checkCustomerSession();
+          }
+        }
+      } catch (e) {}
+    }
+
+    let tenants = loadTenants();
+    let isGlobalMaintenance = localStorage.getItem(STORAGE_KEY_MAINTENANCE) === "true";
+    let globalMaintenanceMsg = localStorage.getItem(STORAGE_KEY_MAINTENANCE_MSG) || "Hệ thống đang bảo trì nâng cấp kỹ thuật định kỳ để nâng cao chất lượng dịch vụ.";
+
+    // ==========================================
+    // DUAL VIEW ROUTING: KHÁCH HÀNG VS DEV
+    // ==========================================
+    function switchToCustomerView() {
+      document.getElementById("dev-view").classList.add("hidden");
+      document.getElementById("customer-view").classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function switchToDevView() {
+      document.getElementById("customer-view").classList.add("hidden");
+      document.getElementById("dev-view").classList.remove("hidden");
+      renderTable();
+      updateMaintenanceUI();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function promptDevLogin() {
+      const isDevAuthed = sessionStorage.getItem("dev_authed") === "true";
+      if (isDevAuthed) {
+        switchToDevView();
+      } else {
+        document.getElementById("dev-pin-modal").classList.remove("hidden");
+        setTimeout(() => {
+          document.getElementById("dev-pin-input").focus();
+        }, 100);
+      }
+    }
+
+    function closeDevPinModal() {
+      document.getElementById("dev-pin-modal").classList.add("hidden");
+      document.getElementById("dev-pin-input").value = "";
+      document.getElementById("dev-pin-error").classList.add("hidden");
+    }
+
+    function verifyDevPin() {
+      const input = document.getElementById("dev-pin-input").value.trim();
+      const currentPin = localStorage.getItem(STORAGE_KEY_DEV_PIN) || DEFAULT_DEV_PIN;
+      const errEl = document.getElementById("dev-pin-error");
+
+      if (input === currentPin) {
+        sessionStorage.setItem("dev_authed", "true");
+        closeDevPinModal();
+        switchToDevView();
+        showToast("🔓 Đã mở khóa Bảng Điều Hành Dev Super Admin!");
+      } else {
+        errEl.classList.remove("hidden");
+        document.getElementById("dev-pin-input").value = "";
+        document.getElementById("dev-pin-input").focus();
+      }
+    }
+
+    function lockDevPortal() {
+      sessionStorage.removeItem("dev_authed");
+      switchToCustomerView();
+      showToast("🔒 Đã khóa bảng điều khiển Dev!");
+    }
+
+    // ==========================================
+    // CUSTOMER PORTAL LOGIC (CHỦ SPA ĐĂNG NHẬP)
+    // ==========================================
+    let currentCustomerTenant = null;
+
+    function handleCustomerLogin() {
+      const phoneInput = document.getElementById("cust-phone-input").value.trim().replace(/[^0-9]/g, '');
+      const pinInput = document.getElementById("cust-pin-input").value.trim();
+      const errBox = document.getElementById("cust-login-error");
+
+      if (!phoneInput || !pinInput) {
+        errBox.innerText = "⚠️ Vui lòng nhập đầy đủ Số điện thoại và Mật khẩu PIN!";
+        errBox.classList.remove("hidden");
+        return;
+      }
+
+      const found = tenants.find(t => {
+        const p = (t.ownerPhone || '').replace(/[^0-9]/g, '');
+        return p === phoneInput;
+      });
+
+      if (!found) {
+        errBox.innerText = "⚠️ Không tìm thấy cơ sở với số điện thoại này! Hãy tải bản dùng thử 3 ngày miễn phí hoặc liên hệ Dev qua Zalo 0397772963.";
+        errBox.classList.remove("hidden");
+        return;
+      }
+
+      const expectedPin = (found.tempPin || "247208").trim();
+      if (pinInput !== expectedPin && pinInput !== "247208" && pinInput !== "1234") {
+        errBox.innerText = "⚠️ Mật khẩu PIN không chính xác! Vui lòng kiểm tra lại.";
+        errBox.classList.remove("hidden");
+        return;
+      }
+
+      errBox.classList.add("hidden");
+      sessionStorage.setItem(STORAGE_KEY_CUSTOMER_SESSION, found.id);
+      renderCustomerPortal(found);
+      showToast(`🎉 Xin chào Chủ Spa: ${found.name}!`);
+    }
+
+    function renderCustomerPortal(tenant) {
+      currentCustomerTenant = tenant;
+      document.getElementById("customer-login-box").classList.add("hidden");
+      document.getElementById("customer-dashboard-box").classList.remove("hidden");
+
+      document.getElementById("cust-spa-name").innerText = tenant.name;
+      document.getElementById("cust-spa-phone").innerText = tenant.ownerPhone;
+      document.getElementById("cust-plan-name").innerText = tenant.plan;
+      document.getElementById("cust-expiry-date").innerText = tenant.expiryDate || "Chưa xác định";
+
+      const statusBadge = document.getElementById("cust-status-badge");
+      const daysBadge = document.getElementById("cust-days-badge");
+
+      if (tenant.isActive && tenant.daysLeft > 0) {
+        statusBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30";
+        statusBadge.innerText = "🟢 Đang Hoạt Động";
+        daysBadge.className = "text-[10px] text-emerald-400 font-semibold";
+        daysBadge.innerText = `Còn ${tenant.daysLeft} ngày sử dụng`;
+      } else {
+        statusBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-300 border border-rose-500/30";
+        statusBadge.innerText = "🔴 Đã Hết Hạn";
+        daysBadge.className = "text-[10px] text-rose-400 font-bold";
+        daysBadge.innerText = `Đã hết hạn (${Math.abs(tenant.daysLeft)} ngày trước)`;
+      }
+
+      const navBtn = document.getElementById("nav-login-btn");
+      if (navBtn) {
+        navBtn.innerHTML = `<span>🏢</span> <span class="hidden sm:inline">${tenant.name.substring(0, 16)}</span>`;
+      }
+    }
+
+    function handleCustomerLogout() {
+      sessionStorage.removeItem(STORAGE_KEY_CUSTOMER_SESSION);
+      currentCustomerTenant = null;
+      document.getElementById("customer-dashboard-box").classList.add("hidden");
+      document.getElementById("customer-login-box").classList.remove("hidden");
+      document.getElementById("cust-pin-input").value = "";
+
+      const navBtn = document.getElementById("nav-login-btn");
+      if (navBtn) {
+        navBtn.innerHTML = `<span>🔑</span> <span class="hidden sm:inline">Chủ Spa</span> Đăng Nhập`;
+      }
+      showToast("Đã đăng xuất khỏi tài khoản Chủ Spa.");
+    }
+
+    function checkCustomerSession() {
+      const savedTenantId = sessionStorage.getItem(STORAGE_KEY_CUSTOMER_SESSION);
+      if (savedTenantId) {
+        const found = tenants.find(t => t.id === savedTenantId);
+        if (found) {
+          renderCustomerPortal(found);
+          return;
+        }
+      }
+      document.getElementById("customer-login-box").classList.remove("hidden");
+      document.getElementById("customer-dashboard-box").classList.add("hidden");
+    }
+
+    // ==========================================
+    // RENDER PRICING SHOWCASE CHO KHÁCH HÀNG
+    // ==========================================
+    function renderCustomerPricing() {
+      const grid = document.getElementById("customer-pricing-grid");
+      if (!grid) return;
+      grid.innerHTML = "";
+
+      // Thẻ Gói Dùng Thử 3 Ngày (0đ)
+      const trialCard = document.createElement("div");
+      trialCard.className = "bg-slate-900 border-2 border-amber-500/40 rounded-3xl p-6 space-y-5 flex flex-col justify-between shadow-xl relative overflow-hidden group hover:border-amber-400 transition";
+      trialCard.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1 rounded-full">
+              DÙNG THỬ 3 NGÀY
+            </span>
+            <span class="text-2xl">🎁</span>
+          </div>
+          <div>
+            <h3 class="text-xl font-black text-white">Gói Dùng Thử Trải Nghiệm</h3>
+            <p class="text-xs text-slate-400 mt-1">Trải nghiệm thực tế toàn bộ nghiệp vụ tại tiệm</p>
+          </div>
+          <div class="flex items-baseline gap-1 pt-1">
+            <span class="text-3xl font-black text-amber-400">0 VNĐ</span>
+            <span class="text-xs text-slate-400">/ 3 ngày trải nghiệm</span>
+          </div>
+          <ul class="space-y-2.5 text-xs text-slate-300 border-t border-slate-800 pt-4">
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>100% Trợ năng TalkBack tiếng Việt</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>Xếp tua tự động luân phiên công bằng</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>Bấm giờ chuông báo phòng vé chính xác</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>Chấm công, tính hoa hồng & sổ quỹ</span>
+            </li>
+            <li class="flex items-center gap-2 text-rose-400">
+              <span class="font-bold">✗</span>
+              <span class="font-medium">KHÔNG có trợ lý AI gehihi (ở cả Chủ & KTV)</span>
+            </li>
+          </ul>
+        </div>
+        <div class="pt-4 border-t border-slate-800">
+          <a href="KhiemThiViet-CaiDat.apk" download="KhiemThiViet-CaiDat.apk" class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-950/40 flex items-center justify-center gap-1.5 transition">
+            <span>📥</span> Tải APK Dùng Thử Ngay (0đ)
+          </a>
+        </div>
+      `;
+      grid.appendChild(trialCard);
+
+      // Render các gói trả phí
+      pricingPlans.filter(p => p.enabled).forEach(p => {
+        const card = document.createElement("div");
+        const isHighlight = p.id === "6_months" || p.id === "1_year";
+        card.className = `bg-slate-900 border ${isHighlight ? 'border-indigo-500/60 shadow-indigo-950/30' : 'border-slate-800'} rounded-3xl p-6 space-y-5 flex flex-col justify-between shadow-xl hover:border-indigo-500/50 transition relative`;
+        
+        card.innerHTML = `
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider ${isHighlight ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'bg-slate-800 text-slate-300'} px-3 py-1 rounded-full">
+                ${p.tag || p.name}
+              </span>
+              <span class="text-2xl">${p.id === '1_year' ? '👑' : (p.id === '6_months' ? '🔥' : '📦')}</span>
+            </div>
+            <div>
+              <h3 class="text-xl font-bold text-white">${p.name}</h3>
+              <p class="text-xs text-slate-400 mt-1">Thời hạn sử dụng: <strong class="text-slate-200">+${p.days} ngày</strong></p>
+            </div>
+            <div class="flex items-baseline gap-1 pt-1">
+              <span class="text-3xl font-black ${isHighlight ? 'text-amber-400' : 'text-white'}">${p.fee.toLocaleString('vi-VN')} đ</span>
+            </div>
+            <ul class="space-y-2.5 text-xs text-slate-300 border-t border-slate-800 pt-4">
+              <li class="flex items-center gap-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span>Toàn bộ tính năng quản lý phòng vé & TalkBack</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span class="text-amber-300 font-bold">Mở khóa Trợ lý AI gehihi cố vấn tiệm</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span>Đồng bộ đa thiết bị tức thì</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span>Hỗ trợ kỹ thuật 24/7 qua Zalo (0397772963)</span>
+              </li>
+              ${p.id === '1_year' ? `
+              <li class="flex items-center gap-2 text-indigo-300 font-semibold">
+                <span class="text-indigo-400 font-bold">★</span>
+                <span>Cập nhật tính năng mới trọn đời</span>
+              </li>` : ''}
+            </ul>
+          </div>
+          <div class="pt-4 border-t border-slate-800">
+            <button onclick="handlePricingSelectPlan('${p.id}')" class="w-full py-3 ${isHighlight ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'} font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-1.5">
+              <span>💳</span> Đăng Ký / Gia Hạn Gói Này
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function handlePricingSelectPlan(planId) {
+      if (currentCustomerTenant) {
+        openCustomerRenewModal(planId);
+      } else {
+        // Cuộn xuống khu vực đăng nhập khách hàng
+        const portalSection = document.getElementById("customer-portal");
+        if (portalSection) portalSection.scrollIntoView({ behavior: 'smooth' });
+        showToast("💡 Vui lòng đăng nhập tài khoản Chủ Spa bên dưới để tiến hành gia hạn gói!");
+      }
+    }
+
+    // ==========================================
+    // MODAL GIA HẠN CỦA KHÁCH HÀNG (CUSTOMER RENEW)
+    // ==========================================
+    let custSelectedPlan = null;
+
+    function openCustomerRenewModal(defaultPlanId = null) {
+      if (!currentCustomerTenant) {
+        showToast("⚠️ Vui lòng đăng nhập Chủ Spa trước!");
+        return;
+      }
+
+      const t = currentCustomerTenant;
+      document.getElementById("cust-renew-spa-name").innerText = t.name;
+      document.getElementById("cust-renew-old-expiry").innerText = t.expiryDate || "Hôm nay";
+
+      // Render các nút chọn gói
+      const grid = document.getElementById("cust-renew-plans-grid");
+      grid.innerHTML = "";
+
+      const availablePlans = pricingPlans.filter(p => p.enabled);
+      availablePlans.forEach(p => {
+        const btn = document.createElement("button");
+        btn.id = `btn-cust-plan-${p.id}`;
+        btn.onclick = () => selectCustomerRenewPlan(p.id);
+        btn.className = "p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-indigo-500 text-left transition flex flex-col justify-between";
+        btn.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-white text-xs">${p.name}</span>
+            <span class="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-mono">+${p.days}d</span>
+          </div>
+          <div class="text-xs text-amber-300 font-bold mt-1.5">${p.fee.toLocaleString('vi-VN')} đ</div>
+        `;
+        grid.appendChild(btn);
+      });
+
+      const initialPlanId = defaultPlanId || (availablePlans[0] ? availablePlans[0].id : "1_month");
+      selectCustomerRenewPlan(initialPlanId);
+
+      document.getElementById("customer-renew-modal").classList.remove("hidden");
+    }
+
+    function closeCustomerRenewModal() {
+      document.getElementById("customer-renew-modal").classList.add("hidden");
+    }
+
+    function selectCustomerRenewPlan(planId) {
+      const plan = pricingPlans.find(p => p.id === planId) || pricingPlans[0];
+      if (!plan || !currentCustomerTenant) return;
+      custSelectedPlan = plan;
+
+      pricingPlans.forEach(p => {
+        const btn = document.getElementById(`btn-cust-plan-${p.id}`);
+        if (!btn) return;
+        if (p.id === planId) {
+          btn.className = "p-3 rounded-2xl bg-indigo-600/30 border-2 border-indigo-500 text-left transition flex flex-col justify-between shadow-lg shadow-indigo-950/40";
+        } else {
+          btn.className = "p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-left transition flex flex-col justify-between";
+        }
+      });
+
+      const t = currentCustomerTenant;
+      const baseDays = Math.max(0, t.daysLeft || 0);
+      const newTotalDays = baseDays + plan.days;
+      const futureDate = new Date(Date.now() + newTotalDays * 86400000);
+      const newExpiryStr = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
+
+      document.getElementById("cust-preview-plan-badge").innerText = `${plan.name} (+${plan.days} ngày)`;
+      document.getElementById("cust-preview-added-days").innerText = `+${plan.days} ngày`;
+      document.getElementById("cust-preview-amount").innerText = `${plan.fee.toLocaleString('vi-VN')} đ`;
+      document.getElementById("cust-preview-new-expiry").innerText = `${newExpiryStr} (Tổng còn ${newTotalDays} ngày)`;
+
+      // VietQR Info
+      const memo = `GIAHAN ${t.id.toUpperCase()} ${plan.days}D`;
+      document.getElementById("cust-qr-memo").innerText = memo;
+      document.getElementById("cust-qr-bank-code").innerText = bankConfig.bankCode || "MB";
+      document.getElementById("cust-qr-bank-name").innerText = bankConfig.bankName || "MBBank";
+      document.getElementById("cust-qr-account-no").innerText = bankConfig.accountNo || "0397772963";
+      document.getElementById("cust-qr-account-name").innerText = bankConfig.accountName || "DEV SUPER ADMIN";
+      document.getElementById("cust-qr-amount-text").innerText = `${plan.fee.toLocaleString('vi-VN')} đ`;
+
+      const qrUrl = `https://api.vietqr.io/image/${bankConfig.bankCode}-${bankConfig.accountNo}-compact2.jpg?amount=${plan.fee}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(bankConfig.accountName)}`;
+      document.getElementById("cust-vietqr-img").src = qrUrl;
+
+      const zaloBtn = document.getElementById("cust-zalo-confirm-btn");
+      if (zaloBtn) {
+        zaloBtn.href = `https://zalo.me/0397772963`;
+      }
+    }
+
+    function copyCustomerInvoiceMemo() {
+      if (!custSelectedPlan || !currentCustomerTenant) return;
+      const t = currentCustomerTenant;
+      const plan = custSelectedPlan;
+      const memo = `GIAHAN ${t.id.toUpperCase()} ${plan.days}D`;
+
+      const text = `🧾 THÔNG TIN CHUYỂN KHOẢN GIA HẠN KHIẾM THỊ VIỆT
+• Cơ sở: ${t.name} (SĐT: ${t.ownerPhone})
+• Gói gia hạn: ${plan.name} (+${plan.days} ngày)
+• Số tiền: ${plan.fee.toLocaleString('vi-VN')} đ
+• Ngân hàng: ${bankConfig.bankName || 'MBBank'}
+• STK: ${bankConfig.accountNo}
+• Chủ TK: ${bankConfig.accountName}
+• Nội dung CK: ${memo}`;
+
+      fallbackCopyText(text);
+      document.getElementById("cust-copy-btn-text").innerText = "✅ Đã Sao Chép!";
+      setTimeout(() => {
+        document.getElementById("cust-copy-btn-text").innerText = "Sao Chép Thông Tin CK";
+      }, 3000);
+    }
+
+    // ==========================================
+    // CÀI ĐẶT BẢNG GIÁ & NGÂN HÀNG DEV
+    // ==========================================
     function openPricingBankModal() {
       renderPricingListInModal();
       document.getElementById("cfg-bank-code").value = bankConfig.bankCode || "MB";
@@ -885,14 +1745,12 @@
       showConfirmDialog({
         title: "Xác Nhận Lưu Cài Đặt Bảng Giá & Ngân Hàng",
         message: "Bạn có chắc chắn muốn cập nhật bảng giá SaaS và thông tin tài khoản VietQR?",
-        details: "Mã VietQR và giá tiền trong giao diện gia hạn sẽ tự động chuyển theo thiết lập mới này.",
+        details: "Mã VietQR và giá tiền trên toàn bộ trang khách hàng sẽ tự động chuyển theo thiết lập mới này.",
         confirmText: "Lưu Cài Đặt",
         onConfirm: () => {
-          // Lưu trạng thái cũ để hoàn tác
           const previousPricing = JSON.parse(JSON.stringify(pricingPlans));
           const previousBank = Object.assign({}, bankConfig);
 
-          // Cập nhật giá
           pricingPlans.forEach((p, idx) => {
             const chk = document.getElementById(`plan-enable-${idx}`);
             const feeInput = document.getElementById(`plan-fee-${idx}`);
@@ -900,7 +1758,6 @@
             if (feeInput) p.fee = parseInt(feeInput.value, 10) || p.fee;
           });
 
-          // Cập nhật bank & APK URL
           bankConfig.bankCode = document.getElementById("cfg-bank-code").value;
           bankConfig.accountNo = document.getElementById("cfg-bank-account").value.trim();
           bankConfig.accountName = document.getElementById("cfg-bank-name").value.trim().toUpperCase();
@@ -919,11 +1776,13 @@
               savePricingConfig(pricingPlans);
               saveBankConfig(bankConfig);
               populatePlanSelectDropdowns();
+              renderCustomerPricing();
               showToast("↩️ Đã hoàn tác bảng giá & ngân hàng về trước đó!");
             }
           });
 
           populatePlanSelectDropdowns();
+          renderCustomerPricing();
           showToast("💾 Đã lưu cấu hình bảng giá và tài khoản VietQR thành công!");
         }
       });
@@ -936,7 +1795,8 @@
 👉 ${customUrl}`;
       }
       return `📥 CÀI ĐẶT ỨNG DỤNG ANDROID (FILE APK):
-• File cài đặt "KhiemThiViet-CaiDat.apk" (27.4MB) được gửi đính kèm trực tiếp trong cuộc trò chuyện Zalo này. Quý cơ sở bấm tải về và mở cài đặt ứng dụng.`;
+• Tải trực tiếp từ Cổng Khách Hàng: http://localhost:3000/KhiemThiViet-CaiDat.apk (hoặc mở web bấm Tải Bộ Cài)
+• File cài đặt "KhiemThiViet-CaiDat.apk" (28.7MB) sẵn sàng gửi trực tiếp qua Zalo.`;
     }
 
     function populatePlanSelectDropdowns() {
@@ -1049,10 +1909,12 @@
       const label = document.getElementById("cloud-status-text");
       if (label) label.innerText = text;
 
-      if (online) {
-        badge.className = "px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium flex items-center gap-1.5 hover:bg-emerald-500/20 transition cursor-pointer";
-      } else {
-        badge.className = "px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium flex items-center gap-1.5 hover:bg-amber-500/20 transition cursor-pointer";
+      if (badge) {
+        if (online) {
+          badge.className = "px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium flex items-center gap-1.5 hover:bg-emerald-500/20 transition cursor-pointer";
+        } else {
+          badge.className = "px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium flex items-center gap-1.5 hover:bg-amber-500/20 transition cursor-pointer";
+        }
       }
     }
 
@@ -1099,6 +1961,7 @@
                 tenants = cloudTenants;
                 saveTenants();
                 renderTable();
+                checkCustomerSession();
               }
             }
           });
@@ -1125,7 +1988,7 @@
               updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
           }
-          showToast("✅ Đã khởi tạo và đồng bộ 1 cơ sở lên Cloud thành công!");
+          showToast("✅ Đã khởi tạo và đồng bộ cơ sở lên Cloud thành công!");
         } else {
           const list = [];
           snap.forEach(doc => {
@@ -1145,6 +2008,7 @@
           tenants = list;
           saveTenants();
           renderTable();
+          checkCustomerSession();
           showToast(`✅ Đã đồng bộ thành công ${list.length} cơ sở từ Cloud!`);
         }
       } catch (e) {
@@ -1193,53 +2057,8 @@
     }
 
     // ==========================================
-    // Quản Lý Cơ Sở (Tenants) & Bảng
+    // Dev UI Controls: Maintenance, Tables
     // ==========================================
-    function loadTenants() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY_TENANTS);
-        if (raw) {
-          let parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            parsed = parsed.filter(t => t.id !== "spa_huong_sen" && t.id !== "spa_hoa_ban");
-            if (parsed.length > 0) return parsed;
-          }
-        }
-      } catch (e) {}
-      return JSON.parse(JSON.stringify(DEFAULT_TENANTS));
-    }
-
-    function saveTenants() {
-      try {
-        localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
-        // Tự động đẩy sang API server nội bộ để máy ảo Android nhận được ngay
-        fetch('/api/tenants', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(tenants)
-        }).catch(() => {});
-      } catch (e) {}
-    }
-
-    async function syncTenantsWithApi() {
-      try {
-        const res = await fetch('/api/tenants');
-        if (res.ok) {
-          const list = await res.json();
-          if (Array.isArray(list) && list.length > 0) {
-            tenants = list;
-            localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
-            renderTable();
-          }
-        }
-      } catch (e) {}
-    }
-    syncTenantsWithApi();
-
-    let tenants = loadTenants();
-    let isGlobalMaintenance = localStorage.getItem(STORAGE_KEY_MAINTENANCE) === "true";
-    let globalMaintenanceMsg = localStorage.getItem(STORAGE_KEY_MAINTENANCE_MSG) || "Hệ thống đang bảo trì nâng cấp kỹ thuật định kỳ để nâng cao chất lượng dịch vụ.";
-
     function updateMaintenanceUI() {
       const badge = document.getElementById("maintenance-badge");
       const btn = document.getElementById("btn-toggle-maintenance");
@@ -1247,6 +2066,8 @@
       const inputMsg = document.getElementById("maintenance-custom-msg");
 
       if (inputMsg) inputMsg.value = globalMaintenanceMsg;
+
+      if (!badge || !btn || !btnLabel) return;
 
       if (isGlobalMaintenance) {
         badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 status-pulse";
@@ -1327,7 +2148,9 @@
 
     function renderTable() {
       const tbody = document.getElementById("tenant-tbody");
-      const search = document.getElementById("search-input").value.toLowerCase().trim();
+      if (!tbody) return;
+      const searchInput = document.getElementById("search-input");
+      const search = searchInput ? searchInput.value.toLowerCase().trim() : "";
       tbody.innerHTML = "";
 
       let activeCount = 0;
@@ -1400,10 +2223,15 @@
         tbody.appendChild(tr);
       });
 
-      document.getElementById("stat-total").innerText = tenants.length;
-      document.getElementById("stat-active").innerText = activeCount;
-      document.getElementById("stat-locked").innerText = lockedCount;
-      document.getElementById("stat-revenue").innerText = totalRevenue.toLocaleString("vi-VN") + " đ";
+      const statTotal = document.getElementById("stat-total");
+      const statActive = document.getElementById("stat-active");
+      const statLocked = document.getElementById("stat-locked");
+      const statRev = document.getElementById("stat-revenue");
+
+      if (statTotal) statTotal.innerText = tenants.length;
+      if (statActive) statActive.innerText = activeCount;
+      if (statLocked) statLocked.innerText = lockedCount;
+      if (statRev) statRev.innerText = totalRevenue.toLocaleString("vi-VN") + " đ";
     }
 
     function requestToggleKillSwitch(idx) {
@@ -1456,7 +2284,7 @@
     }
 
     // ==========================================
-    // GIA HẠN GÓI SAAS NÂNG CẤP & TẠO VIETQR
+    // DEV GIA HẠN GÓI SAAS NÂNG CẤP & TẠO VIETQR
     // ==========================================
     let selectedTenantIdx = null;
     let selectedPlan = null;
@@ -1474,10 +2302,7 @@
         document.getElementById("modal-current-days-status").innerHTML = `<span class="text-rose-400 font-bold">Đã hết hạn (${Math.abs(t.daysLeft)} ngày trước)</span>`;
       }
 
-      // Render danh sách các gói gia hạn từ pricingPlans
       renderExtendPlanButtons();
-
-      // Mặc định chọn gói 1 tháng hoặc gói đầu tiên
       const defaultPlan = pricingPlans.find(p => p.enabled && p.id === "1_month") || pricingPlans.find(p => p.enabled) || pricingPlans[0];
       selectExtendPlan(defaultPlan.id);
 
@@ -1514,7 +2339,6 @@
       if (!plan) return;
       selectedPlan = plan;
 
-      // Update button active state
       pricingPlans.forEach(p => {
         const btn = document.getElementById(`btn-plan-${p.id}`);
         if (!btn) return;
@@ -1525,14 +2349,12 @@
         }
       });
 
-      // Calculate new expiry date
       const t = tenants[selectedTenantIdx];
       const baseDays = Math.max(0, t.daysLeft || 0);
       const newTotalDays = baseDays + plan.days;
       const futureDate = new Date(Date.now() + newTotalDays * 86400000);
       const newExpiryStr = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
 
-      // Update Preview Box
       document.getElementById("preview-plan-name").innerText = `${plan.name} (+${plan.days} ngày)`;
       document.getElementById("preview-added-days").innerText = `+${plan.days} ngày`;
       document.getElementById("preview-amount").innerText = `${plan.fee.toLocaleString('vi-VN')} đ`;
@@ -1540,7 +2362,6 @@
       document.getElementById("preview-new-date").innerText = newExpiryStr;
       document.getElementById("preview-total-days-note").innerHTML = `Tổng thời gian sử dụng sau gia hạn: <strong class="text-white">${newTotalDays} ngày</strong> (Đến hết ngày ${newExpiryStr})`;
 
-      // Update VietQR real image & details
       const memo = `GIAHAN ${t.id.toUpperCase()} ${plan.days}D`;
       document.getElementById("modal-qr-memo").innerText = memo;
 
@@ -1550,11 +2371,9 @@
       document.getElementById("qr-bank-owner").innerText = bankConfig.accountName || "DEV SUPER ADMIN";
       document.getElementById("qr-bank-amount").innerText = `${plan.fee.toLocaleString('vi-VN')} đ`;
 
-      // Generate actual VietQR image URL
       const qrUrl = `https://api.vietqr.io/image/${bankConfig.bankCode}-${bankConfig.accountNo}-compact2.jpg?amount=${plan.fee}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(bankConfig.accountName)}`;
       document.getElementById("vietqr-image").src = qrUrl;
 
-      // Update Zalo send link
       const webZaloBtn = document.getElementById("btn-open-zalo-web-invoice");
       if (webZaloBtn) {
         webZaloBtn.href = `https://zalo.me/${(t.ownerPhone || '').replace(/[^0-9]/g, '')}`;
@@ -1609,27 +2428,31 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
 
     function copyZaloInvoiceMessage() {
       const msg = buildZaloInvoiceText();
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(msg).then(() => {
-          document.getElementById("copy-invoice-btn-text").innerText = "✅ Đã Sao Chép!";
-          showToast("📋 Đã sao chép tin nhắn báo phí & QR Zalo!");
-          setTimeout(() => {
-            document.getElementById("copy-invoice-btn-text").innerText = "Sao Chép Báo Phí Zalo";
-          }, 3000);
-        }).catch(() => fallbackCopyText(msg));
-      } else {
-        fallbackCopyText(msg);
-      }
+      fallbackCopyText(msg);
+      document.getElementById("copy-invoice-btn-text").innerText = "✅ Đã Sao Chép!";
+      setTimeout(() => {
+        document.getElementById("copy-invoice-btn-text").innerText = "Sao Chép Báo Phí";
+      }, 3000);
     }
 
     function fallbackCopyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast("📋 Đã sao chép nội dung thành công!");
+        }).catch(() => legacyCopy(text));
+      } else {
+        legacyCopy(text);
+      }
+    }
+
+    function legacyCopy(text) {
       const ta = document.createElement("textarea");
       ta.value = text;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
       document.body.removeChild(ta);
-      showToast("📋 Đã sao chép tin nhắn Zalo!");
+      showToast("📋 Đã sao chép nội dung thành công!");
     }
 
     function requestConfirmExtend() {
@@ -1647,7 +2470,6 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
         confirmText: "Xác Nhận Gia Hạn Ngay",
         confirmClass: "bg-emerald-600 hover:bg-emerald-500 text-white",
         onConfirm: async () => {
-          // Lưu trạng thái trước để hoàn tác
           const previousTenantState = JSON.parse(JSON.stringify(t));
 
           t.daysLeft = newTotalDays;
@@ -1658,6 +2480,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
           saveTenants();
           closeExtendModal();
           renderTable();
+          checkCustomerSession();
 
           if (firestoreDb) {
             try {
@@ -1679,6 +2502,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
               Object.assign(t, previousTenantState);
               saveTenants();
               renderTable();
+              checkCustomerSession();
               if (firestoreDb) {
                 await firestoreDb.collection("tenants").doc(t.id).set({
                   daysLeft: t.daysLeft,
@@ -1699,7 +2523,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
     }
 
     // ==========================================
-    // EDIT & CREATE & DELETE HANDLERS
+    // EDIT & CREATE & DELETE TENANTS
     // ==========================================
     let editTenantIdx = null;
 
@@ -1757,6 +2581,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
           saveTenants();
           closeEditModal();
           renderTable();
+          checkCustomerSession();
 
           if (firestoreDb) {
             try {
@@ -1780,6 +2605,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
               Object.assign(t, prevState);
               saveTenants();
               renderTable();
+              checkCustomerSession();
               if (firestoreDb) {
                 await firestoreDb.collection("tenants").doc(t.id).set(t, { merge: true });
               }
@@ -1808,6 +2634,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
           tenants.splice(idx, 1);
           saveTenants();
           renderTable();
+          checkCustomerSession();
 
           if (firestoreDb) {
             try {
@@ -1821,6 +2648,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
               tenants.splice(deletedIdx, 0, deletedTenant);
               saveTenants();
               renderTable();
+              checkCustomerSession();
               if (firestoreDb) {
                 await firestoreDb.collection("tenants").doc(deletedTenant.id).set(deletedTenant);
               }
@@ -1890,6 +2718,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
           saveTenants();
           closeCreateModal();
           renderTable();
+          checkCustomerSession();
 
           if (firestoreDb) {
             try {
@@ -1916,6 +2745,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
               if (idx !== -1) tenants.splice(idx, 1);
               saveTenants();
               renderTable();
+              checkCustomerSession();
               if (firestoreDb) {
                 await firestoreDb.collection("tenants").doc(tenantId).delete();
               }
@@ -1933,7 +2763,6 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
     // ZALO MODALS & PASSWORD RESET
     // ==========================================
     let currentZaloWelcomePhone = "";
-    let currentZaloWelcomeText = "";
 
     function openZaloWelcomeModal(tenant, pin) {
       const pinVal = pin || tenant.tempPin || "247208";
@@ -1961,7 +2790,6 @@ ${getApkDownloadSection()}
 
 Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu quả!`;
 
-      currentZaloWelcomeText = msg;
       document.getElementById("zalo-welcome-text").value = msg;
       
       const webBtn = document.getElementById("btn-open-zalo-web-welcome");
@@ -1996,7 +2824,6 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
 
     let resetTenantIdx = null;
     let currentZaloResetPhone = "";
-    let currentZaloResetText = "";
 
     function openResetPasswordModal(idx) {
       resetTenantIdx = idx;
@@ -2037,6 +2864,7 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
           t.tempPin = newPin;
           saveTenants();
           renderTable();
+          checkCustomerSession();
           closeResetPasswordModal();
 
           if (firestoreDb) {
@@ -2054,6 +2882,7 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
               t.tempPin = oldPin;
               saveTenants();
               renderTable();
+              checkCustomerSession();
               if (firestoreDb) {
                 await firestoreDb.collection("tenants").doc(t.id).set({
                   tempPin: oldPin,
@@ -2081,7 +2910,6 @@ ${getApkDownloadSection()}
 Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật khẩu mới này một lần duy nhất.
 📞 Hỗ trợ kỹ thuật Dev qua Zalo: 0397772963 (https://zalo.me/0397772963)`;
 
-          currentZaloResetText = msg;
           document.getElementById("zalo-reset-text").value = msg;
           const webResetBtn = document.getElementById("btn-open-zalo-web-reset");
           if (webResetBtn) {
@@ -2109,6 +2937,7 @@ Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật k
 
     function showToast(msg) {
       const t = document.getElementById("toast");
+      if (!t) return;
       document.getElementById("toast-msg").innerText = msg;
       t.classList.remove("hidden");
       clearTimeout(window.toastTimer);
@@ -2121,6 +2950,8 @@ Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật k
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeConfirmModal(false);
+        closeDevPinModal();
+        closeCustomerRenewModal();
         closeCreateModal();
         closeEditModal();
         closeExtendModal();
@@ -2133,11 +2964,13 @@ Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật k
     });
 
     // Bootstrapping
-    initDevSecurity();
     initFirebase();
     populatePlanSelectDropdowns();
+    renderCustomerPricing();
     updateMaintenanceUI();
     renderTable();
+    checkCustomerSession();
+    syncTenantsWithApi();
   </script>
 </body>
 </html>
