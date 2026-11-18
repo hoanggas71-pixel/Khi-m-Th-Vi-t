@@ -15,6 +15,12 @@
       50% { opacity: 0.6; }
     }
     .status-pulse { animation: pulse-soft 2s infinite ease-in-out; }
+    .vietqr-img {
+      max-width: 200px;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased flex flex-col">
@@ -67,10 +73,13 @@
         </div>
       </div>
 
-      <!-- Dev Profile & Actions -->
-      <div class="flex items-center gap-3">
+      <!-- Dev Actions -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button onclick="openPricingBankModal()" title="Cài đặt bảng giá SaaS & Tài khoản ngân hàng VietQR" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition">
+          <span>💰</span> <span class="hidden sm:inline">Cài Đặt Giá & Ngân Hàng</span>
+        </button>
         <button onclick="openCloudConfigModal()" title="Cài đặt kết nối Firebase Cloud" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition">
-          <span>⚙️</span> <span class="hidden sm:inline">Cài Đặt Cloud</span>
+          <span>⚙️</span> <span class="hidden sm:inline">Cloud Config</span>
         </button>
         <button onclick="openCreateModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30 flex items-center gap-1.5 transition">
           <span>➕</span> <span class="hidden sm:inline">Thêm Chủ Spa Mới</span>
@@ -90,10 +99,10 @@
       <div class="space-y-1">
         <div class="flex items-center gap-2">
           <span class="text-indigo-400 text-lg">🛡️</span>
-          <h2 class="text-sm font-bold text-white">Bảng Điều Hành Độc Lập Cho Nhà Phát Triển (Dev)</h2>
+          <h2 class="text-sm font-bold text-white">Bảng Điều Hành Bản Quyền SaaS Cho Nhà Phát Triển (Dev)</h2>
         </div>
         <p class="text-xs text-slate-400 max-w-3xl leading-relaxed">
-          Dev quản lý gói thuê bao, thời hạn sử dụng và cấp quyền cho các <strong class="text-slate-200">Chủ Spa</strong>. Mọi thao tác Bật/Tắt Bảo Trì hoặc Khóa Quán sẽ được phát sóng realtime qua Cloud Firestore tới toàn bộ ứng dụng Android đang chạy trên điện thoại khách hàng.
+          Quản lý các gói thuê bao (2 Tuần, 1 Tháng, 3 Tháng, 6 Tháng, 1 Năm), thiết lập giá cước và tài khoản VietQR thu phí. Mọi thao tác đều có xác nhận an toàn và hỗ trợ <strong class="text-emerald-400">Hoàn Tác (Undo)</strong> ngay lập tức.
         </p>
       </div>
       <div class="flex items-center gap-2 shrink-0">
@@ -160,7 +169,7 @@
           </p>
         </div>
         <div class="flex items-center gap-3 shrink-0">
-          <button id="btn-toggle-maintenance" onclick="toggleGlobalMaintenance()" class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">
+          <button id="btn-toggle-maintenance" onclick="requestToggleGlobalMaintenance()" class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">
             <span>🛠️</span> <span id="btn-maintenance-label">Bật Chế Độ Bảo Trì</span>
           </button>
         </div>
@@ -214,9 +223,212 @@
 
   </main>
 
+  <!-- ======================================================= -->
+  <!-- MODALS SECTION                                          -->
+  <!-- ======================================================= -->
+
+  <!-- Modal: Xác nhận 2 bước an toàn (Confirm Dialog) -->
+  <div id="confirm-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center gap-3">
+        <div id="confirm-icon-box" class="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-300 flex items-center justify-center text-2xl shrink-0 border border-amber-500/30">
+          ⚠️
+        </div>
+        <div>
+          <h3 id="confirm-title" class="text-base font-bold text-white">Xác Nhận Thao Tác</h3>
+          <p id="confirm-subtitle" class="text-xs text-slate-400">Vui lòng kiểm tra kỹ trước khi thực hiện</p>
+        </div>
+      </div>
+
+      <div id="confirm-message-box" class="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 text-xs text-slate-300 leading-relaxed space-y-2">
+        <!-- Injected by JS -->
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeConfirmModal(false)" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition">
+          Hủy Bỏ
+        </button>
+        <button id="confirm-action-btn" onclick="closeConfirmModal(true)" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/40 transition">
+          Xác Nhận Thực Hiện
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cài Đặt Bảng Giá SaaS & Ngân Hàng Dev -->
+  <div id="pricing-bank-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-lg">
+            💰
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Cài Đặt Bảng Giá SaaS & Tài Khoản VietQR</h3>
+            <p class="text-[11px] text-slate-400">Tùy chỉnh số ngày, giá bán từng gói và tài khoản ngân hàng nhận tiền</p>
+          </div>
+        </div>
+        <button onclick="closePricingBankModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <!-- Phần 1: Bảng Giá 5 Gói SaaS -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+            <span>📦</span> Cấu Hình Bảng Giá Các Gói (2 Tuần, 1 Tháng, 3 Tháng, 6 Tháng, 1 Năm)
+          </label>
+        </div>
+        <div id="pricing-list-container" class="space-y-2 text-xs">
+          <!-- Rendered dynamically by JS -->
+        </div>
+      </div>
+
+      <!-- Phần 2: Cấu Hình Tài Khoản Ngân Hàng Dev (VietQR) -->
+      <div class="space-y-3 border-t border-slate-800 pt-4">
+        <label class="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+          <span>🏦</span> Tài Khoản Ngân Hàng Nhận Tiền Thuê (Tạo Mã VietQR)
+        </label>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div>
+            <label class="font-medium text-slate-400 block mb-1">Ngân hàng:</label>
+            <select id="cfg-bank-code" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
+              <option value="MB">MBBank (Quân Đội)</option>
+              <option value="VCB">Vietcombank</option>
+              <option value="TCB">Techcombank</option>
+              <option value="ACB">ACB</option>
+              <option value="VPB">VPBank</option>
+              <option value="TPB">TPBank</option>
+              <option value="BIDV">BIDV</option>
+              <option value="ICB">VietinBank</option>
+              <option value="VBA">Agribank</option>
+            </select>
+          </div>
+          <div>
+            <label class="font-medium text-slate-400 block mb-1">Số tài khoản:</label>
+            <input type="text" id="cfg-bank-account" placeholder="VD: 0397772963" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono font-bold">
+          </div>
+          <div>
+            <label class="font-medium text-slate-400 block mb-1">Tên chủ tài khoản:</label>
+            <input type="text" id="cfg-bank-name" placeholder="VD: NGUYEN VAN A" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold uppercase">
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+        <button onclick="closePricingBankModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Đóng</button>
+        <button onclick="requestSavePricingBankSettings()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">
+          💾 Lưu Cài Đặt
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Gia Hạn Gói SaaS Nâng Cấp (Hỗ Trợ 5 Gói & VietQR & Zalo) -->
+  <div id="extend-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[95vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>➕</span> Gia Hạn Gói Dịch Vụ SaaS & Thanh Toán VietQR
+        </h3>
+        <button onclick="closeExtendModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <!-- Thông tin cơ sở & Hạn dùng hiện tại -->
+      <div class="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+        <div>
+          <span class="text-slate-400">Cơ sở:</span> <strong id="modal-spa-name" class="text-white text-sm block"></strong>
+          <span class="text-slate-400">Chủ quán:</span> <span id="modal-owner-phone" class="font-mono text-indigo-400 font-semibold"></span>
+        </div>
+        <div class="sm:text-right">
+          <span class="text-slate-400">📅 Hạn dùng hiện tại:</span>
+          <div id="modal-current-expiry" class="text-amber-300 font-bold text-sm"></div>
+          <div id="modal-current-days-status" class="text-[11px] text-slate-400"></div>
+        </div>
+      </div>
+
+      <!-- Danh sách 5 gói gia hạn -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-semibold text-slate-300 block">Chọn thời hạn gia hạn thêm:</label>
+          <button onclick="openPricingBankModal()" class="text-[11px] text-indigo-400 hover:text-indigo-300">⚙️ Chỉnh giá gói</button>
+        </div>
+        <div id="extend-plan-buttons-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <!-- Rendered dynamically by JS -->
+        </div>
+      </div>
+
+      <!-- Preview Hạn Dùng Mới Sau Khi Gia Hạn -->
+      <div id="extend-preview-box" class="p-4 bg-gradient-to-r from-indigo-950/40 via-slate-950 to-indigo-950/40 border border-indigo-500/30 rounded-2xl text-xs space-y-2">
+        <div class="flex items-center justify-between text-indigo-300 font-bold border-b border-indigo-900/40 pb-2">
+          <span class="flex items-center gap-1.5"><span>🚀</span> Chi Tiết Dự Kiến Sau Gia Hạn:</span>
+          <span id="preview-plan-name" class="bg-indigo-500/20 px-2 py-0.5 rounded-full text-[10px] text-indigo-200">Gói 1 Tháng</span>
+        </div>
+        <div class="grid grid-cols-2 gap-3 text-slate-300 pt-1">
+          <div>
+            <div class="text-[11px] text-slate-400">Thời gian cộng thêm:</div>
+            <div id="preview-added-days" class="font-bold text-white text-sm">+30 ngày</div>
+          </div>
+          <div>
+            <div class="text-[11px] text-slate-400">Số tiền thanh toán:</div>
+            <div id="preview-amount" class="font-bold text-amber-400 text-sm">500.000 đ</div>
+          </div>
+        </div>
+        <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+          <div>
+            <span class="text-slate-400">Từ hạn cũ:</span> <span id="preview-old-date" class="font-mono text-slate-300">--</span>
+          </div>
+          <span class="text-indigo-400 font-bold">➔</span>
+          <div>
+            <span class="text-emerald-400 font-bold">Hạn mới:</span> <span id="preview-new-date" class="font-mono font-bold text-emerald-300 text-sm">--</span>
+          </div>
+        </div>
+        <div id="preview-total-days-note" class="text-[11px] text-slate-400 text-center"></div>
+      </div>
+
+      <!-- Khung VietQR Thanh Toán Realtime -->
+      <div id="extend-vietqr-box" class="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-3">
+        <div class="flex items-center justify-between text-[11px] text-slate-400">
+          <span>📲 Quét Mã VietQR Chuyển Khoản Trực Tiếp:</span>
+          <span id="qr-bank-badge" class="font-mono text-emerald-400 font-bold">MBBANK</span>
+        </div>
+        
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 py-1">
+          <div class="bg-white p-2 rounded-2xl shadow-xl flex items-center justify-center">
+            <img id="vietqr-image" src="" alt="Mã VietQR Thanh Toán" class="vietqr-img w-40 h-40 object-contain">
+          </div>
+          <div class="text-left text-xs space-y-1.5 text-slate-300">
+            <div>Ngân hàng: <strong id="qr-bank-name" class="text-white">MBBank</strong></div>
+            <div>Số tài khoản: <strong id="qr-bank-account" class="text-emerald-400 font-mono text-sm">0397772963</strong></div>
+            <div>Chủ tài khoản: <strong id="qr-bank-owner" class="text-amber-300 uppercase">DEV SUPER ADMIN</strong></div>
+            <div>Số tiền: <strong id="qr-bank-amount" class="text-amber-400 text-sm">500.000 đ</strong></div>
+            <div>Nội dung CK: <span id="modal-qr-memo" class="font-mono text-indigo-300 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800"></span></div>
+          </div>
+        </div>
+
+        <!-- Nút Chia sẻ Zalo cho Khách Hàng -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
+          <button id="btn-copy-zalo-invoice" onclick="copyZaloInvoiceMessage()" class="px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+            <span>📋</span> <span id="copy-invoice-btn-text">Sao Chép Báo Phí Zalo</span>
+          </button>
+          <a id="btn-open-zalo-invoice" href="#" target="_blank" class="px-3.5 py-2.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+            <span>💬</span> Gửi Qua Zalo Cho Khách
+          </a>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex justify-end gap-2 pt-1 border-t border-slate-800">
+        <button onclick="closeExtendModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Đóng</button>
+        <button onclick="requestConfirmExtend()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/40 flex items-center gap-1.5 transition">
+          <span>✅</span> Xác Nhận Đã Nhận Tiền & Gia Hạn
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Cấu hình kết nối Firebase Cloud -->
   <div id="cloud-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 class="text-sm font-bold text-white flex items-center gap-2">
           <span>⚙️</span> Cấu Hình Kết Nối Đám Mây Firestore
@@ -245,64 +457,14 @@
 
       <div class="flex justify-end gap-2 pt-2">
         <button onclick="closeCloudConfigModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Đóng</button>
-        <button onclick="saveCloudConfig()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Lưu & Kết Nối Lại</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Gia hạn gói SaaS -->
-  <div id="extend-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <span>➕</span> Gia Hạn Gói Dịch Vụ SaaS
-        </h3>
-        <button onclick="closeExtendModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
-      </div>
-
-      <div class="text-xs text-slate-300 space-y-1">
-        <div>Cơ sở: <strong id="modal-spa-name" class="text-white"></strong></div>
-        <div>Chủ quán: <span id="modal-owner-phone" class="font-mono text-indigo-400"></span></div>
-        <div>Hạn hiện tại: <span id="modal-current-expiry" class="text-amber-400 font-semibold"></span></div>
-      </div>
-
-      <div class="space-y-2">
-        <label class="text-xs font-semibold text-slate-300 block">Chọn thời hạn gia hạn thêm:</label>
-        <div class="grid grid-cols-3 gap-2">
-          <button onclick="confirmExtend(30, '500.000')" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-center text-xs transition">
-            <div class="font-bold text-white">+1 Tháng</div>
-            <div class="text-[10px] text-emerald-400 font-semibold mt-0.5">500.000 đ</div>
-          </button>
-          <button onclick="confirmExtend(90, '1.400.000')" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-center text-xs transition">
-            <div class="font-bold text-white">+3 Tháng</div>
-            <div class="text-[10px] text-emerald-400 font-semibold mt-0.5">1.400.000 đ</div>
-          </button>
-          <button onclick="confirmExtend(365, '5.000.000')" class="p-2.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-center text-xs transition">
-            <div class="font-bold text-indigo-200">+1 Năm (VIP)</div>
-            <div class="text-[10px] text-amber-300 font-bold mt-0.5">5.000.000 đ</div>
-          </button>
-        </div>
-      </div>
-
-      <!-- Quick VietQR for Dev billing -->
-      <div id="extend-vietqr-box" class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-center space-y-2">
-        <div class="text-[11px] text-slate-400">Mã VietQR thu tiền thuê phần mềm (Chuyển khoản vào TK của Dev):</div>
-        <div class="w-32 h-32 mx-auto bg-white p-1 rounded-lg flex items-center justify-center">
-          <div class="w-full h-full bg-slate-900 rounded p-1 flex flex-col items-center justify-center text-center text-white">
-            <span class="text-xl">📲</span>
-            <span class="text-[8px] font-bold text-emerald-400">MBBANK</span>
-            <span class="text-[7px] font-mono text-slate-300">0397772963</span>
-            <span class="text-[7px] text-amber-300 font-semibold mt-0.5">DEV SUPER ADMIN</span>
-          </div>
-        </div>
-        <div class="text-[10px] text-slate-400">Nội dung CK tự động: <span id="modal-qr-memo" class="font-mono text-amber-400 font-bold"></span></div>
+        <button onclick="requestSaveCloudConfig()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Lưu & Kết Nối Lại</button>
       </div>
     </div>
   </div>
 
   <!-- Modal: Thêm cơ sở Spa mới (Onboarding) -->
   <div id="create-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 class="text-sm font-bold text-white flex items-center gap-2">
           <span>🏢</span> Thêm Cơ Sở Spa Thuê Mới (Onboarding)
@@ -331,23 +493,21 @@
         <div>
           <label class="font-medium text-slate-300 block mb-1">Gói thuê bao ban đầu:</label>
           <select id="new-plan" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
-            <option value="1_month">Gói 1 Tháng (500.000 đ)</option>
-            <option value="3_months">Gói 3 Tháng (1.400.000 đ)</option>
-            <option value="1_year" selected>Gói 1 Năm (5.000.000 đ)</option>
+            <!-- Rendered by JS -->
           </select>
         </div>
       </div>
 
       <div class="flex justify-end gap-2 pt-2">
         <button onclick="closeCreateModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Hủy</button>
-        <button onclick="saveNewTenant()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Tạo Cơ Sở & Xuất Tin Zalo</button>
+        <button onclick="requestSaveNewTenant()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Tạo Cơ Sở & Xuất Tin Zalo</button>
       </div>
     </div>
   </div>
 
   <!-- Modal: Chỉnh Sửa Cơ Sở Spa -->
   <div id="edit-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 class="text-sm font-bold text-white flex items-center gap-2">
           <span>✏️</span> Chỉnh Sửa Thông Tin Cơ Sở Spa
@@ -375,9 +535,7 @@
         <div>
           <label class="font-medium text-slate-300 block mb-1">Gói thuê bao SaaS:</label>
           <select id="edit-plan" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
-            <option value="Gói 1 Tháng">Gói 1 Tháng (500.000 đ)</option>
-            <option value="Gói 3 Tháng">Gói 3 Tháng (1.400.000 đ)</option>
-            <option value="VIP 1 Năm">VIP 1 Năm (5.000.000 đ)</option>
+            <!-- Rendered by JS -->
           </select>
         </div>
         <div>
@@ -392,14 +550,14 @@
 
       <div class="flex justify-end gap-2 pt-2">
         <button onclick="closeEditModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Hủy</button>
-        <button onclick="saveEditTenant()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Lưu Thay Đổi</button>
+        <button onclick="requestSaveEditTenant()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Lưu Thay Đổi</button>
       </div>
     </div>
   </div>
 
   <!-- Modal: Tin nhắn Zalo chào mừng khách mới -->
   <div id="zalo-welcome-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
           <span class="text-xl">🎉</span>
@@ -432,7 +590,7 @@
 
   <!-- Modal: Đổi Mật Khẩu Hỗ Trợ Từ Xa -->
   <div id="reset-password-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 class="text-sm font-bold text-white flex items-center gap-2">
           <span>🔑</span> Đổi Mật Khẩu Hỗ Trợ Từ Xa
@@ -457,14 +615,14 @@
 
       <div class="flex justify-end gap-2 pt-2">
         <button onclick="closeResetPasswordModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Hủy</button>
-        <button onclick="confirmResetPassword()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Cập Nhật & Tạo Tin Zalo</button>
+        <button onclick="requestConfirmResetPassword()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Cập Nhật & Tạo Tin Zalo</button>
       </div>
     </div>
   </div>
 
   <!-- Modal: Tin nhắn Zalo đặt lại mật khẩu -->
   <div id="zalo-reset-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
           <span class="text-xl">🔑</span>
@@ -495,6 +653,20 @@
     </div>
   </div>
 
+  <!-- Thanh Hoàn Tác Thông Minh (Undo Toast Bar) -->
+  <div id="undo-toast-bar" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-emerald-500/60 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-4 z-[95] backdrop-blur-md">
+    <div class="flex items-center gap-2">
+      <span class="text-emerald-400 text-base">✅</span>
+      <span id="undo-msg" class="text-xs font-medium">Thao tác thành công.</span>
+    </div>
+    <div class="flex items-center gap-2 border-l border-slate-800 pl-3">
+      <button id="btn-undo-action" onclick="executeUndoAction()" class="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-lg transition shadow flex items-center gap-1">
+        <span>↩️</span> Hoàn Tác (<span id="undo-countdown">10</span>s)
+      </button>
+      <button onclick="dismissUndoBar()" class="text-slate-400 hover:text-white text-sm px-1">&times;</button>
+    </div>
+  </div>
+
   <!-- Notification Toast -->
   <div id="toast" class="hidden fixed bottom-5 right-5 bg-slate-900 border border-indigo-500/50 text-white text-xs px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 z-50">
     <span id="toast-icon">✅</span>
@@ -502,15 +674,36 @@
   </div>
 
   <script>
-    // Constants & Storage Keys
+    // ==========================================
+    // CONSTANTS & INITIAL STORAGE KEYS
+    // ==========================================
     const STORAGE_KEY_TENANTS = "dev_tenants";
     const STORAGE_KEY_MAINTENANCE = "dev_global_maintenance";
     const STORAGE_KEY_MAINTENANCE_MSG = "dev_global_maintenance_msg";
     const STORAGE_KEY_DEV_PIN = "dev_master_pin";
     const STORAGE_KEY_FIREBASE_CONFIG = "dev_firebase_config";
+    const STORAGE_KEY_PRICING = "dev_pricing_config";
+    const STORAGE_KEY_BANK = "dev_bank_config";
     const DEFAULT_DEV_PIN = "247208";
 
-    // Danh sách cơ sở thực tế (chỉ có cơ sở thật)
+    // 5 Gói SaaS chuẩn hóa (thêm gói 2 tuần và gói 6 tháng)
+    const DEFAULT_PRICING_PLANS = [
+      { id: "2_weeks", name: "Gói 2 Tuần", days: 14, fee: 250000, enabled: true, tag: "Dùng thử" },
+      { id: "1_month", name: "Gói 1 Tháng", days: 30, fee: 500000, enabled: true, tag: "Tiêu chuẩn" },
+      { id: "3_months", name: "Gói 3 Tháng", days: 90, fee: 1400000, enabled: true, tag: "Ưu đãi" },
+      { id: "6_months", name: "Gói 6 Tháng", days: 180, fee: 2600000, enabled: true, tag: "Phổ biến" },
+      { id: "1_year", name: "VIP 1 Năm", days: 365, fee: 5000000, enabled: true, tag: "VIP Tiết kiệm" }
+    ];
+
+    // Cấu hình tài khoản ngân hàng Dev mặc định
+    const DEFAULT_BANK_CONFIG = {
+      bankCode: "MB",
+      bankName: "MBBank (Quân Đội)",
+      accountNo: "0397772963",
+      accountName: "DEV SUPER ADMIN"
+    };
+
+    // Danh sách cơ sở thực tế duy nhất (Không có spa ảo)
     const DEFAULT_TENANTS = [
       {
         id: "khiem_thi_viet",
@@ -524,6 +717,17 @@
         tempPin: "247208"
       }
     ];
+
+    // Dọn dẹp cache mock cũ nếu có
+    (function purgeLegacyMockData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_TENANTS);
+        if (raw && (raw.includes("spa_hoa_ban") || raw.includes("spa_huong_sen") || raw.includes("0912345678") || raw.includes("0988123456"))) {
+          localStorage.removeItem(STORAGE_KEY_TENANTS);
+          console.log("Đã dọn dẹp sạch cache mock tenants cũ!");
+        }
+      } catch (e) {}
+    })();
 
     // ==========================================
     // Dev Authentication Security Gate
@@ -566,31 +770,222 @@
     }
 
     // ==========================================
+    // Cấu hình Bảng Giá SaaS & Ngân Hàng Dev
+    // ==========================================
+    function loadPricingConfig() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_PRICING);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length >= 3) return parsed;
+        }
+      } catch (e) {}
+      return JSON.parse(JSON.stringify(DEFAULT_PRICING_PLANS));
+    }
+
+    function savePricingConfig(plans) {
+      localStorage.setItem(STORAGE_KEY_PRICING, JSON.stringify(plans));
+    }
+
+    function loadBankConfig() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_BANK);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.accountNo) return parsed;
+        }
+      } catch (e) {}
+      return Object.assign({}, DEFAULT_BANK_CONFIG);
+    }
+
+    function saveBankConfig(bank) {
+      localStorage.setItem(STORAGE_KEY_BANK, JSON.stringify(bank));
+    }
+
+    let pricingPlans = loadPricingConfig();
+    let bankConfig = loadBankConfig();
+
+    function openPricingBankModal() {
+      renderPricingListInModal();
+      document.getElementById("cfg-bank-code").value = bankConfig.bankCode || "MB";
+      document.getElementById("cfg-bank-account").value = bankConfig.accountNo || "0397772963";
+      document.getElementById("cfg-bank-name").value = bankConfig.accountName || "DEV SUPER ADMIN";
+      document.getElementById("pricing-bank-modal").classList.remove("hidden");
+    }
+
+    function closePricingBankModal() {
+      document.getElementById("pricing-bank-modal").classList.add("hidden");
+    }
+
+    function renderPricingListInModal() {
+      const container = document.getElementById("pricing-list-container");
+      container.innerHTML = "";
+      pricingPlans.forEach((p, idx) => {
+        const div = document.createElement("div");
+        div.className = "p-3 bg-slate-950 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3";
+        div.innerHTML = `
+          <div class="flex items-center gap-3">
+            <input type="checkbox" id="plan-enable-${idx}" ${p.enabled ? 'checked' : ''} class="w-4 h-4 rounded text-indigo-600 bg-slate-900 border-slate-700">
+            <div>
+              <div class="font-bold text-white flex items-center gap-2">
+                <span>${p.name}</span>
+                <span class="text-[10px] font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.2 rounded-full">${p.tag || ''}</span>
+              </div>
+              <div class="text-[11px] text-slate-400">Thời hạn: <strong class="text-slate-200">${p.days} ngày</strong></div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-[11px] text-slate-400 shrink-0">Giá bán:</label>
+            <div class="relative">
+              <input type="number" id="plan-fee-${idx}" value="${p.fee}" step="10000" class="w-32 bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-right font-mono font-bold text-amber-300 text-xs">
+              <span class="text-[10px] text-slate-400 ml-1">đ</span>
+            </div>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function requestSavePricingBankSettings() {
+      showConfirmDialog({
+        title: "Xác Nhận Lưu Cài Đặt Bảng Giá & Ngân Hàng",
+        message: "Bạn có chắc chắn muốn cập nhật bảng giá SaaS và thông tin tài khoản VietQR?",
+        details: "Mã VietQR và giá tiền trong giao diện gia hạn sẽ tự động chuyển theo thiết lập mới này.",
+        confirmText: "Lưu Cài Đặt",
+        onConfirm: () => {
+          // Lưu trạng thái cũ để hoàn tác
+          const previousPricing = JSON.parse(JSON.stringify(pricingPlans));
+          const previousBank = Object.assign({}, bankConfig);
+
+          // Cập nhật giá
+          pricingPlans.forEach((p, idx) => {
+            const chk = document.getElementById(`plan-enable-${idx}`);
+            const feeInput = document.getElementById(`plan-fee-${idx}`);
+            if (chk) p.enabled = chk.checked;
+            if (feeInput) p.fee = parseInt(feeInput.value, 10) || p.fee;
+          });
+
+          // Cập nhật bank
+          bankConfig.bankCode = document.getElementById("cfg-bank-code").value;
+          bankConfig.accountNo = document.getElementById("cfg-bank-account").value.trim();
+          bankConfig.accountName = document.getElementById("cfg-bank-name").value.trim().toUpperCase();
+
+          savePricingConfig(pricingPlans);
+          saveBankConfig(bankConfig);
+          closePricingBankModal();
+
+          registerUndoAction({
+            description: "Cập nhật bảng giá SaaS & tài khoản VietQR",
+            revert: () => {
+              pricingPlans = previousPricing;
+              bankConfig = previousBank;
+              savePricingConfig(pricingPlans);
+              saveBankConfig(bankConfig);
+              populatePlanSelectDropdowns();
+              showToast("↩️ Đã hoàn tác bảng giá & ngân hàng về trước đó!");
+            }
+          });
+
+          populatePlanSelectDropdowns();
+          showToast("💾 Đã lưu cấu hình bảng giá và tài khoản VietQR thành công!");
+        }
+      });
+    }
+
+    function populatePlanSelectDropdowns() {
+      const createSelect = document.getElementById("new-plan");
+      const editSelect = document.getElementById("edit-plan");
+      const optionsHtml = pricingPlans.filter(p => p.enabled).map(p => `
+        <option value="${p.id}">${p.name} (+${p.days} ngày - ${p.fee.toLocaleString('vi-VN')} đ)</option>
+      `).join("");
+
+      if (createSelect) createSelect.innerHTML = optionsHtml;
+      if (editSelect) editSelect.innerHTML = optionsHtml;
+    }
+
+    // ==========================================
+    // HỆ THỐNG XÁC NHẬN AN TOÀN & HOÀN TÁC (UNDO)
+    // ==========================================
+    let pendingConfirmAction = null;
+
+    function showConfirmDialog({ title, message, details, confirmText, confirmClass, onConfirm }) {
+      document.getElementById("confirm-title").innerText = title || "Xác Nhận Thao Tác";
+      document.getElementById("confirm-message-box").innerHTML = `
+        <div class="font-medium text-white">${message || "Bạn có chắc chắn muốn thực hiện hành động này?"}</div>
+        ${details ? `<div class="text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">${details}</div>` : ''}
+      `;
+      const btn = document.getElementById("confirm-action-btn");
+      btn.innerText = confirmText || "Xác Nhận";
+      btn.className = `px-5 py-2.5 text-xs font-bold rounded-xl shadow-lg transition ${confirmClass || 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/40'}`;
+      
+      pendingConfirmAction = onConfirm;
+      document.getElementById("confirm-modal").classList.remove("hidden");
+    }
+
+    function closeConfirmModal(isConfirmed) {
+      document.getElementById("confirm-modal").classList.add("hidden");
+      if (isConfirmed && typeof pendingConfirmAction === "function") {
+        const action = pendingConfirmAction;
+        pendingConfirmAction = null;
+        action();
+      } else {
+        pendingConfirmAction = null;
+      }
+    }
+
+    // Quản lý hoàn tác (Undo Banner)
+    let currentUndoAction = null;
+    let undoCountdownTimer = null;
+    let undoSecondsLeft = 10;
+
+    function registerUndoAction({ description, revert }) {
+      currentUndoAction = revert;
+      undoSecondsLeft = 10;
+      document.getElementById("undo-msg").innerText = description;
+      document.getElementById("undo-countdown").innerText = undoSecondsLeft;
+      document.getElementById("undo-toast-bar").classList.remove("hidden");
+
+      clearInterval(undoCountdownTimer);
+      undoCountdownTimer = setInterval(() => {
+        undoSecondsLeft--;
+        if (undoSecondsLeft <= 0) {
+          dismissUndoBar();
+        } else {
+          document.getElementById("undo-countdown").innerText = undoSecondsLeft;
+        }
+      }, 1000);
+    }
+
+    function executeUndoAction() {
+      if (typeof currentUndoAction === "function") {
+        const fn = currentUndoAction;
+        dismissUndoBar();
+        fn();
+      }
+    }
+
+    function dismissUndoBar() {
+      clearInterval(undoCountdownTimer);
+      currentUndoAction = null;
+      document.getElementById("undo-toast-bar").classList.add("hidden");
+    }
+
+    // ==========================================
     // Firebase Cloud Realtime Sync
     // ==========================================
     let firestoreDb = null;
-    let isCloudConnected = false;
-
     const DEFAULT_FIREBASE_PROJECT = "ai-studio-android-khimthvi-ef189eaa-cab2-4f58-8d2e-533cd20261f3";
 
     function initFirebase() {
       try {
         const savedRaw = localStorage.getItem(STORAGE_KEY_FIREBASE_CONFIG);
-        let config = null;
-        if (savedRaw) {
-          config = JSON.parse(savedRaw);
-        } else {
-          config = {
-            projectId: DEFAULT_FIREBASE_PROJECT
-          };
-        }
+        let config = savedRaw ? JSON.parse(savedRaw) : { projectId: DEFAULT_FIREBASE_PROJECT };
 
         if (config && config.projectId && window.firebase) {
           if (!firebase.apps.length) {
             firebase.initializeApp(config);
           }
           firestoreDb = firebase.firestore();
-          isCloudConnected = true;
           updateCloudStatusBadge(true, `Firestore: ${config.projectId.substring(0, 16)}...`);
           startCloudListeners();
         } else {
@@ -598,7 +993,6 @@
         }
       } catch (e) {
         console.warn("Chưa khởi tạo Firestore:", e.message);
-        isCloudConnected = false;
         updateCloudStatusBadge(false, "Lưu trữ cục bộ (Offline)");
       }
     }
@@ -617,8 +1011,6 @@
 
     function startCloudListeners() {
       if (!firestoreDb) return;
-
-      // 1. Lắng nghe trạng thái bảo trì toàn hệ thống
       try {
         firestoreDb.collection("system_status").document("global")
           .onSnapshot((doc) => {
@@ -634,14 +1026,9 @@
               }
               updateMaintenanceUI();
             }
-          }, (err) => {
-            console.warn("Cloud listener system_status info:", err.message);
           });
-      } catch (e) {
-        console.warn("Error subscribing to system_status:", e);
-      }
+      } catch (e) {}
 
-      // 2. Lắng nghe danh sách cơ sở tenants
       try {
         firestoreDb.collection("tenants")
           .onSnapshot((snapshot) => {
@@ -667,25 +1054,19 @@
                 renderTable();
               }
             }
-          }, (err) => {
-            console.warn("Cloud listener tenants info:", err.message);
           });
-      } catch (e) {
-        console.warn("Error subscribing to tenants:", e);
-      }
+      } catch (e) {}
     }
 
     async function syncFromCloud() {
       if (!firestoreDb) {
-        showToast("⚠️ Chưa kết nối Cloud! Hãy mở 'Cài Đặt Cloud' để kiểm tra kết nối.");
+        showToast("⚠️ Chưa kết nối Cloud! Hãy mở 'Cloud Config' để kiểm tra kết nối.");
         return;
       }
       try {
         showToast("⏳ Đang kéo dữ liệu từ Firestore Cloud...");
         const snap = await firestoreDb.collection("tenants").get();
         if (snap.empty) {
-          showToast("ℹ️ Cloud chưa có document tenant nào. Đang nạp cơ sở hiện tại lên Cloud...");
-          // Đẩy cơ sở hiện tại lên cloud
           for (const t of tenants) {
             await firestoreDb.collection("tenants").doc(t.id).set({
               shopName: t.name,
@@ -720,7 +1101,6 @@
           showToast(`✅ Đã đồng bộ thành công ${list.length} cơ sở từ Cloud!`);
         }
       } catch (e) {
-        console.error("Lỗi đồng bộ Cloud:", e);
         showToast("⚠️ Lỗi đồng bộ: " + e.message);
       }
     }
@@ -738,7 +1118,7 @@
       document.getElementById("cloud-modal").classList.add("hidden");
     }
 
-    function saveCloudConfig() {
+    function requestSaveCloudConfig() {
       const pid = document.getElementById("cfg-project-id").value.trim();
       const did = document.getElementById("cfg-database-id").value.trim();
       const key = document.getElementById("cfg-api-key").value.trim();
@@ -748,20 +1128,25 @@
         return;
       }
 
-      const cfg = { projectId: pid };
-      if (did) cfg.databaseId = did;
-      if (key) cfg.apiKey = key;
-
-      localStorage.setItem(STORAGE_KEY_FIREBASE_CONFIG, JSON.stringify(cfg));
-      closeCloudConfigModal();
-      showToast("💾 Đã lưu cấu hình Cloud! Đang khởi tạo kết nối...");
-      setTimeout(() => {
-        location.reload();
-      }, 800);
+      showConfirmDialog({
+        title: "Xác Nhận Đổi Cấu Hình Cloud Firebase",
+        message: `Bạn có chắc muốn kết nối tới Firebase Project: "${pid}"?`,
+        details: "Hệ thống sẽ tải lại trang và kết nối Firestore theo Project ID mới này.",
+        confirmText: "Lưu & Khởi Động Lại",
+        onConfirm: () => {
+          const cfg = { projectId: pid };
+          if (did) cfg.databaseId = did;
+          if (key) cfg.apiKey = key;
+          localStorage.setItem(STORAGE_KEY_FIREBASE_CONFIG, JSON.stringify(cfg));
+          closeCloudConfigModal();
+          showToast("💾 Đang khởi động lại kết nối Cloud...");
+          setTimeout(() => location.reload(), 600);
+        }
+      });
     }
 
     // ==========================================
-    // Local Tenants & State Management
+    // Quản Lý Cơ Sở (Tenants) & Bảng
     // ==========================================
     function loadTenants() {
       try {
@@ -769,23 +1154,18 @@
         if (raw) {
           let parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // LỌC BỎ TRIỆT ĐỂ CÁC CƠ SỞ MẪU (MOCK DEMO) CŨ
             parsed = parsed.filter(t => t.id !== "spa_huong_sen" && t.id !== "spa_hoa_ban");
             if (parsed.length > 0) return parsed;
           }
         }
-      } catch (e) {
-        console.warn("Lỗi đọc localStorage:", e);
-      }
+      } catch (e) {}
       return JSON.parse(JSON.stringify(DEFAULT_TENANTS));
     }
 
     function saveTenants() {
       try {
         localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
-      } catch (e) {
-        console.error("Lỗi ghi localStorage:", e);
-      }
+      } catch (e) {}
     }
 
     let tenants = loadTenants();
@@ -813,62 +1193,63 @@
       }
     }
 
-    async function toggleGlobalMaintenance() {
-      isGlobalMaintenance = !isGlobalMaintenance;
-      localStorage.setItem(STORAGE_KEY_MAINTENANCE, isGlobalMaintenance ? "true" : "false");
-      updateMaintenanceUI();
+    function requestToggleGlobalMaintenance() {
+      const willBeMaintenance = !isGlobalMaintenance;
+      showConfirmDialog({
+        title: willBeMaintenance ? "🚨 BẬT BẢO TRÌ TOÀN BỘ HỆ THỐNG" : "🟢 TẮT BẢO TRÌ TOÀN HỆ THỐNG",
+        message: willBeMaintenance
+          ? "Bạn có chắc chắn muốn BẬT BẢO TRÌ? Tất cả KTV và Chủ Spa trên toàn quốc sẽ bị khóa ứng dụng ngay lập tức!"
+          : "Bạn có chắc muốn TẮT BẢO TRÌ và mở lại toàn bộ ứng dụng cho các Spa hoạt động bình thường?",
+        details: willBeMaintenance ? `Nội dung phát sóng: "${globalMaintenanceMsg}"` : "Toàn bộ App sẽ trở về trạng thái sẵn sàng không cần đăng nhập lại.",
+        confirmText: willBeMaintenance ? "Khóa Bảo Trì Ngay" : "Mở Lại App",
+        confirmClass: willBeMaintenance ? "bg-rose-600 hover:bg-rose-500 text-white" : "bg-emerald-600 hover:bg-emerald-500 text-white",
+        onConfirm: async () => {
+          const prevState = isGlobalMaintenance;
+          isGlobalMaintenance = willBeMaintenance;
+          localStorage.setItem(STORAGE_KEY_MAINTENANCE, isGlobalMaintenance ? "true" : "false");
+          updateMaintenanceUI();
 
-      // Đẩy lệnh realtime lên Cloud Firestore
-      if (firestoreDb) {
-        try {
-          await firestoreDb.collection("system_status").doc("global").set({
-            globalMaintenance: isGlobalMaintenance,
-            message: globalMaintenanceMsg,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-
-          if (isGlobalMaintenance) {
-            showToast("🚨 ĐÃ PHÁT LỆNH BẢO TRÌ LÊN CLOUD! Toàn bộ app Android đang khóa.");
-          } else {
-            showToast("🟢 ĐÃ TẮT BẢO TRÌ TRÊN CLOUD! Toàn bộ app tự động mở lại.");
+          if (firestoreDb) {
+            try {
+              await firestoreDb.collection("system_status").doc("global").set({
+                globalMaintenance: isGlobalMaintenance,
+                message: globalMaintenanceMsg,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+            } catch (e) {}
           }
-          return;
-        } catch (e) {
-          console.warn("Lỗi đồng bộ Cloud:", e.message);
-          showToast("⚠️ Đã lưu cục bộ (Chưa đẩy được lên Cloud: " + e.message + ")");
-          return;
-        }
-      }
 
-      if (isGlobalMaintenance) {
-        showToast("🚨 Đã BẬT BẢO TRÌ! (Lưu cục bộ)");
-      } else {
-        showToast("🟢 Đã TẮT BẢO TRÌ! (Lưu cục bộ)");
-      }
+          registerUndoAction({
+            description: willBeMaintenance ? "Đã bật bảo trì hệ thống" : "Đã tắt bảo trì hệ thống",
+            revert: async () => {
+              isGlobalMaintenance = prevState;
+              localStorage.setItem(STORAGE_KEY_MAINTENANCE, isGlobalMaintenance ? "true" : "false");
+              updateMaintenanceUI();
+              if (firestoreDb) {
+                await firestoreDb.collection("system_status").doc("global").set({
+                  globalMaintenance: isGlobalMaintenance,
+                  message: globalMaintenanceMsg,
+                  updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+              }
+              showToast("↩️ Đã hoàn tác trạng thái bảo trì!");
+            }
+          });
+
+          showToast(isGlobalMaintenance ? "🚨 ĐÃ BẬT BẢO TRÌ TOÀN BỘ HỆ THỐNG!" : "🟢 ĐÃ MỞ LẠI HỆ THỐNG!");
+        }
+      });
     }
 
-    async function saveMaintenanceMessage(showFeedback = false) {
+    function saveMaintenanceMessage(showFeedback = false) {
       const input = document.getElementById("maintenance-custom-msg");
       if (input) {
         globalMaintenanceMsg = input.value.trim() || "Hệ thống đang bảo trì nâng cấp kỹ thuật định kỳ.";
         localStorage.setItem(STORAGE_KEY_MAINTENANCE_MSG, globalMaintenanceMsg);
-
-        if (firestoreDb && isGlobalMaintenance) {
-          try {
-            await firestoreDb.collection("system_status").doc("global").set({
-              message: globalMaintenanceMsg,
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-          } catch (e) {
-            console.warn("Lỗi lưu message Cloud:", e.message);
-          }
-        }
-
         if (showFeedback) showToast("💾 Đã lưu thông báo bảo trì thành công!");
       }
     }
 
-    // PIN Generator Helper (6-digit numeric PIN)
     function generateRandomPin(targetInputId) {
       const pin = Math.floor(100000 + Math.random() * 900000).toString();
       const el = document.getElementById(targetInputId);
@@ -921,7 +1302,7 @@
             </div>
           </td>
           <td class="py-3 px-4 text-center">
-            <button onclick="toggleKillSwitch(${idx})" class="px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 mx-auto transition ${
+            <button onclick="requestToggleKillSwitch(${idx})" class="px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 mx-auto transition ${
               t.isActive 
                 ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
                 : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30'
@@ -937,13 +1318,13 @@
             <button onclick="openResetPasswordModal(${idx})" class="px-2 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold transition" title="Đổi mật khẩu hỗ trợ từ xa">
               🔑 Đổi MK
             </button>
-            <button onclick="openExtendModal(${idx})" class="px-2 py-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-lg text-xs font-semibold transition" title="Gia hạn gói">
+            <button onclick="openExtendModal(${idx})" class="px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/40 rounded-lg text-xs font-bold transition" title="Gia hạn gói">
               ➕ Gia Hạn
             </button>
             <button onclick="openZaloWelcomeModal(tenants[${idx}], tenants[${idx}].tempPin || '247208')" class="px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold transition" title="Mở tin nhắn Zalo bàn giao">
               📱 Zalo
             </button>
-            <button onclick="deleteTenant(${idx})" class="px-2 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-semibold transition" title="Xóa cơ sở">
+            <button onclick="requestDeleteTenant(${idx})" class="px-2 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-semibold transition" title="Xóa cơ sở">
               🗑️ Xóa
             </button>
           </td>
@@ -951,57 +1332,87 @@
         tbody.appendChild(tr);
       });
 
-      // Update counters
       document.getElementById("stat-total").innerText = tenants.length;
       document.getElementById("stat-active").innerText = activeCount;
       document.getElementById("stat-locked").innerText = lockedCount;
       document.getElementById("stat-revenue").innerText = totalRevenue.toLocaleString("vi-VN") + " đ";
     }
 
-    // Kill switch toggle
-    async function toggleKillSwitch(idx) {
+    function requestToggleKillSwitch(idx) {
       const t = tenants[idx];
-      t.isActive = !t.isActive;
-      saveTenants();
-      renderTable();
+      const willLock = t.isActive;
+      showConfirmDialog({
+        title: willLock ? `🔒 KHÓA CƠ SỞ: ${t.name}` : `🟢 MỞ KHÓA CƠ SỞ: ${t.name}`,
+        message: willLock 
+          ? `Bạn có chắc chắn muốn KHÓA cơ sở "${t.name}"? Ứng dụng của cơ sở này sẽ văng ra màn hình tạm khóa ngay lập tức!`
+          : `Bạn có chắc muốn MỞ KHÓA cho cơ sở "${t.name}" hoạt động trở lại?`,
+        details: `Tài khoản Chủ Spa: ${t.ownerPhone} (Mã: ${t.id})`,
+        confirmText: willLock ? "Khóa Cơ Sở" : "Mở Khóa Cơ Sở",
+        confirmClass: willLock ? "bg-rose-600 hover:bg-rose-500 text-white" : "bg-emerald-600 hover:bg-emerald-500 text-white",
+        onConfirm: async () => {
+          const prevStatus = t.isActive;
+          t.isActive = !t.isActive;
+          saveTenants();
+          renderTable();
 
-      // Đẩy lệnh khóa/mở lên Cloud Firestore
-      if (firestoreDb) {
-        try {
-          await firestoreDb.collection("tenants").doc(t.id).set({
-            isLocked: !t.isActive,
-            status: t.isActive ? "ACTIVE" : "LOCKED",
-            lockedReason: t.isActive ? "" : "Cơ sở tạm thời hết hạn hoặc bị tạm khóa bản quyền.",
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-
-          if (t.isActive) {
-            showToast(`🟢 ĐÃ MỞ KHÓA TRÊN CLOUD cho cơ sở: ${t.name}`);
-          } else {
-            showToast(`🔴 ĐÃ PHÁT LỆNH KHÓA TRÊN CLOUD cho cơ sở: ${t.name}`);
+          if (firestoreDb) {
+            try {
+              await firestoreDb.collection("tenants").doc(t.id).set({
+                isLocked: !t.isActive,
+                status: t.isActive ? "ACTIVE" : "LOCKED",
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+            } catch (e) {}
           }
-          return;
-        } catch (e) {
-          console.warn("Lỗi đẩy lệnh khóa lên Cloud:", e.message);
-        }
-      }
 
-      if (t.isActive) {
-        showToast("🟢 Đã MỞ KHÓA cho cơ sở: " + t.name);
-      } else {
-        showToast("🔴 Đã KHÓA cơ sở: " + t.name);
-      }
+          registerUndoAction({
+            description: `${t.isActive ? 'Đã mở khóa' : 'Đã khóa'} cơ sở ${t.name}`,
+            revert: async () => {
+              t.isActive = prevStatus;
+              saveTenants();
+              renderTable();
+              if (firestoreDb) {
+                await firestoreDb.collection("tenants").doc(t.id).set({
+                  isLocked: !t.isActive,
+                  status: t.isActive ? "ACTIVE" : "LOCKED",
+                  updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+              }
+              showToast(`↩️ Đã hoàn tác trạng thái của ${t.name}!`);
+            }
+          });
+
+          showToast(`${t.isActive ? '🟢 Đã mở khóa' : '🔴 Đã khóa'} thành công cho ${t.name}!`);
+        }
+      });
     }
 
-    // Modal Extend
+    // ==========================================
+    // GIA HẠN GÓI SAAS NÂNG CẤP & TẠO VIETQR
+    // ==========================================
     let selectedTenantIdx = null;
+    let selectedPlan = null;
+
     function openExtendModal(idx) {
       selectedTenantIdx = idx;
       const t = tenants[idx];
       document.getElementById("modal-spa-name").innerText = t.name;
       document.getElementById("modal-owner-phone").innerText = t.ownerPhone;
-      document.getElementById("modal-current-expiry").innerText = t.expiryDate;
-      document.getElementById("modal-qr-memo").innerText = "GIAHAN " + t.id.toUpperCase();
+      document.getElementById("modal-current-expiry").innerText = t.expiryDate || "Chưa xác định";
+
+      if (t.daysLeft > 0) {
+        document.getElementById("modal-current-days-status").innerHTML = `<span class="text-emerald-400 font-semibold">Còn ${t.daysLeft} ngày sử dụng</span>`;
+      } else {
+        document.getElementById("modal-current-days-status").innerHTML = `<span class="text-rose-400 font-bold">Đã hết hạn (${Math.abs(t.daysLeft)} ngày trước)</span>`;
+      }
+
+      // Render danh sách các gói gia hạn từ pricingPlans
+      renderExtendPlanButtons();
+
+      // Mặc định chọn gói 1 tháng hoặc gói đầu tiên
+      const defaultPlan = pricingPlans.find(p => p.enabled && p.id === "1_month") || pricingPlans.find(p => p.enabled) || pricingPlans[0];
+      selectExtendPlan(defaultPlan.id);
+
       document.getElementById("extend-modal").classList.remove("hidden");
     }
 
@@ -1009,48 +1420,218 @@
       document.getElementById("extend-modal").classList.add("hidden");
     }
 
-    async function confirmExtend(days, fee) {
-      if (selectedTenantIdx !== null) {
-        const t = tenants[selectedTenantIdx];
-        t.daysLeft = Math.max(0, t.daysLeft) + days;
-        t.isActive = true;
-        const futureDate = new Date(Date.now() + t.daysLeft * 86400000);
-        t.expiryDate = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
-        saveTenants();
-        closeExtendModal();
-        renderTable();
+    function renderExtendPlanButtons() {
+      const grid = document.getElementById("extend-plan-buttons-grid");
+      grid.innerHTML = "";
 
-        if (firestoreDb) {
-          try {
-            await firestoreDb.collection("tenants").doc(t.id).set({
-              daysLeft: t.daysLeft,
-              expiryDate: t.expiryDate,
-              isLocked: false,
-              status: "ACTIVE",
-              subscriptionExpiresAt: futureDate.getTime(),
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-            showToast(`🎉 ĐÃ GIA HẠN THÀNH CÔNG TRÊN CLOUD: +${days} ngày cho ${t.name}!`);
-            return;
-          } catch (e) {
-            console.warn("Lỗi gia hạn Cloud:", e.message);
-          }
+      pricingPlans.filter(p => p.enabled).forEach(p => {
+        const btn = document.createElement("button");
+        btn.id = `btn-plan-${p.id}`;
+        btn.onclick = () => selectExtendPlan(p.id);
+        btn.className = "p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-indigo-500/50 text-left transition flex flex-col justify-between";
+        btn.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-white text-xs">${p.name}</span>
+            <span class="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-mono">+${p.days}d</span>
+          </div>
+          <div class="text-xs text-amber-300 font-bold mt-1.5">${p.fee.toLocaleString('vi-VN')} đ</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">${p.tag || ''}</div>
+        `;
+        grid.appendChild(btn);
+      });
+    }
+
+    function selectExtendPlan(planId) {
+      const plan = pricingPlans.find(p => p.id === planId);
+      if (!plan) return;
+      selectedPlan = plan;
+
+      // Update button active state
+      pricingPlans.forEach(p => {
+        const btn = document.getElementById(`btn-plan-${p.id}`);
+        if (!btn) return;
+        if (p.id === planId) {
+          btn.className = "p-3 rounded-2xl bg-indigo-600/30 border-2 border-indigo-500 text-left transition flex flex-col justify-between shadow-lg shadow-indigo-950/40";
+        } else {
+          btn.className = "p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-left transition flex flex-col justify-between";
         }
+      });
 
-        showToast(`🎉 Đã gia hạn thành công thêm ${days} ngày cho ${t.name}!`);
+      // Calculate new expiry date
+      const t = tenants[selectedTenantIdx];
+      const baseDays = Math.max(0, t.daysLeft || 0);
+      const newTotalDays = baseDays + plan.days;
+      const futureDate = new Date(Date.now() + newTotalDays * 86400000);
+      const newExpiryStr = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
+
+      // Update Preview Box
+      document.getElementById("preview-plan-name").innerText = `${plan.name} (+${plan.days} ngày)`;
+      document.getElementById("preview-added-days").innerText = `+${plan.days} ngày`;
+      document.getElementById("preview-amount").innerText = `${plan.fee.toLocaleString('vi-VN')} đ`;
+      document.getElementById("preview-old-date").innerText = t.expiryDate || "Hôm nay";
+      document.getElementById("preview-new-date").innerText = newExpiryStr;
+      document.getElementById("preview-total-days-note").innerHTML = `Tổng thời gian sử dụng sau gia hạn: <strong class="text-white">${newTotalDays} ngày</strong> (Đến hết ngày ${newExpiryStr})`;
+
+      // Update VietQR real image & details
+      const memo = `GIAHAN ${t.id.toUpperCase()} ${plan.days}D`;
+      document.getElementById("modal-qr-memo").innerText = memo;
+
+      document.getElementById("qr-bank-badge").innerText = bankConfig.bankCode || "MB";
+      document.getElementById("qr-bank-name").innerText = bankConfig.bankName || "MBBank";
+      document.getElementById("qr-bank-account").innerText = bankConfig.accountNo || "0397772963";
+      document.getElementById("qr-bank-owner").innerText = bankConfig.accountName || "DEV SUPER ADMIN";
+      document.getElementById("qr-bank-amount").innerText = `${plan.fee.toLocaleString('vi-VN')} đ`;
+
+      // Generate actual VietQR image URL
+      const qrUrl = `https://api.vietqr.io/image/${bankConfig.bankCode}-${bankConfig.accountNo}-compact2.jpg?amount=${plan.fee}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(bankConfig.accountName)}`;
+      document.getElementById("vietqr-image").src = qrUrl;
+
+      // Update Zalo send link
+      const openZaloBtn = document.getElementById("btn-open-zalo-invoice");
+      openZaloBtn.href = `https://zalo.me/${t.ownerPhone}`;
+      openZaloBtn.onclick = () => { copyZaloInvoiceMessage(); };
+      document.getElementById("copy-invoice-btn-text").innerText = "Sao Chép Báo Phí Zalo";
+    }
+
+    function buildZaloInvoiceText() {
+      const t = tenants[selectedTenantIdx];
+      const plan = selectedPlan;
+      const baseDays = Math.max(0, t.daysLeft || 0);
+      const newTotalDays = baseDays + plan.days;
+      const futureDate = new Date(Date.now() + newTotalDays * 86400000);
+      const newExpiryStr = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
+      const memo = `GIAHAN ${t.id.toUpperCase()} ${plan.days}D`;
+      const qrUrl = `https://api.vietqr.io/image/${bankConfig.bankCode}-${bankConfig.accountNo}-compact2.jpg?amount=${plan.fee}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(bankConfig.accountName)}`;
+
+      return `🧾 THÔNG BÁO GIA HẠN DỊCH VỤ SAAS — KHIẾM THỊ VIỆT
+
+Kính gửi Quý Chủ Spa: ${t.name}
+Số điện thoại đăng nhập: ${t.ownerPhone}
+
+Hệ thống quản lý Khiếm Thị Việt xin gửi thông tin gia hạn dịch vụ:
+• Gói gia hạn: ${plan.name} (+${plan.days} ngày sử dụng)
+• Hạn dùng hiện tại: ${t.expiryDate || "Đã hết hạn"}
+• ➡️ Hạn dùng mới sau gia hạn: ${newExpiryStr} (Tổng còn ${newTotalDays} ngày)
+• Số tiền thanh toán: ${plan.fee.toLocaleString('vi-VN')} VNĐ
+
+📲 THÔNG TIN CHUYỂN KHOẢN (QUÉT MÃ VIETQR TỰ ĐỘNG):
+• Ngân hàng: ${bankConfig.bankName || 'MBBank'}
+• Số tài khoản: ${bankConfig.accountNo}
+• Chủ tài khoản: ${bankConfig.accountName}
+• Số tiền chính xác: ${plan.fee.toLocaleString('vi-VN')} đ
+• Nội dung chuyển khoản: ${memo}
+
+🔗 Link xem ảnh quét mã QR chuyển khoản nhanh:
+👉 ${qrUrl}
+
+Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ngày sử dụng trên ứng dụng của Quý cơ sở.
+📞 Hotline Hỗ Trợ Dev 24/7: 0397772963 (https://zalo.me/0397772963)`;
+    }
+
+    function copyZaloInvoiceMessage() {
+      const msg = buildZaloInvoiceText();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(msg).then(() => {
+          document.getElementById("copy-invoice-btn-text").innerText = "✅ Đã Sao Chép!";
+          showToast("📋 Đã sao chép tin nhắn báo phí & QR Zalo!");
+          setTimeout(() => {
+            document.getElementById("copy-invoice-btn-text").innerText = "Sao Chép Báo Phí Zalo";
+          }, 3000);
+        }).catch(() => fallbackCopyText(msg));
+      } else {
+        fallbackCopyText(msg);
       }
     }
 
-    // Edit Modal Handlers
+    function fallbackCopyText(text) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      showToast("📋 Đã sao chép tin nhắn Zalo!");
+    }
+
+    function requestConfirmExtend() {
+      const t = tenants[selectedTenantIdx];
+      const plan = selectedPlan;
+      const baseDays = Math.max(0, t.daysLeft || 0);
+      const newTotalDays = baseDays + plan.days;
+      const futureDate = new Date(Date.now() + newTotalDays * 86400000);
+      const newExpiryStr = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
+
+      showConfirmDialog({
+        title: `Xác Nhận Gia Hạn: ${t.name}`,
+        message: `Bạn đã nhận đủ số tiền ${plan.fee.toLocaleString('vi-VN')} đ và muốn gia hạn ${plan.name} (+${plan.days} ngày) cho "${t.name}"?`,
+        details: `Hạn dùng cũ: ${t.expiryDate} ➔ Hạn dùng mới: ${newExpiryStr} (Còn ${newTotalDays} ngày sử dụng).`,
+        confirmText: "Xác Nhận Gia Hạn Ngay",
+        confirmClass: "bg-emerald-600 hover:bg-emerald-500 text-white",
+        onConfirm: async () => {
+          // Lưu trạng thái trước để hoàn tác
+          const previousTenantState = JSON.parse(JSON.stringify(t));
+
+          t.daysLeft = newTotalDays;
+          t.isActive = true;
+          t.expiryDate = newExpiryStr;
+          t.plan = plan.name;
+
+          saveTenants();
+          closeExtendModal();
+          renderTable();
+
+          if (firestoreDb) {
+            try {
+              await firestoreDb.collection("tenants").doc(t.id).set({
+                daysLeft: t.daysLeft,
+                expiryDate: t.expiryDate,
+                planId: t.plan,
+                isLocked: false,
+                status: "ACTIVE",
+                subscriptionExpiresAt: futureDate.getTime(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+            } catch (e) {}
+          }
+
+          registerUndoAction({
+            description: `Gia hạn ${plan.name} cho ${t.name} (Hạn mới: ${newExpiryStr})`,
+            revert: async () => {
+              Object.assign(t, previousTenantState);
+              saveTenants();
+              renderTable();
+              if (firestoreDb) {
+                await firestoreDb.collection("tenants").doc(t.id).set({
+                  daysLeft: t.daysLeft,
+                  expiryDate: t.expiryDate,
+                  planId: t.plan,
+                  isLocked: !t.isActive,
+                  status: t.isActive ? "ACTIVE" : "LOCKED",
+                  updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+              }
+              showToast(`↩️ Đã hoàn tác gia hạn cho ${t.name}!`);
+            }
+          });
+
+          showToast(`🎉 Đã gia hạn thành công thêm ${plan.days} ngày cho ${t.name}! (Hạn mới: ${newExpiryStr})`);
+        }
+      });
+    }
+
+    // ==========================================
+    // EDIT & CREATE & DELETE HANDLERS
+    // ==========================================
     let editTenantIdx = null;
+
     function openEditModal(idx) {
       editTenantIdx = idx;
       const t = tenants[idx];
+      populatePlanSelectDropdowns();
       document.getElementById("edit-tenant-id").value = t.id;
       document.getElementById("edit-spa-name").value = t.name;
       document.getElementById("edit-owner-phone").value = t.ownerPhone;
       document.getElementById("edit-temp-pin").value = t.tempPin || "247208";
-      document.getElementById("edit-plan").value = t.plan;
       document.getElementById("edit-days-left").value = t.daysLeft;
       document.getElementById("edit-is-active").checked = t.isActive;
       document.getElementById("edit-modal").classList.remove("hidden");
@@ -1060,13 +1641,13 @@
       document.getElementById("edit-modal").classList.add("hidden");
     }
 
-    async function saveEditTenant() {
+    function requestSaveEditTenant() {
       if (editTenantIdx === null) return;
       const t = tenants[editTenantIdx];
       const name = document.getElementById("edit-spa-name").value.trim();
       const phone = document.getElementById("edit-owner-phone").value.trim();
       const pin = document.getElementById("edit-temp-pin").value.trim();
-      const plan = document.getElementById("edit-plan").value;
+      const planId = document.getElementById("edit-plan").value;
       const daysLeft = parseInt(document.getElementById("edit-days-left").value, 10) || 0;
       const isActive = document.getElementById("edit-is-active").checked;
 
@@ -1075,73 +1656,106 @@
         return;
       }
 
-      t.name = name;
-      t.ownerPhone = phone;
-      t.tempPin = pin || "247208";
-      t.plan = plan;
-      t.daysLeft = daysLeft;
-      t.isActive = isActive;
+      showConfirmDialog({
+        title: "Xác Nhận Cập Nhật Cơ Sở",
+        message: `Bạn có chắc chắn muốn lưu các thay đổi cho cơ sở "${name}"?`,
+        details: `SĐT: ${phone} | Trạng thái: ${isActive ? 'Đang hoạt động' : 'Tạm khóa'} | Số ngày: ${daysLeft}`,
+        confirmText: "Lưu Thay Đổi",
+        onConfirm: async () => {
+          const prevState = JSON.parse(JSON.stringify(t));
 
-      const futureDate = new Date(Date.now() + daysLeft * 86400000);
-      t.expiryDate = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
+          t.name = name;
+          t.ownerPhone = phone;
+          t.tempPin = pin || "247208";
+          const matchedPlan = pricingPlans.find(p => p.id === planId);
+          if (matchedPlan) t.plan = matchedPlan.name;
+          t.daysLeft = daysLeft;
+          t.isActive = isActive;
 
-      saveTenants();
-      closeEditModal();
-      renderTable();
+          const futureDate = new Date(Date.now() + daysLeft * 86400000);
+          t.expiryDate = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
 
-      if (firestoreDb) {
-        try {
-          await firestoreDb.collection("tenants").doc(t.id).set({
-            shopName: t.name,
-            ownerPhone: t.ownerPhone,
-            tempPin: t.tempPin,
-            planId: t.plan,
-            daysLeft: t.daysLeft,
-            expiryDate: t.expiryDate,
-            isLocked: !t.isActive,
-            status: t.isActive ? "ACTIVE" : "LOCKED",
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-        } catch (e) {
-          console.warn("Lỗi lưu Cloud:", e.message);
+          saveTenants();
+          closeEditModal();
+          renderTable();
+
+          if (firestoreDb) {
+            try {
+              await firestoreDb.collection("tenants").doc(t.id).set({
+                shopName: t.name,
+                ownerPhone: t.ownerPhone,
+                tempPin: t.tempPin,
+                planId: t.plan,
+                daysLeft: t.daysLeft,
+                expiryDate: t.expiryDate,
+                isLocked: !t.isActive,
+                status: t.isActive ? "ACTIVE" : "LOCKED",
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+            } catch (e) {}
+          }
+
+          registerUndoAction({
+            description: `Cập nhật cơ sở ${t.name}`,
+            revert: async () => {
+              Object.assign(t, prevState);
+              saveTenants();
+              renderTable();
+              if (firestoreDb) {
+                await firestoreDb.collection("tenants").doc(t.id).set(t, { merge: true });
+              }
+              showToast(`↩️ Đã hoàn tác cập nhật ${t.name}!`);
+            }
+          });
+
+          showToast(`✏️ Đã cập nhật thành công cơ sở: ${t.name}`);
         }
-      }
-
-      showToast(`✏️ Đã cập nhật thông tin cơ sở: ${t.name}`);
+      });
     }
 
-    // Delete Tenant Handler
-    async function deleteTenant(idx) {
+    function requestDeleteTenant(idx) {
       const t = tenants[idx];
       if (!t) return;
-      if (t.id === "khiem_thi_viet") {
-        if (!confirm(`⚠️ CẢNH BÁO: "${t.name}" là cơ sở chính mặc định. Bạn có chắc chắn muốn xóa không?`)) {
-          return;
-        }
-      } else {
-        if (!confirm(`Bạn có chắc chắn muốn xóa cơ sở "${t.name}" (${t.id}) khỏi hệ thống?`)) {
-          return;
-        }
-      }
-      
-      const targetId = t.id;
-      tenants.splice(idx, 1);
-      saveTenants();
-      renderTable();
+      showConfirmDialog({
+        title: `🗑️ XÓA CƠ SỞ: ${t.name}`,
+        message: `Bạn có chắc chắn muốn XÓA vĩnh viễn cơ sở "${t.name}" khỏi hệ thống?`,
+        details: `Mã Tenant: ${t.id} - SĐT: ${t.ownerPhone}. Thao tác này có thể hoàn tác trong vòng 10 giây.`,
+        confirmText: "Xác Nhận Xóa",
+        confirmClass: "bg-rose-600 hover:bg-rose-500 text-white",
+        onConfirm: async () => {
+          const deletedTenant = JSON.parse(JSON.stringify(t));
+          const deletedIdx = idx;
 
-      if (firestoreDb) {
-        try {
-          await firestoreDb.collection("tenants").doc(targetId).delete();
-        } catch (e) {
-          console.warn("Lỗi xóa doc Cloud:", e.message);
-        }
-      }
+          tenants.splice(idx, 1);
+          saveTenants();
+          renderTable();
 
-      showToast(`🗑️ Đã xóa cơ sở ${t.name} thành công!`);
+          if (firestoreDb) {
+            try {
+              await firestoreDb.collection("tenants").doc(deletedTenant.id).delete();
+            } catch (e) {}
+          }
+
+          registerUndoAction({
+            description: `Đã xóa cơ sở ${deletedTenant.name}`,
+            revert: async () => {
+              tenants.splice(deletedIdx, 0, deletedTenant);
+              saveTenants();
+              renderTable();
+              if (firestoreDb) {
+                await firestoreDb.collection("tenants").doc(deletedTenant.id).set(deletedTenant);
+              }
+              showToast(`↩️ Đã khôi phục lại cơ sở ${deletedTenant.name}!`);
+            }
+          });
+
+          showToast(`🗑️ Đã xóa cơ sở ${deletedTenant.name}!`);
+        }
+      });
     }
 
-    // Create Modal & Onboarding
     function openCreateModal() {
+      populatePlanSelectDropdowns();
       document.getElementById("new-spa-name").value = "";
       document.getElementById("new-owner-phone").value = "";
       generateRandomPin("new-temp-pin");
@@ -1152,11 +1766,11 @@
       document.getElementById("create-modal").classList.add("hidden");
     }
 
-    async function saveNewTenant() {
+    function requestSaveNewTenant() {
       const name = document.getElementById("new-spa-name").value.trim();
       const phone = document.getElementById("new-owner-phone").value.trim();
       const pin = document.getElementById("new-temp-pin").value.trim();
-      const planCode = document.getElementById("new-plan").value;
+      const planId = document.getElementById("new-plan").value;
 
       if (!name || !phone) {
         alert("Vui lòng nhập tên Spa và Số điện thoại Chủ Quán!");
@@ -1170,65 +1784,75 @@
         return;
       }
 
-      let planName = "Gói 1 Tháng";
-      let days = 30;
-      let fee = 500000;
-      if (planCode === "3_months") {
-        planName = "Gói 3 Tháng";
-        days = 90;
-        fee = 1400000;
-      } else if (planCode === "1_year") {
-        planName = "VIP 1 Năm";
-        days = 365;
-        fee = 5000000;
-      }
+      const selectedPlanObj = pricingPlans.find(p => p.id === planId) || pricingPlans[0];
 
-      const futureDate = new Date(Date.now() + days * 86400000);
-      const expiryStr = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
+      showConfirmDialog({
+        title: "Xác Nhận Khởi Tạo Cơ Sở Spa Mới",
+        message: `Bạn có muốn cấp quyền và tạo tài khoản cho cơ sở "${name}"?`,
+        details: `SĐT Chủ Spa: ${phone} | Gói: ${selectedPlanObj.name} (+${selectedPlanObj.days} ngày) | PIN: ${pin || '247208'}`,
+        confirmText: "Tạo Cơ Sở & Xuất Zalo",
+        onConfirm: async () => {
+          const futureDate = new Date(Date.now() + selectedPlanObj.days * 86400000);
+          const expiryStr = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
 
-      const newTenant = {
-        id: tenantId,
-        name: name,
-        ownerPhone: phone,
-        plan: planName,
-        expiryDate: expiryStr,
-        daysLeft: days,
-        isActive: true,
-        monthlyFee: 500000,
-        tempPin: pin || "247208"
-      };
-
-      tenants.push(newTenant);
-      saveTenants();
-      closeCreateModal();
-      renderTable();
-
-      // Đẩy lên Cloud Firestore
-      if (firestoreDb) {
-        try {
-          await firestoreDb.collection("tenants").doc(tenantId).set({
-            shopName: name,
+          const newTenant = {
+            id: tenantId,
+            name: name,
             ownerPhone: phone,
-            planId: planName,
-            status: "ACTIVE",
-            isLocked: false,
-            tempPin: pin || "247208",
-            daysLeft: days,
+            plan: selectedPlanObj.name,
             expiryDate: expiryStr,
-            subscriptionExpiresAt: futureDate.getTime(),
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-        } catch (e) {
-          console.warn("Lỗi đẩy tenant mới lên Cloud:", e.message);
-        }
-      }
+            daysLeft: selectedPlanObj.days,
+            isActive: true,
+            monthlyFee: 500000,
+            tempPin: pin || "247208"
+          };
 
-      showToast(`🎉 Đã thêm thành công cơ sở mới: ${name}!`);
-      openZaloWelcomeModal(newTenant, pin);
+          tenants.push(newTenant);
+          saveTenants();
+          closeCreateModal();
+          renderTable();
+
+          if (firestoreDb) {
+            try {
+              await firestoreDb.collection("tenants").doc(tenantId).set({
+                shopName: name,
+                ownerPhone: phone,
+                planId: selectedPlanObj.name,
+                status: "ACTIVE",
+                isLocked: false,
+                tempPin: pin || "247208",
+                daysLeft: selectedPlanObj.days,
+                expiryDate: expiryStr,
+                subscriptionExpiresAt: futureDate.getTime(),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+            } catch (e) {}
+          }
+
+          registerUndoAction({
+            description: `Tạo mới cơ sở ${name}`,
+            revert: async () => {
+              const idx = tenants.findIndex(t => t.id === tenantId);
+              if (idx !== -1) tenants.splice(idx, 1);
+              saveTenants();
+              renderTable();
+              if (firestoreDb) {
+                await firestoreDb.collection("tenants").doc(tenantId).delete();
+              }
+              showToast(`↩️ Đã hoàn tác xóa cơ sở vừa tạo: ${name}!`);
+            }
+          });
+
+          showToast(`🎉 Đã thêm thành công cơ sở mới: ${name}!`);
+          openZaloWelcomeModal(newTenant, pin);
+        }
+      });
     }
 
-    // Zalo Welcome Message Modal
+    // ==========================================
+    // ZALO MODALS & PASSWORD RESET
+    // ==========================================
     function openZaloWelcomeModal(tenant, pin) {
       const pinVal = pin || tenant.tempPin || "247208";
       const msg = `🎉 CHÀO MỪNG QUÝ CƠ SỞ ĐẾN VỚI KHIẾM THỊ VIỆT SAAS!
@@ -1269,27 +1893,15 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
 
     function copyZaloWelcomeMessage() {
       const text = document.getElementById("zalo-welcome-text").value;
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-          document.getElementById("copy-welcome-btn-text").innerText = "✅ Đã Sao Chép!";
-          showToast("📋 Đã sao chép tin nhắn Zalo chào mừng vào bộ nhớ tạm!");
-          setTimeout(() => {
-            document.getElementById("copy-welcome-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
-          }, 3000);
-        }).catch(() => {
-          document.getElementById("zalo-welcome-text").select();
-          document.execCommand("copy");
-          showToast("📋 Đã sao chép tin nhắn Zalo!");
-        });
-      } else {
-        document.getElementById("zalo-welcome-text").select();
-        document.execCommand("copy");
-        showToast("📋 Đã sao chép tin nhắn Zalo!");
-      }
+      fallbackCopyText(text);
+      document.getElementById("copy-welcome-btn-text").innerText = "✅ Đã Sao Chép!";
+      setTimeout(() => {
+        document.getElementById("copy-welcome-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
+      }, 3000);
     }
 
-    // Remote Password Reset Modal
     let resetTenantIdx = null;
+
     function openResetPasswordModal(idx) {
       resetTenantIdx = idx;
       const t = tenants[idx];
@@ -1303,7 +1915,7 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
       document.getElementById("reset-password-modal").classList.add("hidden");
     }
 
-    async function confirmResetPassword() {
+    function requestConfirmResetPassword() {
       if (resetTenantIdx === null) return;
       const t = tenants[resetTenantIdx];
       const newPin = document.getElementById("reset-new-pin").value.trim();
@@ -1311,26 +1923,48 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
         alert("Vui lòng nhập hoặc tạo mã PIN mới!");
         return;
       }
-      t.tempPin = newPin;
-      saveTenants();
-      renderTable();
-      closeResetPasswordModal();
 
-      if (firestoreDb) {
-        try {
-          await firestoreDb.collection("tenants").doc(t.id).set({
-            tempPin: newPin,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-        } catch (e) {
-          console.warn("Lỗi cập nhật PIN lên Cloud:", e.message);
-        }
-      }
+      showConfirmDialog({
+        title: "Xác Nhận Đổi Mật Khẩu Chủ Spa",
+        message: `Bạn có chắc muốn đổi mã PIN của "${t.name}" (${t.ownerPhone}) thành "${newPin}"?`,
+        details: "Mã PIN mới sẽ được cập nhật lên hệ thống và tạo tin nhắn gửi Zalo.",
+        confirmText: "Đổi Mật Khẩu Ngay",
+        onConfirm: async () => {
+          const oldPin = t.tempPin;
+          t.tempPin = newPin;
+          saveTenants();
+          renderTable();
+          closeResetPasswordModal();
 
-      showToast("🔑 Đã cập nhật mật khẩu mới cho " + t.name);
+          if (firestoreDb) {
+            try {
+              await firestoreDb.collection("tenants").doc(t.id).set({
+                tempPin: newPin,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+            } catch (e) {}
+          }
 
-      // Open Zalo Reset Modal
-      const msg = `🔑 THÔNG BÁO ĐẶT LẠI MẬT KHẨU TÀI KHOẢN CHỦ SPA
+          registerUndoAction({
+            description: `Đổi mật khẩu cho ${t.name}`,
+            revert: async () => {
+              t.tempPin = oldPin;
+              saveTenants();
+              renderTable();
+              if (firestoreDb) {
+                await firestoreDb.collection("tenants").doc(t.id).set({
+                  tempPin: oldPin,
+                  updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+              }
+              showToast(`↩️ Đã hoàn tác trả lại mật khẩu cũ cho ${t.name}!`);
+            }
+          });
+
+          showToast("🔑 Đã cập nhật mật khẩu mới cho " + t.name);
+
+          // Mở modal tin Zalo
+          const msg = `🔑 THÔNG BÁO ĐẶT LẠI MẬT KHẨU TÀI KHOẢN CHỦ SPA
 
 Kính gửi: ${t.name}
 Yêu cầu hỗ trợ đặt lại mật khẩu từ xa cho tài khoản Chủ Spa đã được xử lý thành công!
@@ -1343,12 +1977,14 @@ Yêu cầu hỗ trợ đặt lại mật khẩu từ xa cho tài khoản Chủ S
 Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật khẩu mới này một lần duy nhất.
 📞 Hỗ trợ kỹ thuật Dev qua Zalo: 0397772963 (https://zalo.me/0397772963)`;
 
-      document.getElementById("zalo-reset-text").value = msg;
-      const openResetBtn = document.getElementById("btn-open-zalo-reset");
-      openResetBtn.href = `https://zalo.me/${t.ownerPhone}`;
-      openResetBtn.onclick = function() { copyZaloResetMessage(); };
-      document.getElementById("copy-reset-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
-      document.getElementById("zalo-reset-modal").classList.remove("hidden");
+          document.getElementById("zalo-reset-text").value = msg;
+          const openResetBtn = document.getElementById("btn-open-zalo-reset");
+          openResetBtn.href = `https://zalo.me/${t.ownerPhone}`;
+          openResetBtn.onclick = function() { copyZaloResetMessage(); };
+          document.getElementById("copy-reset-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
+          document.getElementById("zalo-reset-modal").classList.remove("hidden");
+        }
+      });
     }
 
     function closeZaloResetModal() {
@@ -1357,33 +1993,19 @@ Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật k
 
     function copyZaloResetMessage() {
       const text = document.getElementById("zalo-reset-text").value;
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-          document.getElementById("copy-reset-btn-text").innerText = "✅ Đã Sao Chép!";
-          showToast("📋 Đã sao chép tin nhắn Zalo đổi mật khẩu vào bộ nhớ tạm!");
-          setTimeout(() => {
-            document.getElementById("copy-reset-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
-          }, 3000);
-        }).catch(() => {
-          document.getElementById("zalo-reset-text").select();
-          document.execCommand("copy");
-          showToast("📋 Đã sao chép tin nhắn Zalo!");
-        });
-      } else {
-        document.getElementById("zalo-reset-text").select();
-        document.execCommand("copy");
-        showToast("📋 Đã sao chép tin nhắn Zalo!");
-      }
+      fallbackCopyText(text);
+      document.getElementById("copy-reset-btn-text").innerText = "✅ Đã Sao Chép!";
+      setTimeout(() => {
+        document.getElementById("copy-reset-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
+      }, 3000);
     }
 
-    // Toast
-    let toastTimer;
     function showToast(msg) {
       const t = document.getElementById("toast");
       document.getElementById("toast-msg").innerText = msg;
       t.classList.remove("hidden");
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => {
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => {
         t.classList.add("hidden");
       }, 3500);
     }
@@ -1391,6 +2013,7 @@ Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật k
     // Keyboard shortcut (Escape to close modals)
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
+        closeConfirmModal(false);
         closeCreateModal();
         closeEditModal();
         closeExtendModal();
@@ -1398,12 +2021,14 @@ Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật k
         closeZaloWelcomeModal();
         closeZaloResetModal();
         closeCloudConfigModal();
+        closePricingBankModal();
       }
     });
 
     // Bootstrapping
     initDevSecurity();
     initFirebase();
+    populatePlanSelectDropdowns();
     updateMaintenanceUI();
     renderTable();
   </script>
