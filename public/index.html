@@ -106,22 +106,34 @@
     </div>
 
     <!-- Global Maintenance Control Panel -->
-    <div class="bg-gradient-to-r from-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
-      <div class="space-y-1">
-        <div class="flex items-center gap-2">
-          <span class="text-xl">🚨</span>
-          <h3 class="text-sm font-bold text-white">Chế Độ Bảo Trì Toàn Hệ Thống (Global Maintenance)</h3>
-          <span id="maintenance-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-            🟢 Bình Thường (Sẵn Sàng)
-          </span>
+    <div class="bg-gradient-to-r from-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 shadow-xl">
+      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🚨</span>
+            <h3 class="text-sm font-bold text-white">Chế Độ Bảo Trì Toàn Hệ Thống (Global Maintenance)</h3>
+            <span id="maintenance-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+              🟢 Bình Thường (Sẵn Sàng)
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 max-w-3xl leading-relaxed">
+            Khi kích hoạt, <strong class="text-slate-200">tất cả ứng dụng Khiếm Thị Việt (toàn bộ KTV và Chủ Spa)</strong> sẽ nhận tín hiệu và hiển thị màn hình khóa bảo trì ngay lập tức. KTV được nhắc liên hệ Chủ Spa, Chủ Spa có nút TalkBack liên hệ Kỹ thuật Dev qua Zalo (<strong class="text-emerald-400 font-mono">0397772963</strong>). Khi tắt bảo trì, mọi app tự động mở lại bình thường không cần đăng nhập lại.
+          </p>
         </div>
-        <p class="text-xs text-slate-400 max-w-3xl leading-relaxed">
-          Khi kích hoạt, <strong class="text-slate-200">tất cả ứng dụng Khiếm Thị Việt (toàn bộ KTV và Chủ Spa)</strong> sẽ nhận tín hiệu và hiển thị màn hình khóa bảo trì ngay lập tức. KTV được nhắc liên hệ Chủ Spa, Chủ Spa có nút TalkBack liên hệ Kỹ thuật Dev qua Zalo (<strong class="text-emerald-400 font-mono">0397772963</strong>). Khi tắt bảo trì, mọi app tự động mở lại bình thường không cần đăng nhập lại.
-        </p>
+        <div class="flex items-center gap-3 shrink-0">
+          <button id="btn-toggle-maintenance" onclick="toggleGlobalMaintenance()" class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">
+            <span>🛠️</span> <span id="btn-maintenance-label">Bật Chế Độ Bảo Trì</span>
+          </button>
+        </div>
       </div>
-      <div class="flex items-center gap-3 shrink-0">
-        <button id="btn-toggle-maintenance" onclick="toggleGlobalMaintenance()" class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">
-          <span>🛠️</span> <span id="btn-maintenance-label">Bật Chế Độ Bảo Trì</span>
+      <!-- Input thông báo bảo trì tùy chỉnh -->
+      <div class="w-full mt-1 pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <label for="maintenance-custom-msg" class="text-xs text-slate-400 shrink-0 flex items-center gap-1.5">
+          <span>📢</span> Thông báo phát sóng tới App:
+        </label>
+        <input type="text" id="maintenance-custom-msg" oninput="saveMaintenanceMessage()" placeholder="Hệ thống đang bảo trì nâng cấp kỹ thuật định kỳ..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+        <button onclick="saveMaintenanceMessage(true)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 shrink-0 transition">
+          💾 Lưu Thông Báo
         </button>
       </div>
     </div>
@@ -135,6 +147,9 @@
         </div>
         <div class="flex items-center gap-2">
           <input type="text" id="search-input" oninput="renderTable()" placeholder="Tìm theo tên spa, SĐT chủ quán..." class="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-1.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+          <button onclick="resetDefaultData()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition" title="Khôi phục danh sách mẫu ban đầu">
+            🔄 Đặt lại
+          </button>
         </div>
       </div>
 
@@ -255,6 +270,58 @@
     </div>
   </div>
 
+  <!-- Modal: Chỉnh Sửa Cơ Sở Spa -->
+  <div id="edit-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>✏️</span> Chỉnh Sửa Thông Tin Cơ Sở Spa
+        </h3>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="font-medium text-slate-400 block mb-1">Mã Tenant ID (Không thể đổi):</label>
+          <input type="text" id="edit-tenant-id" disabled class="w-full bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 text-slate-400 font-mono cursor-not-allowed">
+        </div>
+        <div>
+          <label class="font-medium text-slate-300 block mb-1">Tên Cơ Sở Spa:</label>
+          <input type="text" id="edit-spa-name" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
+        </div>
+        <div>
+          <label class="font-medium text-slate-300 block mb-1">Số điện thoại Chủ Quán (Owner Login):</label>
+          <input type="text" id="edit-owner-phone" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono">
+        </div>
+        <div>
+          <label class="font-medium text-slate-300 block mb-1">Mật khẩu PIN Chủ Quán:</label>
+          <input type="text" id="edit-temp-pin" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono">
+        </div>
+        <div>
+          <label class="font-medium text-slate-300 block mb-1">Gói thuê bao SaaS:</label>
+          <select id="edit-plan" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
+            <option value="Gói 1 Tháng">Gói 1 Tháng (500.000 đ)</option>
+            <option value="Gói 3 Tháng">Gói 3 Tháng (1.400.000 đ)</option>
+            <option value="VIP 1 Năm">VIP 1 Năm (5.000.000 đ)</option>
+          </select>
+        </div>
+        <div>
+          <label class="font-medium text-slate-300 block mb-1">Số ngày sử dụng còn lại:</label>
+          <input type="number" id="edit-days-left" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono">
+        </div>
+        <div class="flex items-center gap-2 pt-1">
+          <input type="checkbox" id="edit-is-active" class="w-4 h-4 rounded text-indigo-600 bg-slate-950 border-slate-800 focus:ring-0">
+          <label for="edit-is-active" class="font-medium text-slate-200">Đang hoạt động (Bỏ chọn để kích hoạt Kill-Switch khóa cơ sở)</label>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeEditModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Hủy</button>
+        <button onclick="saveEditTenant()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">Lưu Thay Đổi</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Tin nhắn Zalo chào mừng khách mới -->
   <div id="zalo-welcome-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
@@ -360,8 +427,11 @@
   </div>
 
   <script>
-    // In-memory data store for Dev Portal (mirrors Firestore /tenants/)
-    let tenants = [
+    const STORAGE_KEY_TENANTS = "dev_tenants";
+    const STORAGE_KEY_MAINTENANCE = "dev_global_maintenance";
+    const STORAGE_KEY_MAINTENANCE_MSG = "dev_global_maintenance_msg";
+
+    const DEFAULT_TENANTS = [
       {
         id: "khiem_thi_viet",
         name: "Spa Khiếm Thị Việt (Cơ sở 1)",
@@ -377,7 +447,7 @@
         id: "spa_huong_sen",
         name: "Spa Hương Sen Ánh Dương",
         ownerPhone: "0988123456",
-        plan: "Cơ bản 3 Tháng",
+        plan: "Gói 3 Tháng",
         expiryDate: "15/01/2027",
         daysLeft: 59,
         isActive: true,
@@ -388,7 +458,7 @@
         id: "spa_hoa_ban",
         name: "Spa Hoa Ban Trắng",
         ownerPhone: "0912345678",
-        plan: "1 Tháng (Hết hạn)",
+        plan: "Gói 1 Tháng",
         expiryDate: "10/11/2026",
         daysLeft: -7,
         isActive: false,
@@ -397,13 +467,38 @@
       }
     ];
 
-    // Global Maintenance state
-    let isGlobalMaintenance = localStorage.getItem("dev_global_maintenance") === "true";
+    function loadTenants() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_TENANTS);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {
+        console.warn("Lỗi đọc localStorage:", e);
+      }
+      return JSON.parse(JSON.stringify(DEFAULT_TENANTS));
+    }
+
+    function saveTenants() {
+      try {
+        localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
+      } catch (e) {
+        console.error("Lỗi ghi localStorage:", e);
+      }
+    }
+
+    let tenants = loadTenants();
+    let isGlobalMaintenance = localStorage.getItem(STORAGE_KEY_MAINTENANCE) === "true";
+    let globalMaintenanceMsg = localStorage.getItem(STORAGE_KEY_MAINTENANCE_MSG) || "Hệ thống đang bảo trì nâng cấp kỹ thuật định kỳ để nâng cao chất lượng dịch vụ.";
 
     function updateMaintenanceUI() {
       const badge = document.getElementById("maintenance-badge");
       const btn = document.getElementById("btn-toggle-maintenance");
       const btnLabel = document.getElementById("btn-maintenance-label");
+      const inputMsg = document.getElementById("maintenance-custom-msg");
+
+      if (inputMsg) inputMsg.value = globalMaintenanceMsg;
 
       if (isGlobalMaintenance) {
         badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 status-pulse";
@@ -420,12 +515,21 @@
 
     function toggleGlobalMaintenance() {
       isGlobalMaintenance = !isGlobalMaintenance;
-      localStorage.setItem("dev_global_maintenance", isGlobalMaintenance ? "true" : "false");
+      localStorage.setItem(STORAGE_KEY_MAINTENANCE, isGlobalMaintenance ? "true" : "false");
       updateMaintenanceUI();
       if (isGlobalMaintenance) {
         showToast("🚨 Đã BẬT BẢO TRÌ TOÀN DIỆN! Tất cả máy KTV & Chủ Spa sẽ hiển thị màn hình bảo trì.");
       } else {
         showToast("🟢 Đã TẮT BẢO TRÌ! Tất cả ứng dụng tự động hoạt động bình thường trở lại.");
+      }
+    }
+
+    function saveMaintenanceMessage(showFeedback = false) {
+      const input = document.getElementById("maintenance-custom-msg");
+      if (input) {
+        globalMaintenanceMsg = input.value.trim() || "Hệ thống đang bảo trì nâng cấp kỹ thuật định kỳ.";
+        localStorage.setItem(STORAGE_KEY_MAINTENANCE_MSG, globalMaintenanceMsg);
+        if (showFeedback) showToast("💾 Đã lưu thông báo bảo trì thành công!");
       }
     }
 
@@ -449,7 +553,7 @@
       tenants.forEach((t, idx) => {
         if (t.isActive) {
           activeCount++;
-          totalRevenue += t.monthlyFee;
+          totalRevenue += (t.monthlyFee || 500000);
         } else {
           lockedCount++;
         }
@@ -467,7 +571,10 @@
           </td>
           <td class="py-3 px-4">
             <div class="text-slate-200 font-mono font-semibold">${t.ownerPhone}</div>
-            <div class="text-[10px] text-slate-400">Quyền: OWNER (Chủ Spa)</div>
+            <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+              <span>PIN:</span>
+              <span class="font-mono bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-bold border border-slate-800">${t.tempPin || '247208'}</span>
+            </div>
           </td>
           <td class="py-3 px-4">
             <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">${t.plan}</span>
@@ -483,12 +590,21 @@
               <span>${t.isActive ? '🟢 Mở' : '🔴 Khóa'}</span>
             </button>
           </td>
-          <td class="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
-            <button onclick="openResetPasswordModal(${idx})" class="px-2.5 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold transition" title="Đổi mật khẩu hỗ trợ từ xa">
+          <td class="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+            <button onclick="openEditModal(${idx})" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition" title="Chỉnh sửa cơ sở">
+              ✏️ Sửa
+            </button>
+            <button onclick="openResetPasswordModal(${idx})" class="px-2 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold transition" title="Đổi mật khẩu hỗ trợ từ xa">
               🔑 Đổi MK
             </button>
-            <button onclick="openExtendModal(${idx})" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition">
+            <button onclick="openExtendModal(${idx})" class="px-2 py-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-lg text-xs font-semibold transition" title="Gia hạn gói">
               ➕ Gia Hạn
+            </button>
+            <button onclick="openZaloWelcomeModal(tenants[${idx}], tenants[${idx}].tempPin || '247208')" class="px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold transition" title="Mở tin nhắn Zalo bàn giao">
+              📱 Zalo
+            </button>
+            <button onclick="deleteTenant(${idx})" class="px-2 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-semibold transition" title="Xóa cơ sở">
+              🗑️ Xóa
             </button>
           </td>
         `;
@@ -505,6 +621,7 @@
     // Kill switch toggle
     function toggleKillSwitch(idx) {
       tenants[idx].isActive = !tenants[idx].isActive;
+      saveTenants();
       renderTable();
       if (tenants[idx].isActive) {
         showToast("🟢 Đã MỞ KHÓA thành công cho cơ sở: " + tenants[idx].name);
@@ -534,10 +651,90 @@
         const t = tenants[selectedTenantIdx];
         t.daysLeft = Math.max(0, t.daysLeft) + days;
         t.isActive = true;
-        t.expiryDate = "Gia hạn thêm +" + days + " ngày";
+        const futureDate = new Date(Date.now() + t.daysLeft * 86400000);
+        t.expiryDate = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
+        saveTenants();
         closeExtendModal();
         renderTable();
         showToast(`🎉 Đã gia hạn thành công thêm ${days} ngày cho ${t.name}!`);
+      }
+    }
+
+    // Edit Modal Handlers
+    let editTenantIdx = null;
+    function openEditModal(idx) {
+      editTenantIdx = idx;
+      const t = tenants[idx];
+      document.getElementById("edit-tenant-id").value = t.id;
+      document.getElementById("edit-spa-name").value = t.name;
+      document.getElementById("edit-owner-phone").value = t.ownerPhone;
+      document.getElementById("edit-temp-pin").value = t.tempPin || "247208";
+      document.getElementById("edit-plan").value = t.plan;
+      document.getElementById("edit-days-left").value = t.daysLeft;
+      document.getElementById("edit-is-active").checked = t.isActive;
+      document.getElementById("edit-modal").classList.remove("hidden");
+    }
+
+    function closeEditModal() {
+      document.getElementById("edit-modal").classList.add("hidden");
+    }
+
+    function saveEditTenant() {
+      if (editTenantIdx === null) return;
+      const t = tenants[editTenantIdx];
+      const name = document.getElementById("edit-spa-name").value.trim();
+      const phone = document.getElementById("edit-owner-phone").value.trim();
+      const pin = document.getElementById("edit-temp-pin").value.trim();
+      const plan = document.getElementById("edit-plan").value;
+      const daysLeft = parseInt(document.getElementById("edit-days-left").value, 10) || 0;
+      const isActive = document.getElementById("edit-is-active").checked;
+
+      if (!name || !phone) {
+        alert("Vui lòng nhập đầy đủ tên Spa và SĐT Chủ Quán!");
+        return;
+      }
+
+      t.name = name;
+      t.ownerPhone = phone;
+      t.tempPin = pin || "247208";
+      t.plan = plan;
+      t.daysLeft = daysLeft;
+      t.isActive = isActive;
+
+      const futureDate = new Date(Date.now() + daysLeft * 86400000);
+      t.expiryDate = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
+
+      saveTenants();
+      closeEditModal();
+      renderTable();
+      showToast(`✏️ Đã cập nhật thông tin cơ sở: ${t.name}`);
+    }
+
+    // Delete Tenant Handler
+    function deleteTenant(idx) {
+      const t = tenants[idx];
+      if (!t) return;
+      if (t.id === "khiem_thi_viet") {
+        if (!confirm(`⚠️ CẢNH BÁO: "${t.name}" là cơ sở chính mặc định. Bạn có chắc chắn muốn xóa không?`)) {
+          return;
+        }
+      } else {
+        if (!confirm(`Bạn có chắc chắn muốn xóa cơ sở "${t.name}" (${t.id}) khỏi hệ thống?`)) {
+          return;
+        }
+      }
+      tenants.splice(idx, 1);
+      saveTenants();
+      renderTable();
+      showToast(`🗑️ Đã xóa cơ sở ${t.name} thành công!`);
+    }
+
+    function resetDefaultData() {
+      if (confirm("Khôi phục danh sách cơ sở về 3 cơ sở mẫu ban đầu? Toàn bộ dữ liệu tự tạo sẽ được đặt lại.")) {
+        tenants = JSON.parse(JSON.stringify(DEFAULT_TENANTS));
+        saveTenants();
+        renderTable();
+        showToast("🔄 Đã đặt lại dữ liệu mẫu ban đầu!");
       }
     }
 
@@ -567,7 +764,7 @@
         pin = generateRandomPin("new-temp-pin");
       }
 
-      let planName = "Gói 1 Năm";
+      let planName = "VIP 1 Năm";
       let days = 365;
       let fee = 500000;
       if (planVal === "1_month") {
@@ -578,13 +775,16 @@
         days = 90;
       }
 
+      const futureDate = new Date(Date.now() + days * 86400000);
+      const expiryStr = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
+
       const newId = "spa_" + phone.slice(-4);
       const newTenant = {
         id: newId,
         name: name,
         ownerPhone: phone,
         plan: planName,
-        expiryDate: "18/11/2027",
+        expiryDate: expiryStr,
         daysLeft: days,
         isActive: true,
         monthlyFee: fee,
@@ -592,6 +792,7 @@
       };
 
       tenants.push(newTenant);
+      saveTenants();
       closeCreateModal();
       renderTable();
       showToast("🏢 Đã tạo cơ sở " + name + " thành công!");
@@ -602,6 +803,7 @@
 
     // Zalo Welcome Message Modal
     function openZaloWelcomeModal(tenant, pin) {
+      const pinVal = pin || tenant.tempPin || "247208";
       const msg = `🎉 CHÀO MỪNG QUÝ CƠ SỞ ĐẾN VỚI KHIẾM THỊ VIỆT SAAS!
 
 Kính gửi Chủ Spa: ${tenant.name}
@@ -609,7 +811,7 @@ Hệ thống quản lý Khiếm Thị Việt đã được khởi tạo và kíc
 
 📱 THÔNG TIN ĐĂNG NHẬP DÀNH CHO CHỦ SPA:
 • Số điện thoại đăng nhập: ${tenant.ownerPhone}
-• Mật khẩu / Mã PIN tạm thời: ${pin}
+• Mật khẩu / Mã PIN tạm thời: ${pinVal}
 • Gói dịch vụ: ${tenant.plan}
 • Quyền hạn: CHỦ SPA (Full quyền quản lý nhân sự, dịch vụ, doanh thu & sổ quỹ)
 
@@ -627,7 +829,9 @@ Hệ thống quản lý Khiếm Thị Việt đã được khởi tạo và kíc
 Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu quả!`;
 
       document.getElementById("zalo-welcome-text").value = msg;
-      document.getElementById("btn-open-zalo-welcome").href = `https://zalo.me/${tenant.ownerPhone}`;
+      const openBtn = document.getElementById("btn-open-zalo-welcome");
+      openBtn.href = `https://zalo.me/${tenant.ownerPhone}`;
+      openBtn.onclick = function() { copyZaloWelcomeMessage(); };
       document.getElementById("copy-welcome-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
       document.getElementById("zalo-welcome-modal").classList.remove("hidden");
     }
@@ -681,6 +885,8 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
         return;
       }
       t.tempPin = newPin;
+      saveTenants();
+      renderTable();
       closeResetPasswordModal();
       showToast("🔑 Đã cập nhật mật khẩu mới cho " + t.name);
 
@@ -699,7 +905,9 @@ Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật k
 📞 Hỗ trợ kỹ thuật Dev qua Zalo: 0397772963 (https://zalo.me/0397772963)`;
 
       document.getElementById("zalo-reset-text").value = msg;
-      document.getElementById("btn-open-zalo-reset").href = `https://zalo.me/${t.ownerPhone}`;
+      const openResetBtn = document.getElementById("btn-open-zalo-reset");
+      openResetBtn.href = `https://zalo.me/${t.ownerPhone}`;
+      openResetBtn.onclick = function() { copyZaloResetMessage(); };
       document.getElementById("copy-reset-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
       document.getElementById("zalo-reset-modal").classList.remove("hidden");
     }
@@ -740,6 +948,18 @@ Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật k
         t.classList.add("hidden");
       }, 3500);
     }
+
+    // Keyboard shortcut (Escape to close modals)
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeCreateModal();
+        closeEditModal();
+        closeExtendModal();
+        closeResetPasswordModal();
+        closeZaloWelcomeModal();
+        closeZaloResetModal();
+      }
+    });
 
     // Initial render
     updateMaintenanceUI();

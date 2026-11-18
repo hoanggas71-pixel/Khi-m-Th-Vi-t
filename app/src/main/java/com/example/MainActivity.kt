@@ -95,6 +95,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.SwitchAccount
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -144,6 +146,8 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -593,6 +597,8 @@ fun OneTimeLoginScreen(store: SpaStore) {
     val scope = rememberCoroutineScope()
     var phoneInput by rememberSaveable { mutableStateOf("") }
     var passwordInput by rememberSaveable { mutableStateOf("") }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var isLoggingIn by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var cloudBusy by remember { mutableStateOf(false) }
 
@@ -663,6 +669,21 @@ fun OneTimeLoginScreen(store: SpaStore) {
                     label = { Text("Mật khẩu") },
                     placeholder = { Text("Nhập mật khẩu Admin cấp") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        val iconDesc = if (passwordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu"
+                        IconButton(
+                            onClick = { passwordVisible = !passwordVisible },
+                            modifier = Modifier.semantics {
+                                contentDescription = iconDesc
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = iconDesc
+                            )
+                        }
+                    },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -681,97 +702,226 @@ fun OneTimeLoginScreen(store: SpaStore) {
                     )
                 }
 
+                // R3. Gợi ý tài khoản đăng nhập mẫu (Chủ Spa & KTV Lan) với chuẩn TalkBack
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = "Tài khoản đăng nhập mẫu thử nghiệm: Chủ Spa số điện thoại 0397772963, mật khẩu 247208 hoặc 1234. Kỹ thuật viên Lan số điện thoại 0987654321, mã PIN 1234."
+                        }
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.SwitchAccount,
+                                contentDescription = null,
+                                tint = SpaRosewoodDark,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Tài khoản đăng nhập mẫu:",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = SpaRosewoodDark
+                            )
+                        }
+
+                        // Chủ Spa: 0397772963 / 247208 (hoặc 1234)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    phoneInput = "0397772963"
+                                    passwordInput = "247208"
+                                    errorMessage = ""
+                                }
+                                .padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "👑 Chủ Spa:",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = "SĐT: 0397772963 | Mật khẩu: 247208 (hoặc 1234)",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "Chọn",
+                                fontSize = 11.sp,
+                                color = SpaRosewoodDark,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+
+                        // KTV Lan: 0987654321 / PIN 1234
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    phoneInput = "0987654321"
+                                    passwordInput = "1234"
+                                    errorMessage = ""
+                                }
+                                .padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "💆 KTV Lan:",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = "SĐT: 0987654321 | PIN: 1234",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "Chọn",
+                                fontSize = 11.sp,
+                                color = SpaRosewoodDark,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // R2. Nút Đăng nhập có trạng thái chờ ("Đang kiểm tra...") và vô hiệu hóa tương tác
                 Button(
                     onClick = {
                         if (phoneInput.isBlank() || passwordInput.isBlank()) {
                             errorMessage = "Vui lòng nhập đầy đủ số điện thoại và mật khẩu."
                         } else {
-                            cloudBusy = true
+                            isLoggingIn = true
                             scope.launch {
-                                val ok = store.pullLatestFromCloudAndLogin(phoneInput, passwordInput)
-                                cloudBusy = false
-                                if (ok) {
+                                try {
+                                    val ok = store.pullLatestFromCloudAndLogin(phoneInput, passwordInput)
+                                    if (ok) {
+                                        Toast.makeText(
+                                            context,
+                                            "Đăng nhập thành công: ${store.currentUser?.hoTen}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    } else {
+                                        val failMsg = "❌ Sai số điện thoại hoặc mật khẩu! Vui lòng thử lại"
+                                        errorMessage = failMsg
+                                        Toast.makeText(
+                                            context,
+                                            failMsg,
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                } catch (e: Exception) {
+                                    val failMsg = "❌ Sai số điện thoại hoặc mật khẩu! Vui lòng thử lại"
+                                    errorMessage = failMsg
                                     Toast.makeText(
                                         context,
-                                        "Đăng nhập thành công: ${store.currentUser?.hoTen}",
-                                        Toast.LENGTH_SHORT
+                                        failMsg,
+                                        Toast.LENGTH_LONG
                                     ).show()
-                                } else {
-                                    errorMessage = if (!store.isCloudConnected) {
-                                        "Sai số điện thoại hoặc mật khẩu! Bấm 'KẾT NỐI ĐÁM MÂY GOOGLE' bên dưới để đồng bộ tài khoản mới từ máy Admin."
-                                    } else {
-                                        "Sai số điện thoại hoặc mật khẩu! Vui lòng kiểm tra lại thông tin Admin cấp."
-                                    }
+                                } finally {
+                                    isLoggingIn = false
                                 }
                             }
                         }
                     },
+                    enabled = !isLoggingIn && !cloudBusy,
                     colors = ButtonDefaults.buttonColors(containerColor = SpaRosewood),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
                         .semantics {
-                            contentDescription = "Đăng nhập và ghi nhớ tài khoản trên máy này"
+                            contentDescription = if (isLoggingIn) "Đang kiểm tra đăng nhập..." else "Đăng nhập và ghi nhớ tài khoản trên máy này"
                         }
                         .testTag("btn_login_submit")
                 ) {
-                    Text("ĐĂNG NHẬP (GHI NHỚ 1 LẦN)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    if (isLoggingIn) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Đang kiểm tra...", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    } else {
+                        Text("ĐĂNG NHẬP (GHI NHỚ 1 LẦN)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
                 }
 
-                OutlinedButton(
+                // R4. Tinh gọn nút Google thành liên kết phụ / nút nhỏ gọn gàng
+                TextButton(
                     onClick = {
-                        if (!cloudBusy) {
+                        if (!cloudBusy && !isLoggingIn) {
                             cloudBusy = true
                             errorMessage = ""
                             scope.launch {
-                                if (store.isCloudConnected) {
-                                    val ok = store.refreshFromCloudNow()
+                                try {
+                                    if (store.isCloudConnected) {
+                                        val ok = store.refreshFromCloudNow()
+                                        Toast.makeText(
+                                            context,
+                                            if (ok) "Đã đồng bộ ${store.taiKhoans.size} tài khoản mới nhất từ đám mây!" else "Không thể tải từ đám mây, vui lòng kiểm tra mạng.",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    } else {
+                                        signInWithGoogleInteractive(
+                                            activityContext = context,
+                                            onSignedIn = {
+                                                store.startRealtimeCloudSync()
+                                                Toast.makeText(
+                                                    context,
+                                                    "Đã kết nối Đám mây! Đang đồng bộ tài khoản & dữ liệu thời gian thực...",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            },
+                                            onError = { msg ->
+                                                errorMessage = msg
+                                            }
+                                        )
+                                    }
+                                } finally {
                                     cloudBusy = false
-                                    Toast.makeText(
-                                        context,
-                                        if (ok) "Đã đồng bộ ${store.taiKhoans.size} tài khoản mới nhất từ đám mây!" else "Không thể tải từ đám mây, vui lòng kiểm tra mạng.",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                } else {
-                                    signInWithGoogleInteractive(
-                                        activityContext = context,
-                                        onSignedIn = {
-                                            cloudBusy = false
-                                            store.startRealtimeCloudSync()
-                                            Toast.makeText(
-                                                context,
-                                                "Đã kết nối Đám mây! Đang đồng bộ tài khoản & dữ liệu thời gian thực...",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        },
-                                        onError = { msg ->
-                                            cloudBusy = false
-                                            errorMessage = msg
-                                        }
-                                    )
                                 }
                             }
                         }
                     },
-                    shape = RoundedCornerShape(10.dp),
+                    enabled = !isLoggingIn,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 48.dp)
                         .semantics {
                             contentDescription = "Kết nối Đám mây Google để đồng bộ dữ liệu thời gian thực giữa máy Admin và máy Nhân viên"
                         }
                         .testTag("btn_connect_google_cloud")
                 ) {
                     if (cloudBusy) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 1.5.dp)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Đang kết nối đám mây...", fontWeight = FontWeight.Bold)
+                        Text("Đang kết nối đám mây...", fontSize = 13.sp)
                     } else {
                         Text(
-                            if (store.isCloudConnected) "☁️ ĐÃ KẾT NỐI ĐÁM MÂY GOOGLE" else "☁️ KẾT NỐI ĐÁM MÂY GOOGLE",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            if (store.isCloudConnected) "☁️ Đã kết nối Đám mây Google" else "☁️ Kết nối Đám mây Google (Tùy chọn)",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
