@@ -19,6 +19,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -369,9 +370,13 @@ class SpaStore(context: Context) {
     }
 
     init {
+        val savedTenant = prefs.getString(KEY_ACTIVE_TENANT_ID, null)
+        if (!savedTenant.isNullOrBlank()) {
+            activeTenantOverride = savedTenant
+        }
         loadFromPrefs()
         // Nếu cache SharedPreferences bị trống hoặc lỗi, thử khôi phục từ Room SQLite trước
-        if (taiKhoans.isEmpty()) {
+        if (taiKhoans.isEmpty() && currentTenantId == DEFAULT_TENANT_ID) {
             val restored = loadFromRoomDbIfEmpty()
             if (restored) {
                 saveToPrefs() // Đồng bộ ngược dữ liệu Room đã khôi phục vào SharedPreferences
@@ -379,11 +384,12 @@ class SpaStore(context: Context) {
         }
         loadGehihiMemoryVault()
         initFcmToken()
-        if (taiKhoans.isEmpty()) {
+        if (taiKhoans.isEmpty() && currentTenantId == DEFAULT_TENANT_ID) {
             seedDefaultData()
             dongBoTatCaPhieuThuChiTuVeDaChot(luuNgay = false)
             saveToPrefs()
         } else {
+            purgeMockDataForCustomTenants()
             migrateLegacyAccountsAndMenuIfNeeded()
             dongBoTatCaPhieuThuChiTuVeDaChot(luuNgay = true)
         }
@@ -743,7 +749,42 @@ class SpaStore(context: Context) {
     ): Boolean {
         val cleanPhone = normalizePhoneDigits(ownerPhone)
         val tkId = "tk_owner_$cleanPhone"
-        val existingIdx = taiKhoans.indexOfFirst { it.id == tkId || it.username == cleanPhone }
+
+        // Lưu dữ liệu của tenant trước đó nếu đổi cơ sở
+        val isDifferentTenant = (activeTenantOverride != null && activeTenantOverride != tenantId)
+        if (isDifferentTenant) {
+            saveToPrefs()
+        }
+
+        activeTenantOverride = tenantId
+        prefs.edit().putString(KEY_ACTIVE_TENANT_ID, tenantId).apply()
+
+        val tenantDataKey = "${KEY_DATA_JSON}_$tenantId"
+        val savedTenantJson = prefs.getString(tenantDataKey, null)
+
+        if (!savedTenantJson.isNullOrBlank()) {
+            parseDataFromJson(savedTenantJson)
+        } else {
+            // CƠ SỞ MỚI ĐƯỢC TẠO TRÊN WEB DEV -> KHỞI TẠO DỮ LIỆU SẠCH 100%
+            luots.clear()
+            khs.clear()
+            nvs.clear()
+            tcs.clear()
+            dks.clear()
+            deletedIds.clear()
+
+            // Nạp menu 10 dịch vụ và 3 gói liệu trình khiếm thị chuẩn để cơ sở hoạt động ngay
+            dvs.clear()
+            dvs.addAll(danhSachDichVuMenuMoiNhat2())
+            gois.clear()
+            gois.addAll(danhSachGoiMenuMoiNhat2())
+
+            // Khởi tạo DUY NHẤT tài khoản Chủ Spa (Admin cơ sở), gỡ bỏ tài khoản Dev khỏi danh sách
+            taiKhoans.clear()
+        }
+
+        // Đảm bảo tài khoản Chủ Spa (Owner) luôn có trong danh sách tài khoản
+        val existingOwnerIdx = taiKhoans.indexOfFirst { it.id == tkId || it.username == cleanPhone || it.quyen == VaiTro.OWNER }
         val newOwnerTk = TaiKhoan(
             id = tkId,
             username = cleanPhone,
@@ -754,13 +795,15 @@ class SpaStore(context: Context) {
             matKhauHienThi = pass,
             cacQuyenDuocCap = QuyenHan.entries.toSet()
         )
-        if (existingIdx >= 0) {
-            taiKhoans[existingIdx] = newOwnerTk
+        if (existingOwnerIdx >= 0) {
+            taiKhoans[existingOwnerIdx] = newOwnerTk
         } else {
-            taiKhoans.add(newOwnerTk)
+            taiKhoans.add(0, newOwnerTk)
         }
 
-        activeTenantOverride = tenantId
+        // Dọn sạch mọi dữ liệu mock mẫu nếu có sót
+        purgeMockDataForCustomTenants()
+
         tenantInfo = TenantInfo(
             tenantId = tenantId,
             shopName = shopName,
@@ -917,6 +960,8 @@ class SpaStore(context: Context) {
         prefs.edit().remove(KEY_LOGGED_IN_ACCOUNT_ID).apply()
         tenantStatusListener?.remove()
         tenantStatusListener = null
+        localTenantPollJob?.cancel()
+        localTenantPollJob = null
         isTenantLocked = false
         tenantLockReason = ""
         tenantLockQrUrl = ""
@@ -1004,49 +1049,100 @@ class SpaStore(context: Context) {
         }
     }
 
+    private var localTenantPollJob: kotlinx.coroutines.Job? = null
+
     fun startTenantStatusListener() {
-        val db = firestoreDb ?: return
-        tenantStatusListener?.remove()
-        tenantStatusListener = db.collection("tenants")
-            .document(currentTenantId)
-            .addSnapshotListener { snap, err ->
-                if (err != null) return@addSnapshotListener
-                if (snap == null || !snap.exists()) {
-                    facilityTerminationNotice = "Cơ sở này đã bị xóa khỏi hệ sinh thái Khiếm Thị Việt trên Web Portal. Phiên làm việc đã kết thúc."
-                    logout()
-                    return@addSnapshotListener
-                }
-                val status = snap.getString("status") ?: "ACTIVE"
-                val isLocked = snap.getBoolean("isLocked") ?: false
-                val lockedReason = snap.getString("lockedReason") ?: ""
-                val qrUrl = snap.getString("qrPaymentUrl") ?: snap.getString("lockDetails.qrPaymentUrl") ?: ""
+        val tId = currentTenantId
+        val db = firestoreDb
+        if (db != null) {
+            tenantStatusListener?.remove()
+            tenantStatusListener = db.collection("tenants")
+                .document(tId)
+                .addSnapshotListener { snap, err ->
+                    if (err != null) return@addSnapshotListener
+                    if (snap == null || !snap.exists()) {
+                        facilityTerminationNotice = "Cơ sở này đã bị xóa khỏi hệ sinh thái Khiếm Thị Việt trên Web Portal. Phiên làm việc đã kết thúc."
+                        logout()
+                        return@addSnapshotListener
+                    }
+                    val status = snap.getString("status") ?: "ACTIVE"
+                    val isLocked = snap.getBoolean("isLocked") ?: false
+                    val lockedReason = snap.getString("lockedReason") ?: ""
+                    val qrUrl = snap.getString("qrPaymentUrl") ?: snap.getString("lockDetails.qrPaymentUrl") ?: ""
 
-                if (status == "DELETED" || status == "DISABLED" || status == "INACTIVE" || status == "CANCELLED") {
-                    facilityTerminationNotice = "Cơ sở này đã bị vô hiệu hóa hoặc ngừng hoạt động trên Web Portal. Phiên làm việc đã kết thúc."
-                    logout()
-                    return@addSnapshotListener
-                }
+                    if (status == "DELETED" || status == "DISABLED" || status == "INACTIVE" || status == "CANCELLED") {
+                        facilityTerminationNotice = "Cơ sở này đã bị vô hiệu hóa hoặc ngừng hoạt động trên Web Portal. Phiên làm việc đã kết thúc."
+                        logout()
+                        return@addSnapshotListener
+                    }
 
-                isTenantLocked = (status != "ACTIVE" || isLocked)
-                tenantLockReason = if (isTenantLocked) lockedReason.ifBlank { "Tài khoản đã bị tạm khóa. Vui lòng liên hệ hỗ trợ." } else ""
-                tenantLockQrUrl = qrUrl
-                tenantInfo = TenantInfo(
-                    tenantId = currentTenantId,
-                    shopName = snap.getString("shopName") ?: "Khiếm Thị Việt",
-                    status = status,
-                    isLocked = isLocked,
-                    lockedReason = lockedReason,
-                    subscriptionExpiresAt = snap.getLong("subscriptionExpiresAt") ?: 0L,
-                    planId = snap.getString("planId") ?: "PLAN_FREE",
-                    ownerPhone = snap.getString("ownerPhone") ?: "",
-                    ownerEmail = snap.getString("ownerEmail") ?: "",
-                    qrPaymentUrl = qrUrl,
-                    accountsCount = snap.getLong("accountsCount")?.toInt() ?: 0,
-                    ticketsCount = snap.getLong("ticketsCount")?.toInt() ?: 0,
-                    customersCount = snap.getLong("customersCount")?.toInt() ?: 0,
-                    createdAt = snap.getString("createdAt") ?: ""
+                    isTenantLocked = (status != "ACTIVE" || isLocked)
+                    tenantLockReason = if (isTenantLocked) lockedReason.ifBlank { "Tài khoản đã bị tạm khóa. Vui lòng liên hệ hỗ trợ." } else ""
+                    tenantLockQrUrl = qrUrl
+                    tenantInfo = TenantInfo(
+                        tenantId = tId,
+                        shopName = snap.getString("shopName") ?: "Khiếm Thị Việt",
+                        status = status,
+                        isLocked = isLocked,
+                        lockedReason = lockedReason,
+                        subscriptionExpiresAt = snap.getLong("subscriptionExpiresAt") ?: 0L,
+                        planId = snap.getString("planId") ?: "PLAN_FREE",
+                        ownerPhone = snap.getString("ownerPhone") ?: "",
+                        ownerEmail = snap.getString("ownerEmail") ?: "",
+                        qrPaymentUrl = qrUrl,
+                        accountsCount = snap.getLong("accountsCount")?.toInt() ?: 0,
+                        ticketsCount = snap.getLong("ticketsCount")?.toInt() ?: 0,
+                        customersCount = snap.getLong("customersCount")?.toInt() ?: 0,
+                        createdAt = snap.getString("createdAt") ?: ""
+                    )
+                }
+        }
+
+        // 2. Định kỳ kiểm tra Local Server API (cổng 3000) để phát hiện tức thì khi Web Dev xóa hoặc khóa cơ sở
+        localTenantPollJob?.cancel()
+        val targetPhone = currentUser?.username?.ifBlank { tenantInfo?.ownerPhone } ?: return
+        if (targetPhone.isBlank() || tId == DEFAULT_TENANT_ID) return
+
+        localTenantPollJob = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive && currentUser != null) {
+                kotlinx.coroutines.delay(6000L) // Kiểm tra mỗi 6 giây
+                val phone = currentUser?.username?.ifBlank { tenantInfo?.ownerPhone } ?: break
+                val endpoints = listOf(
+                    "http://10.0.2.2:3000/api/tenants/auth?phone=$phone",
+                    "http://192.168.1.105:3000/api/tenants/auth?phone=$phone",
+                    "http://127.0.0.1:3000/api/tenants/auth?phone=$phone"
                 )
+                for (urlStr in endpoints) {
+                    try {
+                        val conn = (java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection).apply {
+                            connectTimeout = 1500
+                            readTimeout = 1500
+                            requestMethod = "GET"
+                        }
+                        if (conn.responseCode == 200) {
+                            val res = conn.inputStream.bufferedReader().use { it.readText() }
+                            val json = org.json.JSONObject(res)
+                            val ok = json.optBoolean("success", false)
+                            val locked = json.optBoolean("locked", false)
+                            if (!ok && !locked) {
+                                // Cơ sở đã bị xóa khỏi Web Dev Portal
+                                withContext(Dispatchers.Main) {
+                                    facilityTerminationNotice = "Cơ sở này đã bị xóa khỏi hệ sinh thái Khiếm Thị Việt trên Web Portal. Phiên làm việc đã kết thúc."
+                                    logout()
+                                }
+                                break
+                            } else if (locked) {
+                                withContext(Dispatchers.Main) {
+                                    isTenantLocked = true
+                                    tenantLockReason = json.optString("message", "Cơ sở đang bị tạm khóa. Vui lòng liên hệ Dev.")
+                                }
+                            }
+                            break
+                        }
+                    } catch (_: Exception) {}
+                }
             }
+        }
     }
 
     fun startGlobalMaintenanceListener() {
@@ -6396,10 +6492,26 @@ class SpaStore(context: Context) {
             }
     }
 
+    fun purgeMockDataForCustomTenants() {
+        if (currentTenantId != DEFAULT_TENANT_ID) {
+            luots.removeAll { it.id in SEED_SAMPLE_IDS }
+            khs.removeAll { it.id in SEED_SAMPLE_IDS }
+            nvs.removeAll { it.id in SEED_SAMPLE_IDS }
+            tcs.removeAll { it.id in SEED_SAMPLE_IDS }
+            dks.removeAll { it.id in SEED_SAMPLE_IDS }
+            taiKhoans.removeAll { it.id in SEED_SAMPLE_IDS || it.id == "tk_admin" || it.username == DEFAULT_ADMIN_PHONE }
+        }
+    }
+
     fun saveToPrefs() {
+        purgeMockDataForCustomTenants()
         val root = buildBackupJsonObject()
         val jsonStr = root.toString()
-        prefs.edit().putString(KEY_DATA_JSON, jsonStr).apply()
+        prefs.edit()
+            .putString(KEY_DATA_JSON, jsonStr)
+            .putString("${KEY_DATA_JSON}_$currentTenantId", jsonStr)
+            .putString(KEY_ACTIVE_TENANT_ID, currentTenantId)
+            .apply()
         saveGehihiMemoryVault()
         persistToRoomDbAsync()
         if (!isApplyingCloudSnapshot) {
@@ -6408,7 +6520,13 @@ class SpaStore(context: Context) {
     }
 
     private fun loadFromPrefs() {
-        val raw = prefs.getString(KEY_DATA_JSON, null) ?: return
+        val tId = activeTenantOverride ?: prefs.getString(KEY_ACTIVE_TENANT_ID, null) ?: DEFAULT_TENANT_ID
+        val raw = prefs.getString("${KEY_DATA_JSON}_$tId", null) ?: prefs.getString(KEY_DATA_JSON, null) ?: return
+        parseDataFromJson(raw)
+        purgeMockDataForCustomTenants()
+    }
+
+    fun parseDataFromJson(raw: String) {
         try {
             val root = JSONObject(raw)
             deletedIds.clear()
@@ -6430,9 +6548,7 @@ class SpaStore(context: Context) {
                         }
                     }
                     val hoTenRaw = o.optString("hoTen")
-                    val cleanHoTen = if (hoTenRaw.contains("OWNER", ignoreCase = true) || hoTenRaw.contains("Chủ Cơ Sở", ignoreCase = true)) {
-                        "Admin Quản trị"
-                    } else hoTenRaw
+                    val cleanHoTen = hoTenRaw.ifBlank { "Chủ Spa" }
                     taiKhoans.add(
                         TaiKhoan(
                             id = o.optString("id"),
@@ -6972,6 +7088,7 @@ class SpaStore(context: Context) {
         const val DEFAULT_TENANT_ID = "khiem_thi_viet"
         const val PREFS_NAME = "tamquat_fresh_v2"
         const val KEY_DATA_JSON = "data_json"
+        const val KEY_ACTIVE_TENANT_ID = "active_tenant_id"
         const val KEY_GEHIHI_MEMORY_JSON = "gehihi_memory_vault_json"
         const val GEHIHI_VAULT_FILE_NAME = "gehihi_memory_vault.json"
         const val KEY_LOGGED_IN_ACCOUNT_ID = "logged_in_account_id"

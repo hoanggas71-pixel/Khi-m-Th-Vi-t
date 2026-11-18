@@ -60,7 +60,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.graphics.SolidColor
@@ -125,6 +129,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -444,15 +449,20 @@ fun KhiemThiVietApp(store: SpaStore) {
         bottomBar = {
             NavigationBar(
                 modifier = Modifier
-                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .height(64.dp)
                     .testTag("bottom_nav_bar"),
-                containerColor = MaterialTheme.colorScheme.surface
+                windowInsets = WindowInsets(0, 0, 0, 0),
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp
             ) {
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Default.ConfirmationNumber, contentDescription = null) },
-                    label = { Text("Vé", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                    icon = { Icon(Icons.Default.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    label = { Text("Vé", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1) },
+                    alwaysShowLabel = true,
                     modifier = Modifier
                         .semantics { contentDescription = "Tab 1: Quản lý Vé phục vụ" }
                         .testTag("tab_ve")
@@ -460,8 +470,9 @@ fun KhiemThiVietApp(store: SpaStore) {
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Default.Group, contentDescription = null) },
-                    label = { Text("Khách", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                    icon = { Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    label = { Text("Khách", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1) },
+                    alwaysShowLabel = true,
                     modifier = Modifier
                         .semantics { contentDescription = "Tab 2: Khách hàng và Nhân viên" }
                         .testTag("tab_nguoi")
@@ -469,8 +480,9 @@ fun KhiemThiVietApp(store: SpaStore) {
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    icon = { Icon(Icons.Default.Spa, contentDescription = null) },
-                    label = { Text("Dịch vụ", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                    icon = { Icon(Icons.Default.Spa, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    label = { Text("Dịch vụ", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1) },
+                    alwaysShowLabel = true,
                     modifier = Modifier
                         .semantics { contentDescription = "Tab 3: Dịch vụ và Gói liệu trình" }
                         .testTag("tab_menu")
@@ -481,10 +493,12 @@ fun KhiemThiVietApp(store: SpaStore) {
                     icon = {
                         Icon(
                             if (canSeeFinanceTab) Icons.Default.AccountBalanceWallet else Icons.Default.Lock,
-                            contentDescription = null
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
                         )
                     },
-                    label = { Text("Sổ quỹ", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                    label = { Text("Sổ quỹ", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1) },
+                    alwaysShowLabel = true,
                     modifier = Modifier
                         .semantics { contentDescription = "Tab 4: Sổ quỹ Thu Chi" }
                         .testTag("tab_so_quy")
@@ -495,10 +509,12 @@ fun KhiemThiVietApp(store: SpaStore) {
                     icon = {
                         Icon(
                             if (canSeeRevenueTab) Icons.Default.Analytics else Icons.Default.Lock,
-                            contentDescription = null
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
                         )
                     },
-                    label = { Text("Báo cáo", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                    label = { Text("Báo cáo", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1) },
+                    alwaysShowLabel = true,
                     modifier = Modifier
                         .semantics { contentDescription = "Tab 5: Báo cáo doanh thu và Bảng lương nhân viên" }
                         .testTag("tab_doanh_thu")
@@ -507,8 +523,9 @@ fun KhiemThiVietApp(store: SpaStore) {
                     NavigationBarItem(
                         selected = selectedTab == 5,
                         onClick = { selectedTab = 5 },
-                        icon = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null) },
-                        label = { Text("Quyền hạn", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                        icon = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        label = { Text("Quyền hạn", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1) },
+                        alwaysShowLabel = true,
                         modifier = Modifier
                             .semantics { contentDescription = "Tab 6 dành riêng cho Admin: Cấp quyền, Tạo tài khoản và Chỉnh sửa thông tin" }
                             .testTag("tab_quyen_han_admin")
@@ -597,6 +614,7 @@ fun KhiemThiVietApp(store: SpaStore) {
 @Composable
 fun OneTimeLoginScreen(store: SpaStore) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     var phoneInput by rememberSaveable { mutableStateOf("") }
     var passwordInput by rememberSaveable { mutableStateOf("") }
@@ -687,7 +705,24 @@ fun OneTimeLoginScreen(store: SpaStore) {
                     },
                     label = { Text("Tên đăng nhập (Số điện thoại hoặc Gmail)") },
                     placeholder = { Text("VD: 0912345678") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = ImeAction.Next,
+                        autoCorrect = false
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                    ),
+                    trailingIcon = if (phoneInput.isNotEmpty()) {
+                        {
+                            IconButton(
+                                onClick = { phoneInput = "" },
+                                modifier = Modifier.semantics { contentDescription = "Xóa số điện thoại" }
+                            ) {
+                                Icon(Icons.Filled.Clear, contentDescription = "Xóa số điện thoại")
+                            }
+                        }
+                    } else null,
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -696,26 +731,49 @@ fun OneTimeLoginScreen(store: SpaStore) {
 
                 OutlinedTextField(
                     value = passwordInput,
-                    onValueChange = {
-                        passwordInput = it
+                    onValueChange = { newVal ->
+                        // Khắc phục triệt để lỗi dính/đè text buffer từ ô SĐT xuống ô Mật khẩu trên Android Emulator
+                        val cleanVal = if (passwordInput.isEmpty() && phoneInput.isNotBlank() && newVal.startsWith(phoneInput) && newVal.length > phoneInput.length) {
+                            newVal.removePrefix(phoneInput)
+                        } else {
+                            newVal
+                        }
+                        passwordInput = cleanVal
                         errorMessage = ""
                     },
                     label = { Text("Mật khẩu") },
                     placeholder = { Text("VD: 123456") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                        autoCorrect = false
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { focusManager.clearFocus() }
+                    ),
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
-                        val iconDesc = if (passwordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu"
-                        IconButton(
-                            onClick = { passwordVisible = !passwordVisible },
-                            modifier = Modifier.semantics {
-                                contentDescription = iconDesc
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (passwordInput.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { passwordInput = "" },
+                                    modifier = Modifier.semantics { contentDescription = "Xóa mật khẩu" }
+                                ) {
+                                    Icon(Icons.Filled.Clear, contentDescription = "Xóa mật khẩu")
+                                }
                             }
-                        ) {
-                            Icon(
-                                imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = iconDesc
-                            )
+                            val iconDesc = if (passwordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu"
+                            IconButton(
+                                onClick = { passwordVisible = !passwordVisible },
+                                modifier = Modifier.semantics {
+                                    contentDescription = iconDesc
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = iconDesc
+                                )
+                            }
                         }
                     },
                     singleLine = true,
@@ -1161,7 +1219,7 @@ fun TabVanHanhVe(
                     )
                 }
             }
-            item { Spacer(modifier = Modifier.height(72.dp)) }
+            item { Spacer(modifier = Modifier.height(96.dp)) }
         }
     }
 
@@ -2561,7 +2619,7 @@ fun TabNguoi(
                             }
                         }
                     }
-                    item { Spacer(modifier = Modifier.height(72.dp)) }
+                    item { Spacer(modifier = Modifier.height(96.dp)) }
                 }
             }
 
@@ -2653,7 +2711,7 @@ fun TabNguoi(
                             }
                         }
                     }
-                    item { Spacer(modifier = Modifier.height(72.dp)) }
+                    item { Spacer(modifier = Modifier.height(96.dp)) }
                 }
             }
         }
@@ -4852,22 +4910,31 @@ fun TabQuyenHanAdmin(
 
     val isDevUser = store.currentUser.isDev()
     val subTabTitles = if (isDevUser) {
-        listOf("Cấp quyền & TK NV", "TK Admin gốc", "Sao lưu & Khôi phục", "👑 Dev Console")
+        listOf("Tài khoản NV", "Chủ cơ sở (Admin)", "Sao lưu dữ liệu", "👑 Dev Console")
     } else {
-        listOf("Cấp quyền & TK NV", "TK Admin gốc", "Sao lưu & Khôi phục")
+        listOf("Tài khoản NV", "Chủ cơ sở (Admin)", "Sao lưu dữ liệu")
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(
+        ScrollableTabRow(
             selectedTabIndex = adminSubTab.coerceIn(0, subTabTitles.lastIndex),
             containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = SpaRosewoodDark
+            contentColor = SpaRosewoodDark,
+            edgePadding = 12.dp
         ) {
             subTabTitles.forEachIndexed { idx, title ->
                 Tab(
                     selected = adminSubTab == idx,
                     onClick = { store.selectAdminSubTab(idx) },
-                    text = { Text(title, fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                    text = {
+                        Text(
+                            text = title,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    },
                     modifier = Modifier.testTag("admin_subtab_$idx")
                 )
             }
@@ -4875,7 +4942,7 @@ fun TabQuyenHanAdmin(
 
         when (adminSubTab) {
             0 -> {
-                val staffAccounts = store.taiKhoans.filter { it.id != "tk_admin" }
+                val staffAccounts = store.taiKhoans.filter { it.id != "tk_admin" && it.quyen != VaiTro.OWNER }
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
@@ -5228,12 +5295,14 @@ fun TabQuyenHanAdmin(
                         }
                     }
 
-                    item { Spacer(modifier = Modifier.height(72.dp)) }
+                    item { Spacer(modifier = Modifier.height(96.dp)) }
                 }
             }
 
             1 -> {
-                val rootAdminTk = store.taiKhoans.firstOrNull { it.id == "tk_admin" } ?: store.currentUser
+                val rootAdminTk = store.taiKhoans.firstOrNull { it.quyen == VaiTro.OWNER }
+                    ?: store.currentUser
+                    ?: store.taiKhoans.firstOrNull { it.id == "tk_admin" }
                 if (rootAdminTk != null) {
                     var hoTenAdmin by remember(rootAdminTk.id) { mutableStateOf(rootAdminTk.hoTen) }
                     var sdtAdmin by remember(rootAdminTk.id) { mutableStateOf(rootAdminTk.username) }
@@ -5555,7 +5624,7 @@ fun TabQuyenHanAdmin(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(72.dp))
+                        Spacer(modifier = Modifier.height(96.dp))
                     }
                 }
             }
