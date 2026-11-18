@@ -265,12 +265,20 @@
         <div class="space-y-4">
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1.5">Số điện thoại Chủ Quán:</label>
-            <input type="text" id="cust-phone-input" placeholder="VD: 0397772963 hoặc 123456789" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 transition">
+            <input type="text" id="cust-phone-input" placeholder="VD: 0912345678" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 transition">
           </div>
 
           <div>
             <label class="block text-xs font-semibold text-slate-300 mb-1.5">Mật khẩu PIN:</label>
-            <input type="password" id="cust-pin-input" placeholder="Nhập PIN (VD: 247208 hoặc 12345)" onkeydown="if(event.key==='Enter') handleCustomerLogin()" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 transition">
+            <input type="password" id="cust-pin-input" placeholder="Nhập mã PIN (VD: 123456)" onkeydown="if(event.key==='Enter') handleCustomerLogin()" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 transition">
+          </div>
+
+          <div class="p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-xl text-xs text-indigo-200 leading-relaxed flex items-start gap-2">
+            <span class="text-base shrink-0">💬</span>
+            <div>
+              <strong class="text-white">Chưa có tài khoản đăng nhập?</strong><br>
+              Quý khách vui lòng liên hệ Dev qua Zalo <a href="https://zalo.me/0397772963" target="_blank" class="text-emerald-400 font-bold underline">0397772963</a> để được tư vấn đăng ký gói và kích hoạt tài khoản sử dụng dịch vụ.
+            </div>
           </div>
 
           <div id="cust-login-error" class="hidden p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 font-medium">
@@ -668,6 +676,67 @@
       <div class="flex justify-end pt-1 border-t border-slate-800">
         <button onclick="closeCustomerRenewModal()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
           Đóng Cửa Sổ
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2B: Tư Vấn & Đăng Ký Gói SaaS Qua Zalo (Khi Chưa Đăng Nhập) -->
+  <div id="customer-consult-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">💬</span>
+          <h3 class="text-sm font-bold text-white">Tư Vấn & Đăng Ký Gói Dịch Vụ SaaS</h3>
+        </div>
+        <button onclick="closeCustomerConsultModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <!-- Thông tin gói đang quan tâm -->
+      <div class="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
+        <div>
+          <span class="text-slate-400">Gói dịch vụ:</span>
+          <strong id="consult-plan-name" class="text-white text-sm block">Gói 1 Tháng</strong>
+        </div>
+        <div class="text-right">
+          <span class="text-slate-400">Thời hạn:</span> <span id="consult-plan-days" class="text-indigo-300 font-bold block">+30 ngày</span>
+          <span id="consult-plan-fee" class="text-amber-300 font-bold text-sm">500.000 đ</span>
+        </div>
+      </div>
+
+      <div class="p-3.5 bg-indigo-950/30 border border-indigo-500/20 rounded-2xl text-xs text-indigo-200 leading-relaxed space-y-2">
+        <div class="flex items-center gap-2 font-bold text-white">
+          <span>ℹ️</span>
+          <span>Hệ thống đăng ký & tư vấn trực tiếp qua Zalo</span>
+        </div>
+        <p class="text-slate-300">
+          Hệ thống thanh toán tự động hiện chưa triển khai. Để đảm bảo cấp đúng tài khoản và hỗ trợ cài đặt trợ năng TalkBack tốt nhất cho cơ sở của bạn, Quý khách vui lòng liên hệ trực tiếp với Kỹ thuật Dev qua Zalo để được tư vấn kích hoạt!
+        </p>
+      </div>
+
+      <!-- Tin nhắn mẫu -->
+      <div class="space-y-1.5">
+        <label class="text-[11px] font-semibold text-slate-400">Nội dung mẫu gửi Zalo cho Dev:</label>
+        <textarea id="consult-message-text" rows="4" readonly class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono resize-none focus:outline-none"></textarea>
+      </div>
+
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-slate-800">
+        <button onclick="copyConsultMessage()" class="w-full sm:w-auto px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition">
+          <span>📋</span> <span id="consult-copy-btn-text">Sao Chép Tin Nhắn</span>
+        </button>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <button onclick="openZaloConsultApp()" class="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-900/40 flex items-center justify-center gap-1.5 transition">
+            <span>📱</span> Mở App Zalo Trên Máy
+          </button>
+          <a id="consult-zalo-web-link" href="https://zalo.me/0397772963" target="_blank" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition" title="Mở Zalo Web">
+            <span>🌐</span> Web
+          </a>
+        </div>
+      </div>
+
+      <div class="text-center pt-1 border-t border-slate-800/60">
+        <button onclick="closeCustomerConsultModal(); scrollToCustomerLogin();" class="text-xs text-amber-300 hover:text-amber-200 underline font-medium">
+          🔑 Đã được cấp tài khoản? Bấm vào đây để đăng nhập
         </button>
       </div>
     </div>
@@ -1577,11 +1646,49 @@
       if (currentCustomerTenant) {
         openCustomerRenewModal(planId);
       } else {
-        // Cuộn xuống khu vực đăng nhập khách hàng
-        const portalSection = document.getElementById("customer-portal");
-        if (portalSection) portalSection.scrollIntoView({ behavior: 'smooth' });
-        showToast("💡 Vui lòng đăng nhập tài khoản Chủ Spa bên dưới để tiến hành gia hạn gói!");
+        openCustomerConsultModal(planId);
       }
+    }
+
+    let consultSelectedPlan = null;
+
+    function openCustomerConsultModal(planId) {
+      const plan = pricingPlans.find(p => p.id === planId) || pricingPlans[0];
+      consultSelectedPlan = plan;
+
+      document.getElementById("consult-plan-name").innerText = plan.name;
+      document.getElementById("consult-plan-days").innerText = `+${plan.days} ngày sử dụng`;
+      document.getElementById("consult-plan-fee").innerText = `${plan.fee.toLocaleString('vi-VN')} đ`;
+
+      const msg = `Xin chào Kỹ thuật Dev Khiếm Thị Việt! Tôi muốn được tư vấn đăng ký sử dụng "${plan.name}" (+${plan.days} ngày - ${plan.fee.toLocaleString('vi-VN')} đ) cho cơ sở Spa của tôi. Nhờ Dev hỗ trợ kích hoạt và hướng dẫn cài đặt giúp tôi nhé!`;
+      document.getElementById("consult-message-text").value = msg;
+
+      document.getElementById("consult-copy-btn-text").innerText = "Sao Chép Tin Nhắn";
+      document.getElementById("customer-consult-modal").classList.remove("hidden");
+    }
+
+    function closeCustomerConsultModal() {
+      document.getElementById("customer-consult-modal").classList.add("hidden");
+    }
+
+    function copyConsultMessage() {
+      const msg = document.getElementById("consult-message-text").value;
+      fallbackCopyText(msg);
+      document.getElementById("consult-copy-btn-text").innerText = "✅ Đã Sao Chép!";
+      setTimeout(() => {
+        document.getElementById("consult-copy-btn-text").innerText = "Sao Chép Tin Nhắn";
+      }, 3000);
+    }
+
+    function openZaloConsultApp() {
+      copyConsultMessage();
+      window.location.href = `zalo://conversation?phone=0397772963`;
+      showToast("📱 Đang mở Zalo! Đã tự động sao chép tin nhắn đăng ký, bạn chỉ cần nhấn Ctrl+V để gửi cho Dev.");
+    }
+
+    function scrollToCustomerLogin() {
+      const el = document.getElementById("customer-portal");
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
     }
 
     // ==========================================
@@ -2952,6 +3059,7 @@ Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật k
         closeConfirmModal(false);
         closeDevPinModal();
         closeCustomerRenewModal();
+        closeCustomerConsultModal();
         closeCreateModal();
         closeEditModal();
         closeExtendModal();
