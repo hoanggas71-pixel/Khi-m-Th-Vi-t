@@ -314,6 +314,24 @@
         </div>
       </div>
 
+      <!-- Phần 3: Cấu Hình Đường Link Tải APK Cài Đặt -->
+      <div class="space-y-2 border-t border-slate-800 pt-4">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+            <span>📥</span> Đường Link Tải APK Cài Đặt (Google Drive / Direct Link)
+          </label>
+          <a href="KhiemThiViet-CaiDat.apk" download="KhiemThiViet-CaiDat.apk" class="text-[11px] text-amber-400 hover:text-amber-300 font-semibold underline">
+            Tải APK gốc (27.4MB)
+          </a>
+        </div>
+        <div>
+          <input type="text" id="cfg-apk-url" placeholder="VD: https://drive.google.com/file/d/.../view (Để trống nếu gửi file trực tiếp qua Zalo)" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono text-xs">
+          <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+            💡 <strong class="text-slate-300">Hướng dẫn:</strong> Bạn có thể upload file <span class="text-amber-300 font-mono">KhiemThiViet-CaiDat.apk</span> lên Google Drive rồi dán link chia sẻ vào đây. Nếu để trống, mẫu tin nhắn Zalo sẽ hướng dẫn Chủ Spa nhận file đính kèm trực tiếp trong Zalo.
+          </p>
+        </div>
+      </div>
+
       <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
         <button onclick="closePricingBankModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Đóng</button>
         <button onclick="requestSavePricingBankSettings()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30">
@@ -406,13 +424,18 @@
         </div>
 
         <!-- Nút Chia sẻ Zalo cho Khách Hàng -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
-          <button id="btn-copy-zalo-invoice" onclick="copyZaloInvoiceMessage()" class="px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
-            <span>📋</span> <span id="copy-invoice-btn-text">Sao Chép Báo Phí Zalo</span>
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+          <button id="btn-copy-zalo-invoice" onclick="copyZaloInvoiceMessage()" class="w-full sm:w-auto px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+            <span>📋</span> <span id="copy-invoice-btn-text">Sao Chép Báo Phí</span>
           </button>
-          <a id="btn-open-zalo-invoice" href="#" target="_blank" class="px-3.5 py-2.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
-            <span>💬</span> Gửi Qua Zalo Cho Khách
-          </a>
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button id="btn-open-zalo-app-invoice" onclick="openZaloAppInvoice()" class="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-900/40 flex items-center justify-center gap-1.5 transition">
+              <span>📱</span> Mở App Zalo Trên Máy
+            </button>
+            <a id="btn-open-zalo-web-invoice" href="#" target="_blank" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition" title="Đăng nhập Zalo trên trình duyệt Web">
+              <span>🌐</span> Web
+            </a>
+          </div>
         </div>
       </div>
 
@@ -574,15 +597,21 @@
         <textarea id="zalo-welcome-text" readonly rows="12" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono leading-relaxed resize-none focus:outline-none"></textarea>
       </div>
 
-      <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-        <button onclick="closeZaloWelcomeModal()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+      <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
+        <button onclick="closeZaloWelcomeModal()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
           Đóng
         </button>
-        <button id="btn-copy-zalo-welcome" onclick="copyZaloWelcomeMessage()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-1.5 transition">
-          <span>📋</span> <span id="copy-welcome-btn-text">Sao Chép Tin Nhắn Zalo</span>
+        <a href="KhiemThiViet-CaiDat.apk" download="KhiemThiViet-CaiDat.apk" class="px-3.5 py-2.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition" title="Tải file APK trực tiếp về máy">
+          <span>📥</span> Tải APK (27.4MB)
+        </a>
+        <button id="btn-copy-zalo-welcome" onclick="copyZaloWelcomeMessage()" class="px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+          <span>📋</span> <span id="copy-welcome-btn-text">Sao Chép Tin Nhắn</span>
         </button>
-        <a id="btn-open-zalo-welcome" href="#" target="_blank" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-950/40 flex items-center justify-center gap-1.5 transition">
-          <span>💬</span> Mở Zalo Gửi Ngay
+        <button id="btn-open-zalo-app-welcome" onclick="openZaloWelcomeApp()" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-900/40 flex items-center justify-center gap-1.5 transition">
+          <span>📱</span> Mở App Zalo Trên Máy
+        </button>
+        <a id="btn-open-zalo-web-welcome" href="#" target="_blank" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition" title="Mở Zalo Web trên trình duyệt">
+          <span>🌐</span> Web
         </a>
       </div>
     </div>
@@ -639,15 +668,18 @@
         <textarea id="zalo-reset-text" readonly rows="10" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono leading-relaxed resize-none focus:outline-none"></textarea>
       </div>
 
-      <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-        <button onclick="closeZaloResetModal()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+      <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
+        <button onclick="closeZaloResetModal()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
           Đóng
         </button>
-        <button id="btn-copy-zalo-reset" onclick="copyZaloResetMessage()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-1.5 transition">
-          <span>📋</span> <span id="copy-reset-btn-text">Sao Chép Tin Nhắn Zalo</span>
+        <button id="btn-copy-zalo-reset" onclick="copyZaloResetMessage()" class="px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+          <span>📋</span> <span id="copy-reset-btn-text">Sao Chép Tin Nhắn</span>
         </button>
-        <a id="btn-open-zalo-reset" href="#" target="_blank" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-950/40 flex items-center justify-center gap-1.5 transition">
-          <span>💬</span> Mở Zalo Gửi Ngay
+        <button id="btn-open-zalo-app-reset" onclick="openZaloResetApp()" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-900/40 flex items-center justify-center gap-1.5 transition">
+          <span>📱</span> Mở App Zalo Trên Máy
+        </button>
+        <a id="btn-open-zalo-web-reset" href="#" target="_blank" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 transition" title="Mở Zalo Web trên trình duyệt">
+          <span>🌐</span> Web
         </a>
       </div>
     </div>
@@ -700,7 +732,8 @@
       bankCode: "MB",
       bankName: "MBBank (Quân Đội)",
       accountNo: "0397772963",
-      accountName: "DEV SUPER ADMIN"
+      accountName: "DEV SUPER ADMIN",
+      apkDownloadUrl: ""
     };
 
     // Danh sách cơ sở thực tế duy nhất (Không có spa ảo)
@@ -810,6 +843,8 @@
       document.getElementById("cfg-bank-code").value = bankConfig.bankCode || "MB";
       document.getElementById("cfg-bank-account").value = bankConfig.accountNo || "0397772963";
       document.getElementById("cfg-bank-name").value = bankConfig.accountName || "DEV SUPER ADMIN";
+      const apkUrlInput = document.getElementById("cfg-apk-url");
+      if (apkUrlInput) apkUrlInput.value = bankConfig.apkDownloadUrl || "";
       document.getElementById("pricing-bank-modal").classList.remove("hidden");
     }
 
@@ -865,10 +900,12 @@
             if (feeInput) p.fee = parseInt(feeInput.value, 10) || p.fee;
           });
 
-          // Cập nhật bank
+          // Cập nhật bank & APK URL
           bankConfig.bankCode = document.getElementById("cfg-bank-code").value;
           bankConfig.accountNo = document.getElementById("cfg-bank-account").value.trim();
           bankConfig.accountName = document.getElementById("cfg-bank-name").value.trim().toUpperCase();
+          const apkInput = document.getElementById("cfg-apk-url");
+          if (apkInput) bankConfig.apkDownloadUrl = apkInput.value.trim();
 
           savePricingConfig(pricingPlans);
           saveBankConfig(bankConfig);
@@ -890,6 +927,16 @@
           showToast("💾 Đã lưu cấu hình bảng giá và tài khoản VietQR thành công!");
         }
       });
+    }
+
+    function getApkDownloadSection() {
+      const customUrl = (bankConfig.apkDownloadUrl || "").trim();
+      if (customUrl) {
+        return `📥 LINK TẢI ỨNG DỤNG ANDROID (APK):
+👉 ${customUrl}`;
+      }
+      return `📥 CÀI ĐẶT ỨNG DỤNG ANDROID (FILE APK):
+• File cài đặt "KhiemThiViet-CaiDat.apk" (27.4MB) được gửi đính kèm trực tiếp trong cuộc trò chuyện Zalo này. Quý cơ sở bấm tải về và mở cài đặt ứng dụng.`;
     }
 
     function populatePlanSelectDropdowns() {
@@ -1487,10 +1534,21 @@
       document.getElementById("vietqr-image").src = qrUrl;
 
       // Update Zalo send link
-      const openZaloBtn = document.getElementById("btn-open-zalo-invoice");
-      openZaloBtn.href = `https://zalo.me/${t.ownerPhone}`;
-      openZaloBtn.onclick = () => { copyZaloInvoiceMessage(); };
-      document.getElementById("copy-invoice-btn-text").innerText = "Sao Chép Báo Phí Zalo";
+      const webZaloBtn = document.getElementById("btn-open-zalo-web-invoice");
+      if (webZaloBtn) {
+        webZaloBtn.href = `https://zalo.me/${(t.ownerPhone || '').replace(/[^0-9]/g, '')}`;
+        webZaloBtn.onclick = () => { copyZaloInvoiceMessage(); };
+      }
+      document.getElementById("copy-invoice-btn-text").innerText = "Sao Chép Báo Phí";
+    }
+
+    function openZaloAppInvoice() {
+      copyZaloInvoiceMessage();
+      const t = tenants[selectedTenantIdx];
+      if (!t) return;
+      const cleanPhone = (t.ownerPhone || "").replace(/[^0-9]/g, "");
+      window.location.href = `zalo://conversation?phone=${cleanPhone}`;
+      showToast("📱 Đang mở ứng dụng Zalo trên máy! Đã tự động sao chép báo phí VietQR, bạn chỉ cần nhấn Ctrl+V để gửi.");
     }
 
     function buildZaloInvoiceText() {
@@ -1853,8 +1911,12 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
     // ==========================================
     // ZALO MODALS & PASSWORD RESET
     // ==========================================
+    let currentZaloWelcomePhone = "";
+    let currentZaloWelcomeText = "";
+
     function openZaloWelcomeModal(tenant, pin) {
       const pinVal = pin || tenant.tempPin || "247208";
+      currentZaloWelcomePhone = tenant.ownerPhone;
       const msg = `🎉 CHÀO MỪNG QUÝ CƠ SỞ ĐẾN VỚI KHIẾM THỊ VIỆT SAAS!
 
 Kính gửi Chủ Spa: ${tenant.name}
@@ -1866,8 +1928,7 @@ Hệ thống quản lý Khiếm Thị Việt đã được khởi tạo và kíc
 • Gói dịch vụ: ${tenant.plan}
 • Quyền hạn: CHỦ SPA (Toàn quyền quản lý nhân sự, dịch vụ, doanh thu & sổ quỹ)
 
-📥 LINK TẢI ỨNG DỤNG ANDROID (APK CHÍNH THỨC):
-👉 https://khiemthiviet.vn/KhiemThiViet-CaiDat.apk
+${getApkDownloadSection()}
 
 ♿ HƯỚNG DẪN DÀNH CHO NGƯỜI KHIẾM THỊ (TALKBACK):
 • Ứng dụng được tối ưu 100% chuẩn Accessibility TalkBack với giọng đọc tiếng Việt rõ ràng.
@@ -1879,12 +1940,24 @@ Hệ thống quản lý Khiếm Thị Việt đã được khởi tạo và kíc
 
 Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu quả!`;
 
+      currentZaloWelcomeText = msg;
       document.getElementById("zalo-welcome-text").value = msg;
-      const openBtn = document.getElementById("btn-open-zalo-welcome");
-      openBtn.href = `https://zalo.me/${tenant.ownerPhone}`;
-      openBtn.onclick = function() { copyZaloWelcomeMessage(); };
-      document.getElementById("copy-welcome-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
+      
+      const webBtn = document.getElementById("btn-open-zalo-web-welcome");
+      if (webBtn) {
+        webBtn.href = `https://zalo.me/${(tenant.ownerPhone || '').replace(/[^0-9]/g, '')}`;
+        webBtn.onclick = () => { copyZaloWelcomeMessage(); };
+      }
+      
+      document.getElementById("copy-welcome-btn-text").innerText = "Sao Chép Tin Nhắn";
       document.getElementById("zalo-welcome-modal").classList.remove("hidden");
+    }
+
+    function openZaloWelcomeApp() {
+      copyZaloWelcomeMessage();
+      const cleanPhone = (currentZaloWelcomePhone || "").replace(/[^0-9]/g, "");
+      window.location.href = `zalo://conversation?phone=${cleanPhone}`;
+      showToast("📱 Đang mở ứng dụng Zalo trên máy! Đã tự động sao chép tin nhắn, bạn chỉ cần nhấn Ctrl+V để gửi.");
     }
 
     function closeZaloWelcomeModal() {
@@ -1896,11 +1969,13 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
       fallbackCopyText(text);
       document.getElementById("copy-welcome-btn-text").innerText = "✅ Đã Sao Chép!";
       setTimeout(() => {
-        document.getElementById("copy-welcome-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
+        document.getElementById("copy-welcome-btn-text").innerText = "Sao Chép Tin Nhắn";
       }, 3000);
     }
 
     let resetTenantIdx = null;
+    let currentZaloResetPhone = "";
+    let currentZaloResetText = "";
 
     function openResetPasswordModal(idx) {
       resetTenantIdx = idx;
@@ -1913,6 +1988,13 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
 
     function closeResetPasswordModal() {
       document.getElementById("reset-password-modal").classList.add("hidden");
+    }
+
+    function openZaloResetApp() {
+      copyZaloResetMessage();
+      const cleanPhone = (currentZaloResetPhone || "").replace(/[^0-9]/g, "");
+      window.location.href = `zalo://conversation?phone=${cleanPhone}`;
+      showToast("📱 Đang mở ứng dụng Zalo trên máy! Đã tự động sao chép tin nhắn, bạn chỉ cần nhấn Ctrl+V để gửi.");
     }
 
     function requestConfirmResetPassword() {
@@ -1964,6 +2046,7 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
           showToast("🔑 Đã cập nhật mật khẩu mới cho " + t.name);
 
           // Mở modal tin Zalo
+          currentZaloResetPhone = t.ownerPhone;
           const msg = `🔑 THÔNG BÁO ĐẶT LẠI MẬT KHẨU TÀI KHOẢN CHỦ SPA
 
 Kính gửi: ${t.name}
@@ -1972,16 +2055,19 @@ Yêu cầu hỗ trợ đặt lại mật khẩu từ xa cho tài khoản Chủ S
 📱 THÔNG TIN ĐĂNG NHẬP MỚI:
 • Số điện thoại: ${t.ownerPhone}
 • Mật khẩu / Mã PIN mới: ${newPin}
-• Link tải/cập nhật app: https://khiemthiviet.vn/KhiemThiViet-CaiDat.apk
+${getApkDownloadSection()}
 
 Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật khẩu mới này một lần duy nhất.
 📞 Hỗ trợ kỹ thuật Dev qua Zalo: 0397772963 (https://zalo.me/0397772963)`;
 
+          currentZaloResetText = msg;
           document.getElementById("zalo-reset-text").value = msg;
-          const openResetBtn = document.getElementById("btn-open-zalo-reset");
-          openResetBtn.href = `https://zalo.me/${t.ownerPhone}`;
-          openResetBtn.onclick = function() { copyZaloResetMessage(); };
-          document.getElementById("copy-reset-btn-text").innerText = "Sao Chép Tin Nhắn Zalo";
+          const webResetBtn = document.getElementById("btn-open-zalo-web-reset");
+          if (webResetBtn) {
+            webResetBtn.href = `https://zalo.me/${(t.ownerPhone || '').replace(/[^0-9]/g, '')}`;
+            webResetBtn.onclick = () => { copyZaloResetMessage(); };
+          }
+          document.getElementById("copy-reset-btn-text").innerText = "Sao Chép Tin Nhắn";
           document.getElementById("zalo-reset-modal").classList.remove("hidden");
         }
       });
