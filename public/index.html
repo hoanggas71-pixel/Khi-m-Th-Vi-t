@@ -671,6 +671,15 @@
             <span>📱</span> Báo Dev Qua Zalo (0397772963)
           </a>
         </div>
+
+        <!-- Ghi chú chụp màn hình chuyển khoản -->
+        <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 leading-relaxed text-left flex items-start gap-2.5 mt-2">
+          <span class="text-base shrink-0">📸</span>
+          <div>
+            <strong class="text-white">Lưu ý sau khi thanh toán:</strong><br>
+            Quý khách vui lòng <span class="text-amber-200 font-bold underline">chụp lại màn hình giao dịch thanh toán thành công</span> và liên hệ gửi cho Dev qua Zalo (<a href="https://zalo.me/0397772963" target="_blank" class="text-emerald-400 font-mono font-bold underline">0397772963</a>) để được xác nhận và kích hoạt ngày dùng tức thì!
+          </div>
+        </div>
       </div>
 
       <div class="flex justify-end pt-1 border-t border-slate-800">
@@ -1793,7 +1802,9 @@
 • Ngân hàng: ${bankConfig.bankName || 'MBBank'}
 • STK: ${bankConfig.accountNo}
 • Chủ TK: ${bankConfig.accountName}
-• Nội dung CK: ${memo}`;
+• Nội dung CK: ${memo}
+
+📸 LƯU Ý: Sau khi thanh toán, Quý khách vui lòng chụp lại màn hình giao dịch và gửi qua Zalo cho Dev (0397772963) để được kích hoạt ngay!`;
 
       fallbackCopyText(text);
       document.getElementById("cust-copy-btn-text").innerText = "✅ Đã Sao Chép!";
