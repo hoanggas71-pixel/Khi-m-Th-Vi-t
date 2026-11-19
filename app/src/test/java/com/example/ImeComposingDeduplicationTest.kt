@@ -269,4 +269,66 @@ class ImeComposingDeduplicationTest {
         val res = ImeInputHelper.deduplicateImeInput("12", "12123")
         assertEquals("123", res)
     }
+
+    // =========================================================================
+    // 9. PHÁT HIỆN VÀ KHỬ CHUỖI NHÂN ĐÔI NGUYÊN XI (DOUBLING BUG - LDPlayer)
+    // Lỗi thực tế: Người dùng nhập mật khẩu "12345", LDPlayer trả về "1234512345"
+    // Nguyên nhân: LDPlayer gửi lại nội dung remember-password cũ + lần nhập mới
+    // =========================================================================
+
+    @Test
+    fun testDoublingBug_passwordDoubledWhenEmpty() {
+        // Trường hợp điển hình từ bug report:
+        // Ô mật khẩu rỗng, LDPlayer gửi "1234512345" = "12345" + "12345"
+        // Phải trả về "12345" (nửa đầu), loại bỏ phần nhân đôi
+        val result = sanitizePasswordInput(current = "", incoming = "1234512345")
+        assertEquals("12345", result)
+    }
+
+    @Test
+    fun testDoublingBug_shortPasswordDoubled() {
+        // "123123": half = 3 < 4 -> KHÔNG phát hiện nhân đôi (tránh false positive mật khẩu hợp lệ "123123")
+        // Chỉ phát hiện nhân đôi khi half >= 4 (ví dụ "1234512345" half=5)
+        val result = sanitizePasswordInput(current = "", incoming = "123123")
+        assertEquals("123123", result)
+    }
+
+    @Test
+    fun testDoublingBug_currentEqualsHalf_keepCurrent() {
+        // Current đã có "12345", LDPlayer gửi "1234512345" (gửi lại cả current + current)
+        // Phải giữ nguyên current "12345", không cộng thêm
+        val result = sanitizePasswordInput(current = "12345", incoming = "1234512345")
+        assertEquals("12345", result)
+    }
+
+    @Test
+    fun testDoublingBug_normalInputNotAffected() {
+        // Gõ bình thường "1234" rồi thêm "5" -> phải ra "12345", không bị ảnh hưởng
+        val result = sanitizePasswordInput(current = "1234", incoming = "12345")
+        assertEquals("12345", result)
+    }
+
+    @Test
+    fun testDoublingBug_repeatedCharPasswordNotAffected() {
+        // Mật khẩu hợp lệ có ký tự lặp đôi "aabbcc" không phải nhân đôi ("abc" + "abc")
+        // "aabbcc" != "aab" + "aab" -> giữ nguyên
+        val result = sanitizePasswordInput(current = "", incoming = "aabbcc")
+        assertEquals("aabbcc", result)
+    }
+
+    @Test
+    fun testDoublingBug_singleCharDoubled() {
+        // "11" có thể là: (a) gõ 2 lần phím '1' hợp lệ, hoặc (b) nhân đôi "1"+"1"
+        // half = 1 < 3 -> KHÔNG áp dụng doubling detection -> giữ nguyên "11"
+        // Bảo toàn tuyệt đối mật khẩu hợp lệ có ký tự trùng
+        val result = sanitizePasswordInput(current = "", incoming = "11")
+        assertEquals("11", result)
+    }
+
+    @Test
+    fun testDoublingBug_fourCharDoubled() {
+        // "12121212" = "1212" + "1212" (half = 4 >= 3) -> phát hiện nhân đôi -> trả về "1212"
+        val result = sanitizePasswordInput(current = "", incoming = "12121212")
+        assertEquals("1212", result)
+    }
 }

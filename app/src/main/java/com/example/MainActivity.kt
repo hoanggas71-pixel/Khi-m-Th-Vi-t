@@ -681,6 +681,15 @@ fun deduplicateImeComposing(current: String, incoming: String): String {
 
     // 3. Bắt đầu từ ô rỗng (ký tự đầu tiên hoặc dán chuỗi)
     if (current.isEmpty()) {
+        // 3a. Phát hiện chuỗi nhân đôi nguyên xi: "1234512345" = "12345" + "12345"
+        // Chỉ áp dụng khi half >= 4 để tránh false positive với mật khẩu "123123", "1212", "aabb"
+        val half = incoming.length / 2
+        if (half >= 4 && incoming.length % 2 == 0) {
+            val firstHalf = incoming.take(half)
+            if (incoming == firstHalf + firstHalf) {
+                return firstHalf
+            }
+        }
         return unpackTriangularComposing(incoming)
     }
 
@@ -690,7 +699,17 @@ fun deduplicateImeComposing(current: String, incoming: String): String {
         return incoming
     }
 
-    // 5. Kiểm tra khử dồn tăng tiến (Incremental Composing Invariant)
+    // 5a. Phát hiện chuỗi nhân đôi nguyên xi khi current == incoming.take(half):
+    // Ví dụ: current = "12345", incoming = "1234512345" -> trả về "12345" (giữ nguyên current)
+    // Chỉ áp dụng khi current.length >= 4 để không ảnh hưởng mật khẩu hợp lệ dạng "123123"
+    if (incoming.length == current.length * 2 && current.length >= 4) {
+        val firstHalf = incoming.take(current.length)
+        if (firstHalf == current && incoming == firstHalf + firstHalf) {
+            return current  // Bỏ qua phần nhân đôi, giữ nguyên
+        }
+    }
+
+    // 5b. Kiểm tra khử dồn tăng tiến (Incremental Composing Invariant)
     // Trên LDPlayer: incoming = current + suffix, trong đó suffix = current + char_moi
     // Ví dụ: current = "1", incoming = "112" -> suffix = "12" (bắt đầu bằng "1", dài hơn "1")
     // Ví dụ: current = "12", incoming = "12123" -> suffix = "123" (bắt đầu bằng "12", dài hơn "12")
@@ -698,6 +717,11 @@ fun deduplicateImeComposing(current: String, incoming: String): String {
         val suffix = incoming.removePrefix(current)
         if (suffix.length > current.length && suffix.startsWith(current)) {
             return suffix
+        }
+        // 5c. current + newChar -> nhưng LDPlayer gửi cả current lại + thêm chuỗi mới khác current
+        // Chỉ nhận nếu suffix là chuỗi mới hoàn toàn (không bắt đầu bằng current)
+        if (suffix.length == 1) {
+            return incoming  // Gõ 1 ký tự mới thêm vào cuối, hợp lệ
         }
     }
 
