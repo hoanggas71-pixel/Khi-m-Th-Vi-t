@@ -634,6 +634,110 @@ fun KhiemThiVietApp(store: SpaStore) {
 }
 
 // =========================================================================
+// TIỆN ÍCH KHỬ DỒN CHUỖI COMPOSING IME CHO BÀN PHÍM GIẢ LẬP LDPLAYER / PC
+// =========================================================================
+
+/**
+ * Giải nén chuỗi composing bị dồn theo quy luật cấp số cộng độ dài tam giác Tn = n*(n+1)/2.
+ * Ví dụ: "112123123412345" -> "12345", "112123" -> "123", "112" -> "12".
+ * Nếu chuỗi không thỏa mãn cấu trúc dồn composing, trả về nguyên bản chuỗi gốc.
+ */
+fun unpackTriangularComposing(text: String): String {
+    val len = text.length
+    if (len < 3) return text
+    val n = kotlin.math.sqrt(2.0 * len).toInt()
+    if (n * (n + 1) / 2 == len) {
+        val candidate = text.takeLast(n)
+        val sb = StringBuilder()
+        for (i in 1..n) {
+            sb.append(candidate.take(i))
+        }
+        if (sb.toString() == text) {
+            return candidate
+        }
+    }
+    return text
+}
+
+/**
+ * Khử dồn chuỗi IME giữa trạng thái hiện tại (current) và giá trị mới nhận từ bàn phím (incoming).
+ * Bảo toàn 100% các thao tác:
+ * - Gõ tuần tự từng ký tự trên bàn phím chuẩn (Single Character Invariant)
+ * - Gõ phím lặp lại (ví dụ "11", "888888")
+ * - Xóa ký tự (Backspace, Clear)
+ * - Dán văn bản thông thường (Paste)
+ * - Khử dồn triệt để chuỗi lặp composing do LDPlayer PC keyboard gửi tới.
+ */
+fun deduplicateImeComposing(current: String, incoming: String): String {
+    // 1. Không đổi hoặc rỗng
+    if (incoming == current || incoming.isEmpty()) {
+        return incoming
+    }
+
+    // 2. Thao tác xóa ký tự (Backspace / Clear)
+    if (incoming.length < current.length) {
+        return incoming
+    }
+
+    // 3. Bắt đầu từ ô rỗng (ký tự đầu tiên hoặc dán chuỗi)
+    if (current.isEmpty()) {
+        return unpackTriangularComposing(incoming)
+    }
+
+    // 4. Bàn phím chuẩn: gõ thêm đúng 1 ký tự (Single Character Invariant)
+    // Giữ nguyên tuyệt đối, không xử lý gì thêm để bảo toàn mật khẩu có ký tự trùng lặp
+    if (incoming.length - current.length == 1) {
+        return incoming
+    }
+
+    // 5. Kiểm tra khử dồn tăng tiến (Incremental Composing Invariant)
+    // Trên LDPlayer: incoming = current + suffix, trong đó suffix = current + char_moi
+    // Ví dụ: current = "1", incoming = "112" -> suffix = "12" (bắt đầu bằng "1", dài hơn "1")
+    // Ví dụ: current = "12", incoming = "12123" -> suffix = "123" (bắt đầu bằng "12", dài hơn "12")
+    if (incoming.startsWith(current)) {
+        val suffix = incoming.removePrefix(current)
+        if (suffix.length > current.length && suffix.startsWith(current)) {
+            return suffix
+        }
+    }
+
+    // 6. Kiểm tra giải nén chuỗi dồn toàn phần nếu bàn phím gửi dồn trễ
+    val unpacked = unpackTriangularComposing(incoming)
+    if (unpacked != incoming) {
+        return unpacked
+    }
+
+    return incoming
+}
+
+/**
+ * Hàm lọc tổng thể cho ô nhập mật khẩu:
+ * 1. Làm sạch bộ đệm số điện thoại bị trôi/đè từ ô trên xuống (Vấn đề 1).
+ * 2. Khử hiện tượng nhân bản dồn chuỗi composing IME của LDPlayer.
+ */
+fun sanitizePasswordInput(current: String, incoming: String, phoneInput: String = ""): String {
+    val withoutPhone = if (phoneInput.isNotBlank() && phoneInput.length >= 3 && incoming.contains(phoneInput)) {
+        incoming.replace(phoneInput, "")
+    } else {
+        incoming
+    }
+    return deduplicateImeComposing(current = current, incoming = withoutPhone)
+}
+
+/**
+ * Helper đối tượng tương thích bổ trợ cho các kịch bản kiểm thử nâng cao.
+ */
+object ImeInputHelper {
+    fun deduplicateImeInput(currentText: String, incomingText: String, phonePrefix: String = ""): String =
+        sanitizePasswordInput(current = currentText, incoming = incomingText, phoneInput = phonePrefix)
+
+    fun extractProgressiveComposing(text: String): String? {
+        val unpacked = unpackTriangularComposing(text)
+        return if (unpacked != text) unpacked else null
+    }
+}
+
+// =========================================================================
 // MÀN HÌNH ĐĂNG NHẬP 1 LẦN DUY NHẤT BẰNG SỐ ĐIỆN THOẠI & MẬT KHẨU
 // KÈM KẾT NỐI ĐỒNG BỘ ĐÁM MÂY THỜI GIAN THỰC CHO MỌI MÁY
 // =========================================================================
@@ -772,12 +876,12 @@ fun OneTimeLoginScreen(store: SpaStore) {
                 OutlinedTextField(
                     value = passwordInput,
                     onValueChange = { newVal ->
-                        // Khắc phục triệt để lỗi dính/đè text buffer từ ô SĐT xuống ô Mật khẩu trên LDPlayer / Android Emulator
-                        val cleanVal = if (phoneInput.isNotBlank() && phoneInput.length >= 3 && newVal.contains(phoneInput)) {
-                            newVal.replace(phoneInput, "")
-                        } else {
-                            newVal
-                        }
+                        // Khắc phục triệt để lỗi dính/đè text buffer từ ô SĐT và lỗi nhân bản dồn chuỗi IME trên LDPlayer
+                        val cleanVal = sanitizePasswordInput(
+                            current = passwordInput,
+                            incoming = newVal,
+                            phoneInput = phoneInput
+                        )
                         passwordInput = cleanVal
                         errorMessage = ""
                     },
