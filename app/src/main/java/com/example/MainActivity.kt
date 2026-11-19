@@ -15,6 +15,19 @@ import android.util.Log
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import java.io.File
+import android.speech.tts.TextToSpeech
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.ContentPaste
+import java.util.Locale
+import java.util.UUID
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -39,6 +52,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -47,6 +61,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -422,6 +437,7 @@ fun KhiemThiVietApp(store: SpaStore) {
     var peopleSubTab by rememberSaveable { mutableIntStateOf(0) }
     var showAccountDialog by remember { mutableStateOf(false) }
     var showAiBotDialog by remember { mutableStateOf(false) }
+    var showAiKeyConfigDialog by remember { mutableStateOf(false) }
     var inspectPayrollNvId by remember { mutableStateOf<String?>(null) }
 
     val isAdmin = user.isAdmin()
@@ -443,7 +459,8 @@ fun KhiemThiVietApp(store: SpaStore) {
                 store = store,
                 currentUser = user,
                 onOpenSwitchAccount = { showAccountDialog = true },
-                onOpenAiBot = { showAiBotDialog = true }
+                onOpenAiBot = { showAiBotDialog = true },
+                onOpenAiKeyConfig = if (user.isAdmin()) { { showAiKeyConfigDialog = true } } else null
             )
         },
         bottomBar = {
@@ -451,9 +468,9 @@ fun KhiemThiVietApp(store: SpaStore) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .height(64.dp)
+                    .heightIn(min = 64.dp)
                     .testTag("bottom_nav_bar"),
-                windowInsets = WindowInsets(0, 0, 0, 0),
+                windowInsets = WindowInsets.navigationBars,
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 6.dp
             ) {
@@ -562,7 +579,8 @@ fun KhiemThiVietApp(store: SpaStore) {
                 5 -> if (isAdmin) {
                     TabQuyenHanAdmin(
                         store = store,
-                        onOpenGehihi = { showAiBotDialog = true }
+                        onOpenGehihi = { showAiBotDialog = true },
+                        onOpenAiKeyConfig = { showAiKeyConfigDialog = true }
                     )
                 } else {
                     TabVanHanhVe(
@@ -602,7 +620,15 @@ fun KhiemThiVietApp(store: SpaStore) {
                 inspectPayrollNvId = nvId
                 selectedTab = 4
             },
-            onDismiss = { showAiBotDialog = false }
+            onDismiss = { showAiBotDialog = false },
+            onOpenAiKeyConfig = if (user.isAdmin()) { { showAiKeyConfigDialog = true } } else null
+        )
+    }
+
+    if (showAiKeyConfigDialog && user.isAdmin()) {
+        AiKeyConfigDialog(
+            store = store,
+            onDismiss = { showAiKeyConfigDialog = false }
         )
     }
 }
@@ -616,6 +642,20 @@ fun OneTimeLoginScreen(store: SpaStore) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
+    val view = LocalView.current
+
+    // Khắc phục triệt để Autofill của Android nhầm lẫn hoặc đè text giữa các ô
+    DisposableEffect(view) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            view.importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+        }
+        onDispose {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                view.importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_AUTO
+            }
+        }
+    }
+
     var phoneInput by rememberSaveable { mutableStateOf("") }
     var passwordInput by rememberSaveable { mutableStateOf("") }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
@@ -706,7 +746,7 @@ fun OneTimeLoginScreen(store: SpaStore) {
                     label = { Text("Tên đăng nhập (Số điện thoại hoặc Gmail)") },
                     placeholder = { Text("VD: 0912345678") },
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Phone,
+                        keyboardType = KeyboardType.Text,
                         imeAction = ImeAction.Next,
                         autoCorrect = false
                     ),
@@ -732,9 +772,9 @@ fun OneTimeLoginScreen(store: SpaStore) {
                 OutlinedTextField(
                     value = passwordInput,
                     onValueChange = { newVal ->
-                        // Khắc phục triệt để lỗi dính/đè text buffer từ ô SĐT xuống ô Mật khẩu trên Android Emulator
-                        val cleanVal = if (passwordInput.isEmpty() && phoneInput.isNotBlank() && newVal.startsWith(phoneInput) && newVal.length > phoneInput.length) {
-                            newVal.removePrefix(phoneInput)
+                        // Khắc phục triệt để lỗi dính/đè text buffer từ ô SĐT xuống ô Mật khẩu trên LDPlayer / Android Emulator
+                        val cleanVal = if (phoneInput.isNotBlank() && phoneInput.length >= 3 && newVal.contains(phoneInput)) {
+                            newVal.replace(phoneInput, "")
                         } else {
                             newVal
                         }
@@ -932,7 +972,8 @@ fun SpaHeaderBar(
     store: SpaStore,
     currentUser: TaiKhoan?,
     onOpenSwitchAccount: () -> Unit,
-    onOpenAiBot: () -> Unit
+    onOpenAiBot: () -> Unit,
+    onOpenAiKeyConfig: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1039,6 +1080,27 @@ fun SpaHeaderBar(
                                 softWrap = false
                             )
                         }
+                }
+
+                if (isAdmin && onOpenAiKeyConfig != null) {
+                    Surface(
+                        onClick = onOpenAiKeyConfig,
+                        color = Color.White.copy(alpha = 0.14f),
+                        shape = RoundedCornerShape(50),
+                        modifier = Modifier
+                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                            .semantics { contentDescription = "Cài đặt khóa Gemini API Key" }
+                            .testTag("btn_header_key_config")
+                    ) {
+                        Box(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Key,
+                                contentDescription = null,
+                                tint = SpaChampagne,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
                 }
 
                 Surface(
@@ -1974,7 +2036,7 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
                                 containerColor = if (phuongThucThanhToan == "TIEN_MAT") Color(0xFF2E7D32) else Color(0xFFE0E0E0)
                             ),
                             shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f).height(42.dp)
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                         ) {
                             Text(
                                 "💵 Tiền mặt",
@@ -1991,7 +2053,7 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
                                 containerColor = if (phuongThucThanhToan == "CHUYEN_KHOAN") Color(0xFF1565C0) else Color(0xFFE0E0E0)
                             ),
                             shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f).height(42.dp)
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                         ) {
                             Text(
                                 "💳 VietQR CK",
@@ -4850,7 +4912,8 @@ fun TabDoanhThuBaoCao(
 @Composable
 fun TabQuyenHanAdmin(
     store: SpaStore,
-    onOpenGehihi: () -> Unit
+    onOpenGehihi: () -> Unit,
+    onOpenAiKeyConfig: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -5573,6 +5636,93 @@ fun TabQuyenHanAdmin(
                                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(6.dp))
                                     Text("LƯU CẤU HÌNH NGÂN HÀNG VIETQR", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                            }
+                        }
+
+                        // CARD CẤU HÌNH GEMINI API KEY (ENTRY POINT 2)
+                        var showKeyConfigInSubtab by remember { mutableStateOf(false) }
+                        if (showKeyConfigInSubtab) {
+                            AiKeyConfigDialog(
+                                store = store,
+                                onDismiss = { showKeyConfigInSubtab = false }
+                            )
+                        }
+
+                        val hasGeminiKey = store.isGeminiConnected || store.layGeminiApiKey().isNotBlank()
+                        Card(
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.8f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics(mergeDescendants = true) {
+                                    contentDescription = "Cấu hình Khóa Trí tuệ Nhân tạo Gemini API Key. Trạng thái: " +
+                                        (if (hasGeminiKey) "Đã cài đặt key trực tuyến" else "Đang dùng ngoại tuyến 100%")
+                                }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Key,
+                                        contentDescription = null,
+                                        tint = SpaChampagne,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        "CẤU HÌNH KHÓA TRÍ TUỆ NHÂN TẠO (GEMINI API KEY)",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = SpaChampagne,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                                Text(
+                                    "Cấu hình Gemini API Key cá nhân để trợ lý Gehihi kết nối mô hình Google Gemini 1.5 Flash trực tuyến, hỗ trợ hỏi đáp kiến thức spa chuyên sâu, dịch thuật đa ngôn ngữ và phân tích dữ liệu tổng thể.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Surface(
+                                    color = if (hasGeminiKey) Color(0xFF1B3B24) else Color(0xFF282A2C),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, if (hasGeminiKey) Color(0xFF81C995) else Color(0xFF444746))
+                                ) {
+                                    Text(
+                                        text = if (hasGeminiKey) "✨ Trạng thái: Gemini AI Trực Tuyến (${store.layGeminiApiKey().take(6)}...)" else "🟢 Trạng thái: Ngoại tuyến (Đọc dữ liệu tiệm 100%)",
+                                        color = if (hasGeminiKey) Color(0xFF81C995) else Color(0xFFC4C7C5),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                                Button(
+                                    onClick = {
+                                        if (onOpenAiKeyConfig != null) {
+                                            onOpenAiKeyConfig()
+                                        } else {
+                                            showKeyConfigInSubtab = true
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SpaRosewoodDark),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .testTag("btn_open_key_config_subtab1")
+                                ) {
+                                    Icon(Icons.Default.Settings, contentDescription = null, tint = SpaChampagne, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "CÀI ĐẶT / ĐỔI GEMINI API KEY",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = Color.White
+                                    )
                                 }
                             }
                         }
@@ -7341,6 +7491,713 @@ fun DevExtendPlanDialog(
 }
 
 // =========================================================================
+// THÀNH PHẦN BÁO CÁO GIÀU THÔNG TIN (RICH REPORT CARD) & TIỆN ÍCH GEHIHI (R2)
+// =========================================================================
+data class ReportKpiData(
+    val tongThu: String,
+    val chiPhi: String,
+    val laiRong: String,
+    val soVe: String? = null,
+    val ktvSummary: String? = null
+)
+
+fun extractReportKpi(rawText: String): ReportKpiData? {
+    val clean = rawText.replace("**", "").replace("*", "")
+    val hasKpiKeywords = clean.contains("Tổng thu", ignoreCase = true) ||
+        clean.contains("Doanh thu", ignoreCase = true) ||
+        clean.contains("Thu:", ignoreCase = true) ||
+        clean.contains("Chi phí", ignoreCase = true) ||
+        clean.contains("Trả KTV", ignoreCase = true) ||
+        clean.contains("Hoa hồng", ignoreCase = true) ||
+        clean.contains("Lãi ròng", ignoreCase = true) ||
+        clean.contains("Thực nhận", ignoreCase = true) ||
+        clean.contains("Lợi nhuận", ignoreCase = true) ||
+        clean.contains("Tổng chi", ignoreCase = true)
+
+    if (!hasKpiKeywords) return null
+
+    val thuRegex = Regex("""(?:(?:\(?\s*(?:Tổng\s+[Tt]hu|Doanh\s+[Tt]hu|[Tt]hu)\s*\)?))\s*[:•]?\s*([+\-]?[0-9.,]+(?:\s*(?:đồng|dong|VND|vnđ|đ|k|tr))?)""", RegexOption.IGNORE_CASE)
+    val chiRegex = Regex("""(?:(?:\(?\s*(?:Chi\s+phí|Trả\s+KTV|[Tt]ổng\s+[Cc]hi|Hoa\s+hồng(?:\s*&\s*Chi)?)\s*\)?))\s*[:•]?\s*([+\-]?[0-9.,]+(?:\s*(?:đồng|dong|VND|vnđ|đ|k|tr))?)""", RegexOption.IGNORE_CASE)
+    val laiRegex = Regex("""(?:Chủ\s+quán\s+thực\s+nhận[^(:\n•]*(?:\([^)]*\))?|\(?\s*(?:Lãi\s+ròng|Thực\s+nhận|Lợi\s+nhuận)\s*\)?|\([^)]*(?:Lãi\s+ròng|Thực\s+nhận|Lợi\s+nhuận)[^)]*\))\s*[:•]?\s*([+\-]?[0-9.,]+(?:\s*(?:đồng|dong|VND|vnđ|đ|k|tr))?)""", RegexOption.IGNORE_CASE)
+    val veRegex = Regex("""(\d+\s*vé)""", RegexOption.IGNORE_CASE)
+    val ktvRegex = Regex("""(?:KTV|nhân viên)[\s:•\-]+([^\n,]+)""", RegexOption.IGNORE_CASE)
+
+    val matchThu = thuRegex.find(clean)?.groupValues?.get(1)?.trim()
+    val matchChi = chiRegex.find(clean)?.groupValues?.get(1)?.trim()
+    val matchLai = laiRegex.find(clean)?.groupValues?.get(1)?.trim()
+    val matchVe = veRegex.find(clean)?.groupValues?.get(1)?.trim()
+    val matchKtv = ktvRegex.find(clean)?.groupValues?.get(1)?.trim()
+
+    if (matchThu == null && matchChi == null && matchLai == null) return null
+
+    fun formatKpiUnit(raw: String): String {
+        val trimmed = raw.trim()
+        val hasUnit = trimmed.endsWith("đ", ignoreCase = true) ||
+            trimmed.endsWith("k", ignoreCase = true) ||
+            trimmed.endsWith("tr", ignoreCase = true) ||
+            trimmed.endsWith("vnd", ignoreCase = true) ||
+            trimmed.endsWith("đồng", ignoreCase = true) ||
+            trimmed.endsWith("dong", ignoreCase = true)
+        return if (hasUnit) trimmed else "${trimmed}đ"
+    }
+
+    val fThu = matchThu ?: "0đ"
+    val fChi = matchChi ?: "0đ"
+    val fLai = matchLai ?: "0đ"
+
+    return ReportKpiData(
+        tongThu = formatKpiUnit(fThu),
+        chiPhi = formatKpiUnit(fChi),
+        laiRong = formatKpiUnit(fLai),
+        soVe = matchVe,
+        ktvSummary = matchKtv
+    )
+}
+
+@Composable
+fun RichReportCardComposable(
+    kpi: ReportKpiData,
+    onNavigateTab: (Int) -> Unit,
+    onSwitchPeopleSubTab: (Int) -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1F20)),
+        border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.6f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Báo cáo KPI tiệm: Tổng thu ${kpi.tongThu}, Chi phí ${kpi.chiPhi}, Lãi ròng ${kpi.laiRong}." +
+                    (kpi.soVe?.let { " $it." } ?: "") +
+                    (kpi.ktvSummary?.let { " KTV: $it." } ?: "")
+            }
+            .testTag("card_rich_report_kpi")
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    Icons.Default.Analytics,
+                    contentDescription = null,
+                    tint = SpaChampagne,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "TỔNG HỢP CHỈ SỐ KPI TIỆM",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = SpaChampagne
+                )
+            }
+
+            // 3 Card KPI: Tổng thu (Xanh lá), Chi phí (Đỏ), Lãi ròng (Vàng kim)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // 1. Tổng thu (Green)
+                Surface(
+                    color = Color(0xFF1B3B24),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0xFF81C995).copy(alpha = 0.5f)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Tổng Thu",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF81C995).copy(alpha = 0.85f)
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = kpi.tongThu,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF81C995),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // 2. Chi phí (Red)
+                Surface(
+                    color = Color(0xFF3E1B1B),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFF8A80).copy(alpha = 0.5f)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Chi Phí",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFFF8A80).copy(alpha = 0.85f)
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = kpi.chiPhi,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFFFF8A80),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // 3. Lãi ròng (Gold / Amber)
+                Surface(
+                    color = Color(0xFF3E3215),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.5f)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Lãi Ròng",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFFFD54F).copy(alpha = 0.85f)
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = kpi.laiRong,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFFFFD54F),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            // Dòng tóm tắt vé & KTV nếu có
+            if (!kpi.soVe.isNullOrBlank() || !kpi.ktvSummary.isNullOrBlank()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    kpi.soVe?.let {
+                        Surface(
+                            color = Color(0xFF282A2C),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "🎫 $it",
+                                fontSize = 11.sp,
+                                color = Color(0xFFE3E3E3),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    kpi.ktvSummary?.let {
+                        Surface(
+                            color = Color(0xFF282A2C),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "👥 $it",
+                                fontSize = 11.sp,
+                                color = Color(0xFFE3E3E3),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Hàng Quick Action Pills
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    onClick = { onNavigateTab(0) },
+                    color = Color(0xFF282A2C),
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .semantics { contentDescription = "Chuyển sang màn hình Mở vé" }
+                        .testTag("pill_action_open_tickets")
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
+                        Text("🎫 Mở vé", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+
+                Surface(
+                    onClick = { onNavigateTab(3) },
+                    color = Color(0xFF282A2C),
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .semantics { contentDescription = "Chuyển sang màn hình Xem sổ quỹ" }
+                        .testTag("pill_action_view_cashbook")
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
+                        Text("📖 Xem sổ quỹ", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+
+                Surface(
+                    onClick = {
+                        onNavigateTab(1)
+                        onSwitchPeopleSubTab(1)
+                    },
+                    color = Color(0xFF282A2C),
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .semantics { contentDescription = "Chuyển sang màn hình Gọi nhân viên KTV" }
+                        .testTag("pill_action_call_ktv")
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
+                        Text("👥 Gọi KTV", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+
+                Surface(
+                    onClick = { onNavigateTab(4) },
+                    color = Color(0xFF282A2C),
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .semantics { contentDescription = "Chuyển sang màn hình Xem báo cáo doanh thu" }
+                        .testTag("pill_action_view_reports")
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
+                        Text("📊 Xem báo cáo", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// =========================================================================
+// HỘP THOẠI CẤU HÌNH GEMINI API KEY (R3 UI)
+// =========================================================================
+@Composable
+fun AiKeyConfigDialog(
+    store: SpaStore,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    if (!store.currentUser.isAdmin()) {
+        LaunchedEffect(Unit) {
+            Toast.makeText(context, "Chỉ Chủ Spa (Admin) mới có quyền cấu hình API Key!", Toast.LENGTH_SHORT).show()
+            onDismiss()
+        }
+        return
+    }
+    val scope = rememberCoroutineScope()
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    var keyInput by rememberSaveable { mutableStateOf(store.layGeminiApiKey()) }
+    var showKey by rememberSaveable { mutableStateOf(false) }
+    var isTesting by remember { mutableStateOf(false) }
+    var testResult by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+    val isConnected = store.isGeminiConnected || store.layGeminiApiKey().isNotBlank()
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = Color(0xFF1E1F20),
+            border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.6f)),
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .padding(vertical = 16.dp)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "Hộp thoại Cài Đặt Gemini API Key"
+                }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // 1. Tiêu đề hộp thoại
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            color = SpaRosewoodDark,
+                            shape = CircleShape,
+                            border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.5f)),
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Key,
+                                    contentDescription = null,
+                                    tint = SpaChampagne,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                "Cài Đặt Gemini API Key",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp,
+                                color = Color.White
+                            )
+                            Text(
+                                "Kết nối AI Google Gemini 1.5 Flash",
+                                fontSize = 11.sp,
+                                color = Color(0xFFC4C7C5)
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .semantics { contentDescription = "Đóng hộp thoại cài đặt API key" }
+                            .testTag("btn_close_key_config_dialog")
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
+                    }
+                }
+
+                // 2. Huy hiệu trạng thái hiện tại
+                Surface(
+                    color = if (isConnected) Color(0xFF1B3B24) else Color(0xFF282A2C),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, if (isConnected) Color(0xFF81C995).copy(alpha = 0.6f) else Color(0xFF444746)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = if (isConnected) "Trạng thái: Trực tuyến. Đã có khóa Gemini AI." else "Trạng thái: Ngoại tuyến. Đang đọc dữ liệu tiệm 100%."
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = if (isConnected) "✨" else "🟢",
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = if (isConnected) {
+                                val current = store.layGeminiApiKey()
+                                val masked = if (current.length > 10) "${current.take(6)}...${current.takeLast(4)}" else current
+                                "Trực tuyến: Đã kết nối Gemini API ($masked)"
+                            } else {
+                                "Ngoại tuyến: Sẵn sàng đọc dữ liệu tiệm 100% không cần key"
+                            },
+                            color = if (isConnected) Color(0xFF81C995) else Color(0xFFE3E3E3),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                // 3. Ô nhập liệu API Key
+                OutlinedTextField(
+                    value = keyInput,
+                    onValueChange = {
+                        keyInput = it
+                        testResult = null
+                    },
+                    label = { Text("Gemini API Key (AIzaSy...)") },
+                    singleLine = true,
+                    visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (keyInput.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { keyInput = "" },
+                                    modifier = Modifier.semantics { contentDescription = "Xóa nội dung ô nhập key" }
+                                ) {
+                                    Icon(Icons.Default.Clear, contentDescription = null, tint = Color(0xFFC4C7C5))
+                                }
+                            }
+                            IconButton(
+                                onClick = { showKey = !showKey },
+                                modifier = Modifier.semantics { contentDescription = if (showKey) "Ẩn mã khóa" else "Hiện mã khóa" }
+                            ) {
+                                Icon(
+                                    if (showKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = null,
+                                    tint = SpaChampagne
+                                )
+                            }
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = SpaChampagne,
+                        unfocusedBorderColor = Color(0xFF555555),
+                        focusedLabelColor = SpaChampagne,
+                        unfocusedLabelColor = Color(0xFF999999)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("tf_gemini_api_key")
+                )
+
+                // 4. Hàng nút thao tác nhanh: Dán & Xóa
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            val clip = clipboardManager.getText()?.text.orEmpty().trim()
+                            if (clip.isNotBlank()) {
+                                keyInput = clip
+                                Toast.makeText(context, "Đã dán key từ bộ nhớ tạm!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Bộ nhớ tạm không có văn bản", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFF555555)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .testTag("btn_paste_gemini_key")
+                    ) {
+                        Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp), tint = SpaChampagne)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Dán từ bộ nhớ", fontSize = 12.sp, color = Color.White)
+                    }
+
+                    OutlinedButton(
+                        onClick = { keyInput = "" },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFF555555)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .testTag("btn_clear_text_key")
+                    ) {
+                        Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFFFF8A80))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Làm trống ô", fontSize = 12.sp, color = Color.White)
+                    }
+                }
+
+                // 5. Nút Test kết nối AI
+                Button(
+                    onClick = {
+                        val toTest = keyInput.trim()
+                        if (toTest.isBlank()) {
+                            testResult = Pair(false, "Vui lòng nhập hoặc dán mã API Key trước khi test.")
+                            return@Button
+                        }
+                        isTesting = true
+                        testResult = null
+                        scope.launch {
+                            val res = store.kiemTraGeminiApiKey(toTest)
+                            isTesting = false
+                            testResult = res
+                        }
+                    },
+                    enabled = !isTesting,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00668B)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("btn_test_gemini_key")
+                ) {
+                    if (isTesting) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Đang kiểm tra kết nối với Google AI...", fontSize = 13.sp, color = Color.White)
+                    } else {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color(0xFFA8C7FA))
+                        Spacer(Modifier.width(8.dp))
+                        Text("⚡ Test Kết Nối AI (200 OK)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                    }
+                }
+
+                // Kết quả test nếu có
+                testResult?.let { (success, msg) ->
+                    Surface(
+                        color = if (success) Color(0xFF1B3B24) else Color(0xFF3E1B1B),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, if (success) Color(0xFF81C995) else Color(0xFFFF8A80)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics(mergeDescendants = true) {
+                                contentDescription = if (success) "Kiểm tra thành công: $msg" else "Kiểm tra thất bại: $msg"
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                if (success) Icons.Default.CheckCircle else Icons.Default.Close,
+                                contentDescription = null,
+                                tint = if (success) Color(0xFF81C995) else Color(0xFFFF8A80),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = msg,
+                                color = if (success) Color(0xFF81C995) else Color(0xFFFF8A80),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
+                // 6. Cặp nút Lưu khóa & Gỡ khóa
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val clean = keyInput.trim()
+                            if (clean.isBlank()) {
+                                Toast.makeText(context, "Vui lòng nhập API Key để lưu!", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            store.luuGeminiApiKey(clean)
+                            Toast.makeText(context, "Đã lưu Gemini API Key thành công!", Toast.LENGTH_SHORT).show()
+                            onDismiss()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = SpaRosewoodDark),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .height(48.dp)
+                            .testTag("btn_save_gemini_key")
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = SpaChampagne, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("💾 Lưu Khóa Vào Máy", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            store.xoaGeminiApiKey()
+                            keyInput = ""
+                            testResult = null
+                            Toast.makeText(context, "Đã gỡ khóa cá nhân, chuyển sang dùng ngoại tuyến 100%!", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8A80)),
+                        border = BorderStroke(1.dp, Color(0xFFFF8A80).copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("btn_clear_gemini_key")
+                    ) {
+                        Text("✕ Gỡ Khóa", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color(0xFFFF8A80))
+                    }
+                }
+
+                // 7. Khung hướng dẫn 3 bước tiếng Việt + Nút mở Google AI Studio
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF282A2C)),
+                    border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = "Hướng dẫn 3 bước lấy Gemini API Key miễn phí. Bước 1: Mở Google AI Studio. Bước 2: Bấm Create API Key. Bước 3: Dán mã vào ứng dụng."
+                        }
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            "💡 Hướng Dẫn 3 Bước Lấy Key Miễn Phí (1 Phút)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = SpaChampagne
+                        )
+                        Text(
+                            "• Bước 1: Mở Google AI Studio bằng tài khoản Google bất kỳ.\n" +
+                            "• Bước 2: Bấm nút \"Create API key\" (Miễn phí 100%, không yêu cầu thẻ tín dụng).\n" +
+                            "• Bước 3: Sao chép chuỗi mã (bắt đầu bằng AIzaSy...) và dán vào ô trên, sau đó bấm \"Lưu Khóa Vào Máy\".",
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            color = Color(0xFFE3E3E3)
+                        )
+                        Button(
+                            onClick = {
+                                runCatching {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey"))
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(intent)
+                                }.onFailure {
+                                    Toast.makeText(context, "Không thể mở trình duyệt: ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SpaChampagne.copy(alpha = 0.25f)),
+                            border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.7f)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .testTag("btn_open_google_ai_studio")
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, tint = SpaChampagne, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "🌐 Mở Google AI Studio để lấy Key Miễn Phí",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// =========================================================================
 // DIALOG TRỢ LÝ AI "GEHIHI" — ĐIỀU KHIỂN APP TOÀN QUYỀN (CHỈ DÀNH CHO ADMIN)
 // Có cơ chế Xác nhận lại trước khi Thêm/Xóa & Bộ nhớ Vĩnh viễn không bao giờ quên
 // =========================================================================
@@ -7351,9 +8208,12 @@ fun AdminAiAssistantBotDialog(
     onSwitchTicketSubTab: (Int) -> Unit,
     onSwitchPeopleSubTab: (Int) -> Unit,
     onInspectStaffPayroll: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpenAiKeyConfig: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val view = LocalView.current
+    val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var inputPrompt by remember { mutableStateOf("") }
     var showQuickSuggestions by rememberSaveable { mutableStateOf(true) }
@@ -7361,8 +8221,26 @@ fun AdminAiAssistantBotDialog(
     var attachedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var attachedFileName by remember { mutableStateOf("") }
     var attachedFileContent by remember { mutableStateOf("") }
+    var isFullscreen by rememberSaveable { mutableStateOf(false) }
+    var showKeyConfigInBot by remember { mutableStateOf(false) }
+    var showClearConfirmDialog by remember { mutableStateOf(false) }
     val chatScrollState = rememberScrollState()
     val pendingConfirm = store.pendingAiConfirmation
+
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    DisposableEffect(context) {
+        var ttsInstance: TextToSpeech? = null
+        ttsInstance = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                ttsInstance?.language = Locale("vi", "VN")
+            }
+        }
+        tts = ttsInstance
+        onDispose {
+            ttsInstance?.stop()
+            ttsInstance?.shutdown()
+        }
+    }
 
     val pickPhotoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -7456,93 +8334,238 @@ fun AdminAiAssistantBotDialog(
     val geminiAccentBlue = Color(0xFFA8C7FA)
     val geminiAccentPurple = Color(0xFFD0BCFF)
 
-    // Render trực tiếp trong cửa sổ chính của Activity (không dùng Dialog riêng) để bàn phím đẩy khung nhập lên 100% chính xác
-    Surface(
-        color = geminiBg,
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .imePadding()
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // 1. HEADER TỐI GIẢN, GỌN GÀNG
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { heading() }
-                ) {
-                    Icon(
-                        Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        tint = geminiAccentBlue,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "gehihi",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = geminiTextPrimary,
-                        maxLines = 1
-                    )
-                    Surface(
-                        color = geminiComposerBg,
-                        shape = RoundedCornerShape(50),
-                        border = BorderStroke(1.dp, geminiChipBorder)
-                    ) {
-                        Text(
-                            text = if (isAdmin) "Chủ Spa • ${store.aiLongTermMemories.size} nhớ" else "Kỹ thuật viên • Trợ lý",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = geminiAccentBlue,
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
-                            maxLines = 1
-                        )
-                    }
-                }
+    if (showKeyConfigInBot && store.currentUser.isAdmin()) {
+        AiKeyConfigDialog(
+            store = store,
+            onDismiss = { showKeyConfigInBot = false }
+        )
+    }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+    if (showClearConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmDialog = false },
+            title = { Text("Xóa Lịch Sử Trò Chuyện?", fontWeight = FontWeight.Bold) },
+            text = { Text("Hành động này sẽ làm sạch các tin nhắn hội thoại của gehihi trên thiết bị này. Bộ nhớ tri thức vĩnh viễn của quán vẫn được bảo toàn.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        store.xoaLichSuTroChuyenGehihi()
+                        showClearConfirmDialog = false
+                        Toast.makeText(context, "Đã làm sạch lịch sử trò chuyện gehihi!", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SpaDanger)
                 ) {
-                    TextButton(
-                        onClick = { showQuickSuggestions = !showQuickSuggestions },
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                        modifier = Modifier.height(34.dp)
-                    ) {
-                        Text(
-                            text = if (showQuickSuggestions) "Ẩn gợi ý" else "Gợi ý",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = geminiTextSecondary
-                        )
-                    }
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .semantics { contentDescription = "Đóng cửa sổ trợ lý AI gehihi" }
-                            .testTag("btn_close_gehihi_dialog")
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = null,
-                            tint = geminiTextPrimary
-                        )
-                    }
+                    Text("Xóa lịch sử", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmDialog = false }) {
+                    Text("Hủy")
                 }
             }
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = if (isFullscreen) 1f else 0.55f))
+            .imePadding(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Surface(
+            color = geminiBg,
+            shape = if (isFullscreen) RoundedCornerShape(0.dp) else RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            modifier = if (isFullscreen) {
+                Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.92f)
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+            }
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // 1. HEADER BAR CHUẨN ROSEWOOD/CHAMPAGNE (R2)
+                Surface(
+                    color = SpaRosewoodDark,
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.4f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .semantics { heading() }
+                            ) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = SpaChampagne,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "gehihi",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
+                                    color = Color.White,
+                                    maxLines = 1
+                                )
+                                Surface(
+                                    color = Color.White.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(50),
+                                    border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.6f))
+                                ) {
+                                    Text(
+                                        text = if (isAdmin) "Chủ Spa • ${store.aiLongTermMemories.size} nhớ" else "KTV • Trợ lý",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = SpaChampagne,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                if (store.currentUser.isAdmin()) {
+                                    // Nút ⚙️/🔑 Cấu hình Gemini Key
+                                    IconButton(
+                                        onClick = {
+                                            if (onOpenAiKeyConfig != null) {
+                                                onOpenAiKeyConfig()
+                                            } else {
+                                                showKeyConfigInBot = true
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .semantics { contentDescription = "Cài đặt khóa Gemini API Key" }
+                                            .testTag("btn_gehihi_key_settings")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Key,
+                                            contentDescription = null,
+                                            tint = SpaChampagne,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                // Nút Chuyển đổi Fullscreen
+                                IconButton(
+                                    onClick = { isFullscreen = !isFullscreen },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .semantics { contentDescription = if (isFullscreen) "Thu gọn cửa sổ trợ lý" else "Mở rộng toàn màn hình trợ lý" }
+                                        .testTag("btn_toggle_fullscreen")
+                                ) {
+                                    Icon(
+                                        if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                // Nút Xóa lịch sử trò chuyện
+                                IconButton(
+                                    onClick = { showClearConfirmDialog = true },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .semantics { contentDescription = "Xóa lịch sử trò chuyện gehihi" }
+                                        .testTag("btn_clear_chat_history")
+                                ) {
+                                    Icon(
+                                        Icons.Default.DeleteSweep,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFF8A80),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                // Nút Gợi ý nhanh
+                                TextButton(
+                                    onClick = { showQuickSuggestions = !showQuickSuggestions },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                    modifier = Modifier.heightIn(min = 48.dp)
+                                ) {
+                                    Text(
+                                        text = if (showQuickSuggestions) "Ẩn gợi ý" else "Gợi ý",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFFC4C7C5)
+                                    )
+                                }
+
+                                // Nút Đóng dialog
+                                IconButton(
+                                    onClick = onDismiss,
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .semantics { contentDescription = "Đóng cửa sổ trợ lý AI gehihi" }
+                                        .testTag("btn_close_gehihi_dialog")
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Dynamic Connection Status Badge
+                        Spacer(Modifier.height(4.dp))
+                        val isGeminiReady = store.isGeminiConnected || store.layGeminiApiKey().isNotBlank()
+                        Surface(
+                            color = if (isGeminiReady) Color(0xFF3E3215) else Color(0xFF1B3B24),
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(1.dp, if (isGeminiReady) SpaChampagne.copy(alpha = 0.7f) else Color(0xFF81C995).copy(alpha = 0.6f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics(mergeDescendants = true) {
+                                    contentDescription = if (isGeminiReady) "Trạng thái: Trực tuyến. Gemini AI kết nối." else "Trạng thái: Ngoại tuyến. Sẵn sàng đọc dữ liệu tiệm 100%."
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = if (isGeminiReady) "✨ Trực tuyến: Gemini AI kết nối" else "🟢 Ngoại tuyến: Sẵn sàng đọc dữ liệu tiệm 100%",
+                                    color = if (isGeminiReady) SpaChampagne else Color(0xFF81C995),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
 
             // 2. GỢI Ý NHANH (TỰ ẨN KHI BẬT BÀN PHÍM HOẶC ĐANG GÕ CHỮ ĐỂ NHƯỜNG CHỖ CHO NỘI DUNG CHAT)
             if (showQuickSuggestions && !isKeyboardOpen && inputPrompt.isEmpty()) {
@@ -7688,12 +8711,23 @@ fun AdminAiAssistantBotDialog(
                                 }
                             }
 
+                            val kpiData = extractReportKpi(displayMsgText)
+
                             Text(
                                 text = displayMsgText,
                                 fontSize = 15.sp,
                                 lineHeight = 23.sp,
                                 color = geminiTextPrimary
                             )
+
+                            // THẺ BÁO CÁO KẾT QUẢ GIÀU THÔNG TIN (RICH REPORT CARD)
+                            if (kpiData != null) {
+                                RichReportCardComposable(
+                                    kpi = kpiData,
+                                    onNavigateTab = onNavigateTab,
+                                    onSwitchPeopleSubTab = onSwitchPeopleSubTab
+                                )
+                            }
 
                             if (msg.actionNote.isNotBlank()) {
                                 Surface(
@@ -7727,6 +8761,88 @@ fun AdminAiAssistantBotDialog(
                                                 fontWeight = FontWeight.Bold,
                                                 color = geminiAccentPurple
                                             )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // TIỆN ÍCH ĐIỀU KHIỂN: [📋 Sao chép] & [🔊 Đọc to] & [🔑 Mở Cài Đặt Key]
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
+                                Surface(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(displayMsgText))
+                                        Toast.makeText(context, "Đã sao chép câu trả lời của gehihi!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    color = geminiComposerBg,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, geminiBorder),
+                                    modifier = Modifier
+                                        .heightIn(min = 48.dp)
+                                        .semantics { contentDescription = "Sao chép câu trả lời vào bộ nhớ tạm" }
+                                        .testTag("btn_copy_response")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = null, tint = geminiTextSecondary, modifier = Modifier.size(14.dp))
+                                        Text("Sao chép", fontSize = 11.sp, color = geminiTextSecondary)
+                                    }
+                                }
+
+                                Surface(
+                                    onClick = {
+                                        tts?.speak(displayMsgText, TextToSpeech.QUEUE_FLUSH, null, "gehihi_tts_${msg.id}")
+                                        view.announceForAccessibility(displayMsgText)
+                                    },
+                                    color = geminiComposerBg,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, geminiBorder),
+                                    modifier = Modifier
+                                        .heightIn(min = 48.dp)
+                                        .semantics { contentDescription = "Đọc câu trả lời bằng giọng nói" }
+                                        .testTag("btn_speak_response")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.VolumeUp, contentDescription = null, tint = geminiTextSecondary, modifier = Modifier.size(14.dp))
+                                        Text("Đọc to", fontSize = 11.sp, color = geminiTextSecondary)
+                                    }
+                                }
+
+                                if (store.currentUser.isAdmin() && (displayMsgText.contains("Cài Đặt Gemini API Key", ignoreCase = true) ||
+                                    msg.actionNote.contains("Gemini API Key", ignoreCase = true))) {
+                                    Surface(
+                                        onClick = {
+                                            if (onOpenAiKeyConfig != null) {
+                                                onOpenAiKeyConfig()
+                                            } else {
+                                                showKeyConfigInBot = true
+                                            }
+                                        },
+                                        color = SpaRosewoodDark,
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.7f)),
+                                        modifier = Modifier
+                                            .heightIn(min = 48.dp)
+                                            .semantics { contentDescription = "Mở hộp thoại Cài đặt Gemini API Key" }
+                                            .testTag("btn_open_key_from_chat")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(Icons.Default.Key, contentDescription = null, tint = SpaChampagne, modifier = Modifier.size(14.dp))
+                                            Text("Mở Cài Đặt Key", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -7838,7 +8954,7 @@ fun AdminAiAssistantBotDialog(
                                 shape = RoundedCornerShape(50),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(46.dp)
+                                    .heightIn(min = 48.dp)
                                     .semantics {
                                         contentDescription = "Xác nhận thực hiện lệnh ${pendingConfirm.tieuDeTomTat} và chuyển tới màn hình vừa sửa"
                                     }
@@ -7855,7 +8971,7 @@ fun AdminAiAssistantBotDialog(
                                 shape = RoundedCornerShape(50),
                                 border = BorderStroke(1.dp, Color(0xFFFF8A80)),
                                 modifier = Modifier
-                                    .height(46.dp)
+                                    .heightIn(min = 48.dp)
                                     .semantics {
                                         contentDescription = "Hủy bỏ lệnh ${pendingConfirm.tieuDeTomTat}"
                                     }
@@ -7981,7 +9097,7 @@ fun AdminAiAssistantBotDialog(
                                 border = BorderStroke(1.dp, geminiChipBorder),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(40.dp)
+                                    .heightIn(min = 48.dp)
                                     .testTag("btn_attach_image_gehihi")
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
@@ -8002,7 +9118,7 @@ fun AdminAiAssistantBotDialog(
                                 border = BorderStroke(1.dp, geminiChipBorder),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(40.dp)
+                                    .heightIn(min = 48.dp)
                                     .testTag("btn_attach_file_gehihi")
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
@@ -8065,7 +9181,7 @@ fun AdminAiAssistantBotDialog(
                             shape = RoundedCornerShape(50),
                             border = BorderStroke(1.dp, geminiChipBorder),
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(48.dp)
                                 .semantics {
                                     contentDescription = "Đính kèm ảnh hoặc file JSON cho gehihi"
                                 }
@@ -8120,18 +9236,74 @@ fun AdminAiAssistantBotDialog(
                                             attachedFileName = ""
                                             attachedFileContent = ""
                                             showAttachmentMenu = false
-                                            scope.launch {
-                                                store.guiYeuCauAiBot(
-                                                    userPrompt = textToSend,
-                                                    attachedBitmap = bmpToSend,
-                                                    attachedFileName = fileNameToSend,
-                                                    attachedFileContent = fileContentToSend,
-                                                    onNavigateTab = onNavigateTab,
-                                                    onSwitchTicketSubTab = onSwitchTicketSubTab,
-                                                    onSwitchPeopleSubTab = onSwitchPeopleSubTab,
-                                                    onInspectStaffPayroll = onInspectStaffPayroll,
-                                                    onCloseDialogOnAction = handleActionAutoClose
-                                                )
+
+                                            val norm = textToSend.lowercase().trim()
+                                            val isKeyConfigIntent = norm.contains("cai dat api key") || norm.contains("cài đặt api key") ||
+                                                norm.contains("sua api key") || norm.contains("sửa api key") ||
+                                                norm.contains("doi api key") || norm.contains("đổi api key") ||
+                                                norm.contains("cau hinh gemini") || norm.contains("cấu hình gemini") ||
+                                                norm.contains("cai api key") || norm.contains("cài api key") ||
+                                                norm.contains("nhap api key") || norm.contains("nhập api key")
+
+                                            if (isKeyConfigIntent && bmpToSend == null && fileContentToSend.isBlank()) {
+                                                if (!store.currentUser.isAdmin()) {
+                                                    store.aiMessages.add(
+                                                        AiChatMessage(
+                                                            id = UUID.randomUUID().toString(),
+                                                            isUser = true,
+                                                            text = textToSend,
+                                                            thoiGian = "${todayDateStr()} ${nowTimeStr()}"
+                                                        )
+                                                    )
+                                                    store.aiMessages.add(
+                                                        AiChatMessage(
+                                                            id = UUID.randomUUID().toString(),
+                                                            isUser = false,
+                                                            text = "Dạ, tính năng Cài Đặt Gemini API Key chỉ dành riêng cho Chủ Spa (Quản trị viên) để bảo mật hệ thống. Bạn vui lòng liên hệ Chủ Spa để được hỗ trợ nhé!",
+                                                            actionNote = "Từ chối quyền cấu hình Key",
+                                                            thoiGian = "${todayDateStr()} ${nowTimeStr()}"
+                                                        )
+                                                    )
+                                                    store.saveGehihiMemoryVault()
+                                                } else {
+                                                    if (onOpenAiKeyConfig != null) {
+                                                        onOpenAiKeyConfig()
+                                                    } else {
+                                                        showKeyConfigInBot = true
+                                                    }
+                                                    store.aiMessages.add(
+                                                        AiChatMessage(
+                                                            id = UUID.randomUUID().toString(),
+                                                            isUser = true,
+                                                            text = textToSend,
+                                                            thoiGian = "${todayDateStr()} ${nowTimeStr()}"
+                                                        )
+                                                    )
+                                                    store.aiMessages.add(
+                                                        AiChatMessage(
+                                                            id = UUID.randomUUID().toString(),
+                                                            isUser = false,
+                                                            text = "Dạ, em đã mở hộp thoại Cài Đặt Gemini API Key để bạn cấu hình khóa trực quan rồi nhé! Bạn có thể dán mã khóa, kiểm tra kết nối 200 OK và lưu vào máy.",
+                                                            actionNote = "Cài đặt Gemini API Key",
+                                                            thoiGian = "${todayDateStr()} ${nowTimeStr()}"
+                                                        )
+                                                    )
+                                                    store.saveGehihiMemoryVault()
+                                                }
+                                            } else {
+                                                scope.launch {
+                                                    store.guiYeuCauAiBot(
+                                                        userPrompt = textToSend,
+                                                        attachedBitmap = bmpToSend,
+                                                        attachedFileName = fileNameToSend,
+                                                        attachedFileContent = fileContentToSend,
+                                                        onNavigateTab = onNavigateTab,
+                                                        onSwitchTicketSubTab = onSwitchTicketSubTab,
+                                                        onSwitchPeopleSubTab = onSwitchPeopleSubTab,
+                                                        onInspectStaffPayroll = onInspectStaffPayroll,
+                                                        onCloseDialogOnAction = handleActionAutoClose
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -8143,7 +9315,7 @@ fun AdminAiAssistantBotDialog(
                                     if (canSend) geminiAccentBlue.copy(alpha = 0.55f) else geminiChipBorder
                                 ),
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(48.dp)
                                     .semantics {
                                         contentDescription = "Gửi yêu cầu cho gehihi"
                                     }
@@ -8164,6 +9336,7 @@ fun AdminAiAssistantBotDialog(
             }
         }
     }
+}
 }
 
 // =========================================================================

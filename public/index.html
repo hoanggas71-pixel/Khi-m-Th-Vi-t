@@ -9,6 +9,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <!-- External Stylesheet: Modern UI, System AI, VietQR, Zalo Share & @media print -->
+  <link rel="stylesheet" href="style.css">
   <style>
     @keyframes pulse-soft {
       0%, 100% { opacity: 1; }
@@ -522,6 +524,96 @@
         </div>
       </div>
 
+      <!-- System Gemini API Key Configuration Card (Super Admin) -->
+      <div class="ai-config-card rounded-2xl p-5 sm:p-6 space-y-4 shadow-xl">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-indigo-900/40 pb-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2.5">
+              <span class="text-2xl">🤖</span>
+              <h3 class="text-sm sm:text-base font-extrabold text-white tracking-wide">Cấu Hình Trí Tuệ Nhân Tạo Hệ Thống (System Gemini AI Key)</h3>
+              <span id="ai-status-badge" class="badge-ai-ready px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 status-pulse"></span>
+                <span id="ai-status-text">Đang tải...</span>
+              </span>
+            </div>
+            <p class="text-xs text-slate-300 max-w-3xl leading-relaxed">
+              Khóa API Gemini dùng chung cấp phát từ Web Portal. Khi KTV và Chủ Spa chưa nhập khóa cá nhân trên điện thoại, app Android sẽ tự động đồng bộ khóa hệ thống này qua endpoint <code class="bg-slate-950 px-1.5 py-0.5 rounded text-indigo-300 font-mono text-[11px] border border-slate-800">/api/system/ai-config</code> để vận hành trợ lý Gehihi trực tuyến.
+            </p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold flex items-center gap-1.5 transition" title="Lấy API Key Gemini miễn phí từ Google AI Studio">
+              <span>🔗</span> <span>Lấy Key Google Miễn Phí</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Form nhập & kiểm tra key -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+          <!-- Cột nhập API Key (7 cols) -->
+          <div class="lg:col-span-7 space-y-2">
+            <label for="system-gemini-key-input" class="text-xs font-semibold text-slate-200 flex items-center justify-between">
+              <span class="flex items-center gap-1.5"><span>🔑</span> Khóa Gemini API Key Hệ Thống:</span>
+              <span id="ai-key-updated-at" class="text-[10px] text-slate-400 font-mono">Cập nhật: --</span>
+            </label>
+            <div class="ai-key-input-wrapper relative flex items-center">
+              <input type="password" id="system-gemini-key-input" placeholder="Dán mã khóa AIzaSy... vào đây" class="ai-key-input w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 pl-3 pr-24 text-xs text-white placeholder-slate-500 font-mono focus:outline-none">
+              <div class="absolute right-1.5 flex items-center gap-1">
+                <button type="button" onclick="pasteApiKeyFromClipboard()" title="Dán từ Clipboard" class="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg text-xs transition">
+                  📋
+                </button>
+                <button type="button" onclick="clearApiKeyInput()" title="Xóa trắng ô nhập" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg text-xs transition">
+                  🗑️
+                </button>
+                <button type="button" id="btn-toggle-key-visibility" onclick="toggleApiKeyVisibility()" title="Ẩn/Hiện mã khóa" class="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded-lg text-xs transition">
+                  👁️
+                </button>
+              </div>
+            </div>
+            <!-- Alert phản hồi kiểm tra kết nối -->
+            <div id="ai-test-result" class="hidden p-2.5 rounded-xl text-xs font-medium border flex items-center justify-between">
+              <span id="ai-test-result-text"></span>
+              <button onclick="document.getElementById('ai-test-result').classList.add('hidden')" class="text-xs opacity-75 hover:opacity-100">&times;</button>
+            </div>
+          </div>
+
+          <!-- Cột Model & Hành động (5 cols) -->
+          <div class="lg:col-span-5 space-y-2">
+            <label for="system-gemini-model-select" class="text-xs font-semibold text-slate-200 block">
+              <span>🧠</span> Mô Hình Gemini Triển Khai:
+            </label>
+            <select id="system-gemini-model-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 px-3 text-xs text-white font-mono focus:outline-none focus:border-indigo-500">
+              <option value="gemini-1.5-flash">gemini-1.5-flash (Khuyên dùng — Phản hồi siêu tốc <0.5s, chính xác cao)</option>
+              <option value="gemini-2.0-flash">gemini-2.0-flash (Thế hệ mới — Tối ưu suy luận nhanh)</option>
+              <option value="gemini-1.5-pro">gemini-1.5-pro (Phân tích chuyên sâu phức tạp)</option>
+            </select>
+            <div class="flex items-center gap-2 pt-1">
+              <button type="button" id="btn-test-ai-key" onclick="testGeminiApiKeyConnection()" class="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+                <span>⚡</span> <span id="btn-test-ai-label">Test Kết Nối</span>
+              </button>
+              <button type="button" id="btn-save-ai-key" onclick="saveSystemAiConfig()" class="flex-1 py-2 px-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-950/50 flex items-center justify-center gap-1.5 transition">
+                <span>💾</span> <span id="btn-save-ai-label">Lưu Khóa Hệ Thống</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 bước hướng dẫn nhanh tiếng Việt -->
+        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 text-[11px] text-slate-400 grid grid-cols-1 md:grid-cols-3 gap-3 leading-relaxed">
+          <div class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold flex items-center justify-center shrink-0 text-[10px]">1</span>
+            <span>Đăng nhập <strong class="text-slate-200">Google AI Studio</strong> bằng tài khoản Gmail và chọn <strong class="text-slate-200">Get API key</strong>.</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 font-bold flex items-center justify-center shrink-0 text-[10px]">2</span>
+            <span>Tạo key mới hoàn toàn miễn phí, sao chép chuỗi ký tự bắt đầu bằng <strong class="text-amber-200 font-mono">AIzaSy...</strong></span>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold flex items-center justify-center shrink-0 text-[10px]">3</span>
+            <span>Dán vào ô trên, bấm <strong class="text-emerald-300">Test Kết Nối</strong> (HTTP 200 OK) rồi bấm <strong class="text-white">Lưu Khóa Hệ Thống</strong>.</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Tenant Spa Management Table -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div class="p-4 sm:px-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -535,6 +627,19 @@
               🔄 Đồng bộ Cloud
             </button>
           </div>
+        </div>
+
+        <!-- Quick Plan Filter Buttons -->
+        <div class="px-4 sm:px-6 py-2.5 bg-slate-950/60 border-b border-slate-800 flex flex-wrap items-center gap-1.5">
+          <span class="text-[11px] font-semibold text-slate-400 mr-2 flex items-center gap-1">
+            <span>🏷️</span> Lọc gói bản quyền:
+          </span>
+          <button type="button" class="plan-filter-btn active" onclick="filterTenantsByPlan('ALL', this)">Tất Cả (<span id="filter-count-all">0</span>)</button>
+          <button type="button" class="plan-filter-btn" onclick="filterTenantsByPlan('VIP 1 Năm', this)">VIP 1 Năm (<span id="filter-count-1year">0</span>)</button>
+          <button type="button" class="plan-filter-btn" onclick="filterTenantsByPlan('6 Tháng', this)">6 Tháng (<span id="filter-count-6months">0</span>)</button>
+          <button type="button" class="plan-filter-btn" onclick="filterTenantsByPlan('3 Tháng', this)">3 Tháng (<span id="filter-count-3months">0</span>)</button>
+          <button type="button" class="plan-filter-btn" onclick="filterTenantsByPlan('1 Tháng', this)">1 Tháng (<span id="filter-count-1month">0</span>)</button>
+          <button type="button" class="plan-filter-btn" onclick="filterTenantsByPlan('Dùng Thử', this)">Dùng Thử 2 Tuần (<span id="filter-count-trial">0</span>)</button>
         </div>
 
         <!-- Table -->
@@ -602,6 +707,13 @@
   <!-- Modal 2: Khách Hàng Gia Hạn Gói & Quét VietQR -->
   <div id="customer-renew-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[95vh] overflow-y-auto">
+      <!-- Header in ấn chỉ hiển thị khi in ra giấy hoặc xuất PDF -->
+      <div class="print-invoice-header hidden">
+        <div class="print-invoice-title">HỆ THỐNG SAAS QUẢN LÝ SPA KHIẾM THỊ VIỆT</div>
+        <div class="print-invoice-sub">PHIẾU THÔNG BÁO BÁO PHÍ & GIA HẠN GÓI DỊCH VỤ SAAS (VIETQR)</div>
+        <div class="print-invoice-sub">Hotline Dev / Kỹ Thuật: 0397772963 • Website: khiemthiviet.vn</div>
+      </div>
+
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
           <span class="text-xl">💳</span>
@@ -664,9 +776,14 @@
         </div>
 
         <div class="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
-          <button onclick="copyCustomerInvoiceMemo()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition">
-            <span>📋</span> <span id="cust-copy-btn-text">Sao Chép Thông Tin CK</span>
-          </button>
+          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button onclick="copyCustomerInvoiceMemo()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition">
+              <span>📋</span> <span id="cust-copy-btn-text">Sao Chép Thông Tin CK</span>
+            </button>
+            <button type="button" onclick="printInvoice('customer')" class="no-print px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition" title="In phiếu báo phí và mã VietQR chuẩn giấy A4">
+              <span>🖨️</span> In Báo Phí
+            </button>
+          </div>
           <a id="cust-zalo-confirm-btn" href="https://zalo.me/0397772963" target="_blank" class="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-900/40 flex items-center justify-center gap-1.5 transition">
             <span>📱</span> Báo Dev Qua Zalo (0397772963)
           </a>
@@ -866,6 +983,13 @@
   <!-- Modal 5: Dev Gia Hạn Gói SaaS Cho Spa (Có VietQR & Chia Sẻ Zalo) -->
   <div id="extend-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[95vh] overflow-y-auto">
+      <!-- Header in ấn chỉ hiển thị khi in ra giấy hoặc xuất PDF -->
+      <div class="print-invoice-header hidden">
+        <div class="print-invoice-title">HỆ THỐNG SAAS QUẢN LÝ SPA KHIẾM THỊ VIỆT</div>
+        <div class="print-invoice-sub">PHIẾU THÔNG BÁO BÁO CƯỚC & GIA HẠN GÓI DỊCH VỤ SAAS (VIETQR)</div>
+        <div class="print-invoice-sub">Hotline Dev / Kỹ Thuật: 0397772963 • Website: khiemthiviet.vn</div>
+      </div>
+
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 class="text-sm font-bold text-white flex items-center gap-2">
           <span>➕</span> Gia Hạn Gói Dịch Vụ SaaS & Thanh Toán VietQR
@@ -947,9 +1071,14 @@
 
         <!-- Nút Chia sẻ Zalo cho Khách Hàng -->
         <div class="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
-          <button id="btn-copy-zalo-invoice" onclick="copyZaloInvoiceMessage()" class="w-full sm:w-auto px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
-            <span>📋</span> <span id="copy-invoice-btn-text">Sao Chép Báo Phí</span>
-          </button>
+          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button id="btn-copy-zalo-invoice" onclick="copyZaloInvoiceMessage()" class="px-3.5 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+              <span>📋</span> <span id="copy-invoice-btn-text">Sao Chép Báo Phí</span>
+            </button>
+            <button type="button" onclick="printInvoice('extend')" class="no-print px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition" title="In phiếu báo phí và mã VietQR chuẩn giấy A4">
+              <span>🖨️</span> In Báo Phí
+            </button>
+          </div>
           <div class="flex items-center gap-2 w-full sm:w-auto">
             <button id="btn-open-zalo-app-invoice" onclick="openZaloAppInvoice()" class="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-900/40 flex items-center justify-center gap-1.5 transition">
               <span>📱</span> Mở App Zalo Trên Máy
@@ -1124,8 +1253,15 @@
         Mẫu tin nhắn chuẩn hóa chứa thông tin kích hoạt, link tải APK và hotline hỗ trợ. Hãy bấm nút sao chép bên dưới để gửi ngay cho Chủ Spa qua Zalo.
       </div>
 
-      <div class="relative">
-        <textarea id="zalo-welcome-text" readonly rows="12" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono leading-relaxed resize-none focus:outline-none"></textarea>
+      <div class="zalo-share-card">
+        <div class="zalo-share-header">
+          <div class="flex items-center gap-2">
+            <span class="zalo-brand-badge">Zalo</span>
+            <span class="text-xs text-slate-300 font-semibold">Định dạng gửi tin nhắn chuẩn</span>
+          </div>
+          <span class="text-[10px] text-slate-400 font-mono">Bàn giao tài khoản</span>
+        </div>
+        <textarea id="zalo-welcome-text" readonly rows="12" class="zalo-monospace-box w-full border-0 resize-none focus:outline-none"></textarea>
       </div>
 
       <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
@@ -1195,8 +1331,15 @@
         Mẫu tin thông báo mật khẩu mới cho Chủ Spa. Hãy bấm nút sao chép để gửi ngay qua Zalo.
       </div>
 
-      <div class="relative">
-        <textarea id="zalo-reset-text" readonly rows="10" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono leading-relaxed resize-none focus:outline-none"></textarea>
+      <div class="zalo-share-card">
+        <div class="zalo-share-header">
+          <div class="flex items-center gap-2">
+            <span class="zalo-brand-badge">Zalo</span>
+            <span class="text-xs text-slate-300 font-semibold">Định dạng cấp mật khẩu mới</span>
+          </div>
+          <span class="text-[10px] text-slate-400 font-mono">Bảo mật</span>
+        </div>
+        <textarea id="zalo-reset-text" readonly rows="10" class="zalo-monospace-box w-full border-0 resize-none focus:outline-none"></textarea>
       </div>
 
       <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
@@ -1405,6 +1548,7 @@
       document.getElementById("dev-view").classList.remove("hidden");
       renderTable();
       updateMaintenanceUI();
+      loadSystemAiConfig();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -1751,6 +1895,7 @@
     }
 
     function closeCustomerRenewModal() {
+      document.body.classList.remove("printing-invoice");
       document.getElementById("customer-renew-modal").classList.add("hidden");
     }
 
@@ -2273,6 +2418,206 @@
       return pin;
     }
 
+    // ==========================================
+    // SYSTEM GEMINI AI CONFIGURATION CONTROLLER
+    // ==========================================
+    async function loadSystemAiConfig() {
+      const badge = document.getElementById("ai-status-badge");
+      const badgeText = document.getElementById("ai-status-text");
+      const keyInput = document.getElementById("system-gemini-key-input");
+      const modelSelect = document.getElementById("system-gemini-model-select");
+      const updatedText = document.getElementById("ai-key-updated-at");
+
+      try {
+        if (badge) {
+          badge.className = "badge-ai-testing px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5";
+        }
+        if (badgeText) badgeText.innerText = "Đang kiểm tra...";
+
+        const res = await fetch("/api/system/ai-config");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success) {
+            if (keyInput) keyInput.value = data.apiKey || "";
+            if (modelSelect && data.model) modelSelect.value = data.model;
+            if (updatedText) {
+              const dt = data.updatedAt ? new Date(data.updatedAt) : new Date();
+              updatedText.innerText = `Cập nhật: ${dt.toLocaleTimeString('vi-VN')} ${dt.toLocaleDateString('vi-VN')}`;
+            }
+
+            if (data.apiKey && data.apiKey.trim().length > 10) {
+              if (badge) badge.className = "badge-ai-ready px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5";
+              if (badgeText) badgeText.innerText = "🟢 Sẵn Sàng (Khóa hợp lệ)";
+            } else {
+              if (badge) badge.className = "badge-ai-warning px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5";
+              if (badgeText) badgeText.innerText = "⚠️ Chưa Cấu Hình Khóa";
+            }
+            return data;
+          }
+        }
+      } catch (err) {
+        console.error("Lỗi tải cấu hình AI hệ thống:", err);
+      }
+      if (badge) badge.className = "badge-ai-warning px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5";
+      if (badgeText) badgeText.innerText = "⚠️ Chưa Kết Nối Server";
+      return null;
+    }
+
+    async function saveSystemAiConfig() {
+      const keyInput = document.getElementById("system-gemini-key-input");
+      const modelSelect = document.getElementById("system-gemini-model-select");
+      const btnSave = document.getElementById("btn-save-ai-key");
+      const btnLabel = document.getElementById("btn-save-ai-label");
+
+      const apiKey = keyInput ? keyInput.value.trim() : "";
+      const model = modelSelect ? modelSelect.value : "gemini-1.5-flash";
+
+      try {
+        if (btnSave) btnSave.disabled = true;
+        if (btnLabel) btnLabel.innerText = "Đang lưu...";
+
+        const res = await fetch("/api/system/ai-config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ apiKey, model })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast("✅ Đã lưu cấu hình AI hệ thống thành công!");
+          await loadSystemAiConfig();
+        } else {
+          showToast("❌ Lỗi lưu cấu hình: " + (data.error || "Không rõ nguyên nhân"));
+        }
+      } catch (err) {
+        console.error("Lỗi lưu cấu hình AI:", err);
+        showToast("❌ Lỗi kết nối máy chủ khi lưu cấu hình!");
+      } finally {
+        if (btnSave) btnSave.disabled = false;
+        if (btnLabel) btnLabel.innerText = "Lưu Khóa Hệ Thống";
+      }
+    }
+
+    async function testGeminiApiKeyConnection() {
+      const keyInput = document.getElementById("system-gemini-key-input");
+      const modelSelect = document.getElementById("system-gemini-model-select");
+      const resultBox = document.getElementById("ai-test-result");
+      const resultText = document.getElementById("ai-test-result-text");
+      const btnTest = document.getElementById("btn-test-ai-key");
+      const btnLabel = document.getElementById("btn-test-ai-label");
+
+      const apiKey = keyInput ? keyInput.value.trim() : "";
+      const model = modelSelect ? modelSelect.value : "gemini-1.5-flash";
+
+      if (!apiKey) {
+        if (resultBox && resultText) {
+          resultBox.className = "p-2.5 rounded-xl text-xs font-medium border bg-amber-500/10 border-amber-500/30 text-amber-300 flex items-center justify-between";
+          resultText.innerHTML = "⚠️ Vui lòng nhập hoặc dán mã khóa Gemini API Key trước khi kiểm tra!";
+          resultBox.classList.remove("hidden");
+        }
+        return;
+      }
+
+      try {
+        if (btnTest) btnTest.disabled = true;
+        if (btnLabel) btnLabel.innerText = "Đang ping...";
+        if (resultBox && resultText) {
+          resultBox.className = "p-2.5 rounded-xl text-xs font-medium border bg-indigo-500/10 border-indigo-500/30 text-indigo-300 flex items-center justify-between";
+          resultText.innerHTML = "🔄 Đang gửi yêu cầu kiểm tra kết nối tới Google Gemini API (HTTP 200 OK)...";
+          resultBox.classList.remove("hidden");
+        }
+
+        // Test API call to Google Gemini endpoint
+        const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}?key=${encodeURIComponent(apiKey)}`;
+        const res = await fetch(testUrl);
+
+        if (res.status === 200) {
+          const data = await res.json();
+          const displayName = data.displayName || model;
+          resultBox.className = "p-2.5 rounded-xl text-xs font-medium border bg-emerald-500/10 border-emerald-500/30 text-emerald-300 flex items-center justify-between";
+          resultText.innerHTML = `✅ <strong>Kết nối thành công! (HTTP 200 OK)</strong><br><span class="text-[11px] opacity-90">Mô hình: ${displayName} | Sẵn sàng phục vụ toàn bộ app.</span>`;
+          showToast("🎉 Kết nối Google Gemini API thành công (HTTP 200 OK)!");
+        } else {
+          let errDetail = `Mã lỗi HTTP ${res.status}`;
+          try {
+            const errJson = await res.json();
+            if (errJson.error && errJson.error.message) {
+              errDetail += `: ${errJson.error.message}`;
+            }
+          } catch (_) {}
+          resultBox.className = "p-2.5 rounded-xl text-xs font-medium border bg-rose-500/10 border-rose-500/30 text-rose-300 flex items-center justify-between";
+          resultText.innerHTML = `❌ <strong>Kết nối thất bại:</strong> ${errDetail}`;
+          showToast("❌ Kết nối thất bại: " + errDetail);
+        }
+      } catch (err) {
+        if (resultBox && resultText) {
+          resultBox.className = "p-2.5 rounded-xl text-xs font-medium border bg-rose-500/10 border-rose-500/30 text-rose-300 flex items-center justify-between";
+          resultText.innerHTML = `❌ <strong>Lỗi mạng / CORS:</strong> ${err.message || 'Không thể kết nối'}`;
+        }
+      } finally {
+        if (btnTest) btnTest.disabled = false;
+        if (btnLabel) btnLabel.innerText = "Test Kết Nối";
+      }
+    }
+
+    function toggleApiKeyVisibility() {
+      const input = document.getElementById("system-gemini-key-input");
+      const btn = document.getElementById("btn-toggle-key-visibility");
+      if (!input) return;
+      if (input.type === "password") {
+        input.type = "text";
+        if (btn) btn.innerText = "🙈";
+      } else {
+        input.type = "password";
+        if (btn) btn.innerText = "👁️";
+      }
+    }
+
+    async function pasteApiKeyFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        const input = document.getElementById("system-gemini-key-input");
+        if (input && text) {
+          input.value = text.trim();
+          showToast("📋 Đã dán mã khóa từ bộ nhớ tạm!");
+        }
+      } catch (e) {
+        showToast("⚠️ Vui lòng cấp quyền truy cập Clipboard hoặc dùng phím tắt Ctrl+V");
+      }
+    }
+
+    function clearApiKeyInput() {
+      const input = document.getElementById("system-gemini-key-input");
+      if (input) {
+        input.value = "";
+        input.focus();
+        showToast("🗑️ Đã xóa trắng ô nhập khóa!");
+      }
+    }
+
+    function printInvoice(type) {
+      document.body.classList.add("printing-invoice");
+
+      const cleanup = () => {
+        document.body.classList.remove("printing-invoice");
+        window.removeEventListener("afterprint", cleanup);
+      };
+
+      window.addEventListener("afterprint", cleanup);
+      setTimeout(cleanup, 2500);
+
+      window.print();
+    }
+
+    let currentPlanFilter = "ALL";
+
+    function filterTenantsByPlan(plan, btnEl) {
+      currentPlanFilter = plan;
+      document.querySelectorAll(".plan-filter-btn").forEach(b => b.classList.remove("active"));
+      if (btnEl) btnEl.classList.add("active");
+      renderTable();
+    }
+
     function renderTable() {
       const tbody = document.getElementById("tenant-tbody");
       if (!tbody) return;
@@ -2284,12 +2629,41 @@
       let lockedCount = 0;
       let totalRevenue = 0;
 
+      // Update plan filter counts
+      let countAll = tenants.length;
+      let count1Year = 0, count6Months = 0, count3Months = 0, count1Month = 0, countTrial = 0;
+      tenants.forEach(t => {
+        const pl = (t.plan || '').toLowerCase();
+        if (pl.includes('1 năm') || pl.includes('1 nam')) count1Year++;
+        else if (pl.includes('6 tháng') || pl.includes('6 thang')) count6Months++;
+        else if (pl.includes('3 tháng') || pl.includes('3 thang')) count3Months++;
+        else if (pl.includes('1 tháng') || pl.includes('1 thang')) count1Month++;
+        else if (pl.includes('thử') || pl.includes('thu') || pl.includes('tuần') || pl.includes('tuan')) countTrial++;
+      });
+      const elAll = document.getElementById("filter-count-all"); if (elAll) elAll.innerText = countAll;
+      const el1Y = document.getElementById("filter-count-1year"); if (el1Y) el1Y.innerText = count1Year;
+      const el6M = document.getElementById("filter-count-6months"); if (el6M) el6M.innerText = count6Months;
+      const el3M = document.getElementById("filter-count-3months"); if (el3M) el3M.innerText = count3Months;
+      const el1M = document.getElementById("filter-count-1month"); if (el1M) el1M.innerText = count1Month;
+      const elTr = document.getElementById("filter-count-trial"); if (elTr) elTr.innerText = countTrial;
+
       tenants.forEach((t, idx) => {
         if (t.isActive) {
           activeCount++;
           totalRevenue += (t.monthlyFee || 500000);
         } else {
           lockedCount++;
+        }
+
+        // Plan filter check
+        if (currentPlanFilter !== "ALL") {
+          const pFilter = currentPlanFilter.toLowerCase();
+          const pl = (t.plan || '').toLowerCase();
+          if (pFilter === 'dùng thử') {
+            if (!pl.includes('thử') && !pl.includes('thu') && !pl.includes('tuần') && !pl.includes('tuan')) return;
+          } else {
+            if (!pl.includes(pFilter)) return;
+          }
         }
 
         if (search && !t.name.toLowerCase().includes(search) && !t.ownerPhone.includes(search) && !t.id.includes(search)) {
@@ -2437,6 +2811,7 @@
     }
 
     function closeExtendModal() {
+      document.body.classList.remove("printing-invoice");
       document.getElementById("extend-modal").classList.add("hidden");
     }
 
@@ -3099,6 +3474,7 @@ Lưu ý: Mở ứng dụng Khiếm Thị Việt và đăng nhập bằng mật k
     renderTable();
     checkCustomerSession();
     syncTenantsWithApi();
+    loadSystemAiConfig();
   </script>
 </body>
 </html>

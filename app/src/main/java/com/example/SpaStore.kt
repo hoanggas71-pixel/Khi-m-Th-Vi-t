@@ -214,7 +214,7 @@ class SpaStore(context: Context) {
     val deletedIds = mutableStateListOf<String>()
 
     var currentUser by mutableStateOf<TaiKhoan?>(null)
-        private set
+    var isGeminiConnected by mutableStateOf(false)
 
     // Multi-Tenant: Trạng thái tenant (Kill-Switch)
     var tenantInfo by mutableStateOf<TenantInfo?>(null)
@@ -432,6 +432,12 @@ class SpaStore(context: Context) {
         // Tự động lắng nghe trạng thái bảo trì toàn hệ thống từ Firestore
         runCatching {
             startGlobalMaintenanceListener()
+        }
+
+        // Khởi tạo trạng thái kết nối Gemini và tự động đồng bộ System Key từ Server nếu chưa có key riêng
+        runCatching {
+            isGeminiConnected = layGeminiApiKey().isNotBlank()
+            dongBoGeminiApiKeyTuServer()
         }
     }
 
@@ -3324,12 +3330,31 @@ class SpaStore(context: Context) {
                 }
             }
 
-            // LƯU Ý: Không dùng regex/contains chặn bắt câu lệnh trước Gemini để tránh nhận nhầm từ khóa
             if (attachedBitmap == null) {
                 // Tính toán biểu thức toán học nhanh nếu người dùng chỉ nhập phép tính thuần
                 val mathResult = tinhBieuThucToanHoc(cleanPrompt)
                 if (mathResult != null) {
                     themTinNhanAi(isUser = false, text = mathResult)
+                    aiIsLoading = false
+                    return
+                }
+
+                // OFFLINE-FIRST FAST PATH (<5ms):
+                // Định tuyến câu hỏi qua OnDeviceSpaQueryEngine trước. Nếu được nhận diện là câu hỏi nghiệp vụ Spa
+                // (Doanh thu, Sổ quỹ, Khách hàng, Gói liệu trình, KTV bận/rảnh, Dịch vụ bán chạy, So sánh đa kỳ),
+                // phản hồi ngay lập tức trên máy mà không cần chờ timeout mạng và không cần Gemini API Key!
+                val onDeviceReply = OnDeviceSpaQueryEngine.xuLyTruyVanNgoaiTuyen(cleanPrompt, this)
+                if (onDeviceReply != null) {
+                    apDungDieuHuong(onDeviceReply, onNavigateTab, onSwitchTicketSubTab, onSwitchPeopleSubTab, onInspectStaffPayroll)
+                    themTinNhanAi(
+                        isUser = false,
+                        text = onDeviceReply.cauTraLoi.replace("**", ""),
+                        actionNote = onDeviceReply.hanhDongThucThi
+                    )
+                    saveToPrefs()
+                    if (onDeviceReply.tuDongDongChat && pendingAiConfirmation == null) {
+                        onCloseDialogOnAction(onDeviceReply.hanhDongThucThi.ifBlank { onDeviceReply.cauTraLoi })
+                    }
                     aiIsLoading = false
                     return
                 }
@@ -3398,7 +3423,19 @@ class SpaStore(context: Context) {
     }
 
     fun layGeminiApiKey(): String {
-        // 1. Thử lấy từ BuildConfig (do Secrets Gradle Plugin sinh ra từ .env / .env.example)
+        // 1. Thử lấy từ SharedPreferences cục bộ do người dùng cấu hình
+        val prefKey = prefs.getString("gemini_api_key", "").orEmpty().trim()
+        if (prefKey.isNotBlank() && prefKey != "YOUR_GEMINI_API_KEY") {
+            return prefKey
+        }
+
+        // 2. Thử lấy từ System Key đồng bộ từ Web Portal Server
+        val sysKey = prefs.getString("system_gemini_api_key", "").orEmpty().trim()
+        if (sysKey.isNotBlank() && sysKey != "YOUR_GEMINI_API_KEY") {
+            return sysKey
+        }
+
+        // 3. Thử lấy từ BuildConfig (do Secrets Gradle Plugin sinh ra từ .env / .env.example)
         val buildKey = runCatching {
             val field = BuildConfig::class.java.getField("GEMINI_API_KEY")
             field.get(null) as? String
@@ -3408,19 +3445,103 @@ class SpaStore(context: Context) {
             return buildKey
         }
 
-        // 2. Thử lấy từ biến môi trường của hệ thống
+        // 4. Thử lấy từ biến môi trường của hệ thống
         val envKey = runCatching { System.getenv("GEMINI_API_KEY") }.getOrNull().orEmpty().trim()
         if (envKey.isNotBlank() && envKey != "YOUR_GEMINI_API_KEY") {
             return envKey
         }
 
-        // 3. Thử lấy từ SharedPreferences cục bộ của ứng dụng
-        val prefKey = prefs.getString("gemini_api_key", "").orEmpty().trim()
-        if (prefKey.isNotBlank() && prefKey != "YOUR_GEMINI_API_KEY") {
-            return prefKey
-        }
-
         return ""
+    }
+
+    fun luuGeminiApiKey(key: String): Boolean {
+        if (!currentUser.isAdmin()) return false
+        val cleaned = key.trim()
+        if (cleaned.isNotBlank()) {
+            prefs.edit().putString("gemini_api_key", cleaned).apply()
+            isGeminiConnected = true
+            return true
+        } else {
+            return xoaGeminiApiKey()
+        }
+    }
+
+    fun xoaGeminiApiKey(): Boolean {
+        if (!currentUser.isAdmin()) return false
+        prefs.edit().remove("gemini_api_key").apply()
+        isGeminiConnected = false
+        return true
+    }
+
+    suspend fun kiemTraGeminiApiKey(key: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val cleanKey = key.trim()
+        if (cleanKey.isBlank()) {
+            return@withContext Pair(false, "Mã khóa API không được để trống")
+        }
+        try {
+            val url = java.net.URL("https://generativelanguage.googleapis.com/v1beta/models?key=$cleanKey")
+            val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 8000
+                readTimeout = 8000
+            }
+            val code = conn.responseCode
+            if (code == 200) {
+                Pair(true, "Kết nối thành công (200 OK)! Gemini API đã sẵn sàng.")
+            } else {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                Pair(false, "Lỗi kết nối ($code) từ Google AI: ${err.take(200)}")
+            }
+        } catch (e: Exception) {
+            Pair(false, "Không thể kết nối đến máy chủ Google: ${e.message}")
+        }
+    }
+
+    fun xoaLichSuTroChuyenGehihi() {
+        aiMessages.clear()
+        saveGehihiMemoryVault()
+    }
+
+    suspend fun fetchSystemAiConfigFromServer(): String? = withContext(Dispatchers.IO) {
+        val endpoints = listOf(
+            "http://10.0.2.2:3000/api/system/ai-config",
+            "http://localhost:3000/api/system/ai-config",
+            "http://127.0.0.1:3000/api/system/ai-config"
+        )
+        for (ep in endpoints) {
+            try {
+                val url = java.net.URL(ep)
+                val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 3000
+                    readTimeout = 3000
+                }
+                if (conn.responseCode == 200) {
+                    val resp = conn.inputStream.bufferedReader().use { it.readText() }
+                    val json = JSONObject(resp)
+                    val sysKey = json.optString("apiKey", "").trim()
+                    if (sysKey.isNotBlank() && sysKey != "YOUR_GEMINI_API_KEY") {
+                        prefs.edit().putString("system_gemini_api_key", sysKey).apply()
+                        return@withContext sysKey
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        null
+    }
+
+    fun dongBoGeminiApiKeyTuServer() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val currentKey = prefs.getString("gemini_api_key", "").orEmpty().trim()
+            if (currentKey.isBlank() || currentKey == "YOUR_GEMINI_API_KEY") {
+                val sysKey = fetchSystemAiConfigFromServer()
+                if (sysKey != null) {
+                    withContext(Dispatchers.Main) {
+                        isGeminiConnected = layGeminiApiKey().isNotBlank()
+                    }
+                }
+            }
+        }
     }
 
     private suspend fun goiGeminiApiDirect(
@@ -5741,7 +5862,12 @@ class SpaStore(context: Context) {
         return "gehihi tính giúp bạn: ${formatNum(a)} $op ${formatNum(b)} = ${formatNum(res)}."
     }
 
-    private fun traLoiThongMinhNoiBo(prompt: String): KetQuaAiBot {
+    fun traLoiThongMinhNoiBo(prompt: String): KetQuaAiBot {
+        // 0. ĐỘNG CƠ TRUY VẤN VÀ SUY LUẬN NGOẠI TUYẾN TOÀN DIỆN (ON-DEVICE SPA INTELLIGENCE - R1)
+        // Xử lý 5 phân hệ: Doanh thu/Sổ quỹ/Lãi ròng (kèm Zero-Data Honesty), Khách hàng/Gói/VIP,
+        // KTV Bận/Rảnh/Hoa hồng, Dịch vụ bán chạy, Phân tích so sánh đa kỳ.
+        OnDeviceSpaQueryEngine.xuLyTruyVanNgoaiTuyen(prompt, this)?.let { return it }
+
         val norm = normalizeVietnameseText(prompt).trim()
         val today = todayDateStr()
         val user = currentUser
@@ -5909,20 +6035,8 @@ class SpaStore(context: Context) {
             norm.contains("bao nhieu ve") || norm.contains("may ve") || norm.contains("tinh hinh") ||
             norm.contains("so quy") || norm.contains("hom nay")
         ) {
-            val veHomNay = luots.filter { it.daXacNhan && it.ngay == today }
-            val tongThuHomNay = tcs.filter { it.loai == LoaiTC.THU && it.ngay == today }.sumOf { it.tien } +
-                veHomNay.filter { ve -> ve.thu > 0L && (ve.phieuThuVeId.isBlank() || tcs.none { it.id == ve.phieuThuVeId }) }.sumOf { it.thu }
-            val tongChiHomNay = tcs.filter { it.loai == LoaiTC.CHI && it.ngay == today }.sumOf { it.tien }
-            val chuThucNhan = tongThuHomNay - tongChiHomNay
-            return KetQuaAiBot(
-                cauTraLoi = "📊 Báo cáo ca hôm nay ($today, tính từ 6h sáng):\n" +
-                    "• Vé phục vụ: ${luots.count { it.dangLam }} đang làm • ${luots.count { it.choChot }} chờ chốt • ${veHomNay.size} đã chốt.\n" +
-                    "• Tổng Thu: +${formatVndSpeakable(tongThuHomNay)}\n" +
-                    "• Trả KTV & Chi: -${formatVndSpeakable(tongChiHomNay)}\n" +
-                    "• Chủ quán thực nhận (Lãi ròng): ${if (chuThucNhan >= 0) "+" else ""}${formatVndSpeakable(chuThucNhan)}.",
-                hanhDongThucThi = "Xem Báo cáo & Lãi ròng",
-                chuyenTab = 4
-            )
+            val queryRes = OnDeviceSpaQueryEngine.xuLyTruyVanNgoaiTuyen(prompt, this)
+            if (queryRes != null) return queryRes
         }
 
         // 7. Hỏi về Bộ nhớ của gehihi

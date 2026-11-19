@@ -3,9 +3,78 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const TENANTS_FILE = path.join(PUBLIC_DIR, 'tenants.json');
+const AI_CONFIG_FILE = path.join(PUBLIC_DIR, 'ai-config.json');
+
+function getEnvFallbackApiKey() {
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() && process.env.GEMINI_API_KEY !== 'YOUR_GEMINI_API_KEY') {
+    return process.env.GEMINI_API_KEY.trim();
+  }
+  const envPath = path.join(__dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    try {
+      const content = fs.readFileSync(envPath, 'utf8');
+      const match = content.match(/^\s*GEMINI_API_KEY\s*=\s*(.+)$/m);
+      if (match && match[1]) {
+        const val = match[1].trim().replace(/^['"]|['"]$/g, '');
+        if (val && val !== 'YOUR_GEMINI_API_KEY') {
+          return val;
+        }
+      }
+    } catch (e) {
+      console.error("Lỗi đọc .env:", e.message);
+    }
+  }
+  return "";
+}
+
+function loadAiConfigFromDisk() {
+  try {
+    if (fs.existsSync(AI_CONFIG_FILE)) {
+      const data = fs.readFileSync(AI_CONFIG_FILE, 'utf8');
+      const config = JSON.parse(data);
+      if (config && typeof config === 'object') {
+        if (!config.apiKey || !config.apiKey.trim()) {
+          const fallback = getEnvFallbackApiKey();
+          if (fallback) config.apiKey = fallback;
+        }
+        if (!config.model) config.model = "gemini-1.5-flash";
+        return config;
+      }
+    }
+  } catch (e) {
+    console.error("Lỗi đọc ai-config.json:", e.message);
+  }
+  const fallbackKey = getEnvFallbackApiKey();
+  return {
+    apiKey: fallbackKey,
+    model: "gemini-1.5-flash",
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function saveAiConfigToDisk(config) {
+  try {
+    const toSave = {
+      apiKey: (config.apiKey || '').trim(),
+      model: (config.model || 'gemini-1.5-flash').trim(),
+      updatedAt: new Date().toISOString()
+    };
+    fs.writeFileSync(AI_CONFIG_FILE, JSON.stringify(toSave, null, 2), 'utf8');
+    return toSave;
+  } catch (e) {
+    console.error("Lỗi lưu ai-config.json:", e.message);
+    return null;
+  }
+}
+
+// Khởi tạo file ai-config.json nếu chưa có (với fallback từ .env)
+if (!fs.existsSync(AI_CONFIG_FILE)) {
+  const initConfig = loadAiConfigFromDisk();
+  saveAiConfigToDisk(initConfig);
+}
 
 const DEFAULT_TENANTS = [
   {
@@ -80,6 +149,46 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
     res.end(JSON.stringify({ status: "OK", time: new Date().toISOString() }));
     return;
+  }
+
+  // API 1b: Cấu hình Gemini AI Hệ Thống (System AI Config)
+  if (pathname === '/api/system/ai-config') {
+    if (req.method === 'GET') {
+      const config = loadAiConfigFromDisk();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+      res.end(JSON.stringify({
+        success: true,
+        apiKey: config.apiKey || "",
+        model: config.model || "gemini-1.5-flash",
+        updatedAt: config.updatedAt || new Date().toISOString()
+      }));
+      return;
+    } else if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          if (typeof payload === 'object' && payload !== null) {
+            const saved = saveAiConfigToDisk(payload);
+            if (saved) {
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+              res.end(JSON.stringify({
+                success: true,
+                message: "Cấu hình AI hệ thống đã lưu thành công",
+                apiKey: saved.apiKey,
+                model: saved.model,
+                updatedAt: saved.updatedAt
+              }));
+              return;
+            }
+          }
+        } catch (e) {}
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: false, error: "Invalid JSON format" }));
+      });
+      return;
+    }
   }
 
   // API 2: Lấy danh sách hoặc lưu Tenants
