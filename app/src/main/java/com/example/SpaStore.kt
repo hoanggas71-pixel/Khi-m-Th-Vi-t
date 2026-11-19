@@ -1067,8 +1067,7 @@ class SpaStore(context: Context) {
                 .addSnapshotListener { snap, err ->
                     if (err != null) return@addSnapshotListener
                     if (snap == null || !snap.exists()) {
-                        facilityTerminationNotice = "Cơ sở này đã bị xóa khỏi hệ sinh thái Khiếm Thị Việt trên Web Portal. Phiên làm việc đã kết thúc."
-                        logout()
+                        // Không văng phiên nếu tenant chưa đồng bộ lên Firestore hoặc chạy nội bộ
                         return@addSnapshotListener
                     }
                     val status = snap.getString("status") ?: "ACTIVE"
@@ -1106,23 +1105,28 @@ class SpaStore(context: Context) {
 
         // 2. Định kỳ kiểm tra Local Server API (cổng 3000) để phát hiện tức thì khi Web Dev xóa hoặc khóa cơ sở
         localTenantPollJob?.cancel()
-        val targetPhone = currentUser?.username?.ifBlank { tenantInfo?.ownerPhone } ?: return
+        val targetPhone = tenantInfo?.ownerPhone?.ifBlank {
+            currentUser?.username?.let { normalizePhoneDigits(it).takeIf { d -> d.length >= 8 } }
+        } ?: return
         if (targetPhone.isBlank() || tId == DEFAULT_TENANT_ID) return
 
         localTenantPollJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive && currentUser != null) {
-                kotlinx.coroutines.delay(6000L) // Kiểm tra mỗi 6 giây
-                val phone = currentUser?.username?.ifBlank { tenantInfo?.ownerPhone } ?: break
+                kotlinx.coroutines.delay(10000L) // Kiểm tra mỗi 10 giây
+                val phone = tenantInfo?.ownerPhone?.ifBlank {
+                    currentUser?.username?.let { normalizePhoneDigits(it).takeIf { d -> d.length >= 8 } }
+                } ?: break
                 val endpoints = listOf(
+                    "http://10.0.2.2:3000/api/tenants/status?phone=$phone",
                     "http://10.0.2.2:3000/api/tenants/auth?phone=$phone",
-                    "http://192.168.1.105:3000/api/tenants/auth?phone=$phone",
-                    "http://127.0.0.1:3000/api/tenants/auth?phone=$phone"
+                    "http://192.168.1.105:3000/api/tenants/status?phone=$phone",
+                    "http://127.0.0.1:3000/api/tenants/status?phone=$phone"
                 )
                 for (urlStr in endpoints) {
                     try {
                         val conn = (java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection).apply {
-                            connectTimeout = 1500
-                            readTimeout = 1500
+                            connectTimeout = 2000
+                            readTimeout = 2000
                             requestMethod = "GET"
                         }
                         if (conn.responseCode == 200) {
@@ -1130,20 +1134,31 @@ class SpaStore(context: Context) {
                             val json = org.json.JSONObject(res)
                             val ok = json.optBoolean("success", false)
                             val locked = json.optBoolean("locked", false)
-                            if (!ok && !locked) {
-                                // Cơ sở đã bị xóa khỏi Web Dev Portal
+                            val notFound = json.optBoolean("notFound", false) || res.contains("Không tìm thấy cơ sở")
+
+                            if (locked) {
+                                withContext(Dispatchers.Main) {
+                                    isTenantLocked = true
+                                    tenantLockReason = json.optString("message", "Cơ sở đang bị tạm khóa. Vui lòng liên hệ Dev.")
+                                }
+                                break
+                            } else if (notFound) {
+                                // Chỉ ngắt phiên khi Web Portal xác nhận cơ sở đã bị xóa hoàn toàn khỏi hệ sinh thái
                                 withContext(Dispatchers.Main) {
                                     facilityTerminationNotice = "Cơ sở này đã bị xóa khỏi hệ sinh thái Khiếm Thị Việt trên Web Portal. Phiên làm việc đã kết thúc."
                                     logout()
                                 }
                                 break
-                            } else if (locked) {
+                            } else if (ok) {
+                                // Cơ sở đang hoạt động bình thường, nếu đang bị khóa trước đó thì mở khóa
                                 withContext(Dispatchers.Main) {
-                                    isTenantLocked = true
-                                    tenantLockReason = json.optString("message", "Cơ sở đang bị tạm khóa. Vui lòng liên hệ Dev.")
+                                    if (isTenantLocked) {
+                                        isTenantLocked = false
+                                        tenantLockReason = ""
+                                    }
                                 }
+                                break
                             }
-                            break
                         }
                     } catch (_: Exception) {}
                 }

@@ -218,8 +218,8 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // API 3: Xác thực đăng nhập cho Ứng dụng APK (Chủ Spa)
-  if (pathname === '/api/tenants/auth' || pathname === '/api/auth') {
+  // API 3: Xác thực đăng nhập hoặc kiểm tra trạng thái cơ sở cho Ứng dụng APK (Chủ Spa)
+  if (pathname === '/api/tenants/auth' || pathname === '/api/auth' || pathname === '/api/tenants/status') {
     const phone = (parsedUrl.query.phone || '').trim().replace(/[^0-9]/g, '');
     const pin = (parsedUrl.query.pin || '').trim();
 
@@ -232,11 +232,16 @@ const server = http.createServer((req, res) => {
       });
 
       if (!t) {
-        return { success: false, message: "Không tìm thấy cơ sở Spa với số điện thoại này!" };
+        return { success: false, notFound: true, message: "Không tìm thấy cơ sở Spa với số điện thoại này!" };
       }
 
       if (t.isActive === false) {
         return { success: false, locked: true, message: "Cơ sở này đang bị khóa tạm thời. Vui lòng liên hệ Dev để gia hạn." };
+      }
+
+      // Nếu không gửi mã PIN hoặc truy vấn endpoint /status -> Đây là yêu cầu kiểm tra trạng thái định kỳ (Heartbeat)
+      if (!pass || pathname === '/api/tenants/status') {
+        return { success: true, active: true, tenant: t };
       }
 
       const expectedPin = (t.tempPin || "247208").trim();
