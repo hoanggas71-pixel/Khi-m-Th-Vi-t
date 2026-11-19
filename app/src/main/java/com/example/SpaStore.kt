@@ -227,6 +227,7 @@ class SpaStore(context: Context) {
     var tenantLockQrUrl by mutableStateOf("")
         private set
     var facilityTerminationNotice by mutableStateOf<String?>(null)
+    var lastAuthErrorMessage by mutableStateOf("")
     private var tenantStatusListener: ListenerRegistration? = null
     private var globalMaintenanceListener: ListenerRegistration? = null
     var isGlobalMaintenance by mutableStateOf(false)
@@ -836,26 +837,31 @@ class SpaStore(context: Context) {
      * 3. Tự động cấp quyền khởi tạo tài khoản Owner và mở app ngay lập tức!
      */
     suspend fun pullLatestFromCloudAndLogin(phoneOrUsername: String, rawPassword: String, rememberMe: Boolean = true): Boolean = withContext(Dispatchers.IO) {
+        lastAuthErrorMessage = ""
         if (login(phoneOrUsername, rawPassword, rememberMe = rememberMe)) return@withContext true
 
         val cleanPhone = normalizePhoneDigits(phoneOrUsername)
         val cleanPass = rawPassword.trim()
 
-        // 1. Kiểm tra qua Local API Server (Hỗ trợ máy ảo Android LDPlayer / Emulator kết nối Web Dev qua cổng 3000)
+        // 1. Kiểm tra qua Local API Server & Cloud Tunnel (Hỗ trợ máy ảo Android LDPlayer / Emulator kết nối Web Dev qua cổng 3000 và Internet)
         val localApiUrls = listOf(
             "http://10.0.2.2:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
             "http://192.168.1.105:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
+            "http://172.16.1.2:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
+            "https://highway-workout-dairy-source.trycloudflare.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
             "http://127.0.0.1:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass"
         )
+        var serverResponded = false
         for (apiUrl in localApiUrls) {
             try {
                 val conn = (java.net.URL(apiUrl).openConnection() as java.net.HttpURLConnection).apply {
-                    connectTimeout = 2000
-                    readTimeout = 2500
+                    connectTimeout = 2500
+                    readTimeout = 3000
                     requestMethod = "GET"
                     setRequestProperty("Accept", "application/json")
                 }
                 if (conn.responseCode == 200) {
+                    serverResponded = true
                     val respText = conn.inputStream.bufferedReader().use { it.readText() }
                     val json = org.json.JSONObject(respText)
                     if (json.optBoolean("success", false)) {
@@ -877,6 +883,19 @@ class SpaStore(context: Context) {
                                 rememberMe = rememberMe
                             )
                         }
+                    } else {
+                        // Máy chủ phản hồi từ chối đăng nhập với lý do cụ thể
+                        val msg = json.optString("message", "")
+                        if (json.optBoolean("notFound", false)) {
+                            lastAuthErrorMessage = "Không tìm thấy cơ sở với SĐT này trên Web Portal!"
+                        } else if (json.optBoolean("locked", false)) {
+                            lastAuthErrorMessage = "Cơ sở này đang bị tạm khóa trên Web Portal. Vui lòng gia hạn."
+                        } else if (msg.isNotBlank()) {
+                            lastAuthErrorMessage = msg
+                        } else {
+                            lastAuthErrorMessage = "Sai số điện thoại hoặc mật khẩu!"
+                        }
+                        return@withContext false
                     }
                 }
             } catch (e: Exception) {
@@ -932,6 +951,13 @@ class SpaStore(context: Context) {
             }
         }
 
+        if (lastAuthErrorMessage.isBlank()) {
+            lastAuthErrorMessage = if (!serverResponded) {
+                "Không thể kết nối đến Máy chủ Web Portal (cổng 3000 hoặc mạng ngoại tuyến)!"
+            } else {
+                "Sai số điện thoại hoặc mật khẩu! Vui lòng thử lại"
+            }
+        }
         return@withContext false
     }
 
@@ -1119,8 +1145,9 @@ class SpaStore(context: Context) {
                 } ?: break
                 val endpoints = listOf(
                     "http://10.0.2.2:3000/api/tenants/status?phone=$phone",
-                    "http://10.0.2.2:3000/api/tenants/auth?phone=$phone",
                     "http://192.168.1.105:3000/api/tenants/status?phone=$phone",
+                    "http://172.16.1.2:3000/api/tenants/status?phone=$phone",
+                    "https://highway-workout-dairy-source.trycloudflare.com/api/tenants/status?phone=$phone",
                     "http://127.0.0.1:3000/api/tenants/status?phone=$phone"
                 )
                 for (urlStr in endpoints) {

@@ -1010,7 +1010,7 @@ fun OneTimeLoginScreen(store: SpaStore) {
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     } else {
-                                        val failMsg = "❌ Sai số điện thoại hoặc mật khẩu! Vui lòng thử lại"
+                                        val failMsg = store.lastAuthErrorMessage.ifBlank { "❌ Sai số điện thoại hoặc mật khẩu! Vui lòng thử lại" }
                                         errorMessage = failMsg
                                         Toast.makeText(
                                             context,
@@ -1019,7 +1019,7 @@ fun OneTimeLoginScreen(store: SpaStore) {
                                         ).show()
                                     }
                                 } catch (e: Exception) {
-                                    val failMsg = "❌ Sai số điện thoại hoặc mật khẩu! Vui lòng thử lại"
+                                    val failMsg = store.lastAuthErrorMessage.ifBlank { "❌ Lỗi kết nối đăng nhập: ${e.message ?: "Vui lòng thử lại"}" }
                                     errorMessage = failMsg
                                     Toast.makeText(
                                         context,
