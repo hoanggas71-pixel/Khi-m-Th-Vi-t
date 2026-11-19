@@ -4791,10 +4791,11 @@ class SpaStore(context: Context) {
         }
 
         // 6. LỆNH TẠO TÀI KHOẢN MỚI / THÊM NHÂN VIÊN KTV (YÊU CẦU XÁC NHẬN LẠI TRƯỚC KHI THÊM)
-        if (norm.contains("them nhan vien") || norm.contains("them ktv") || norm.contains("them nv") ||
+        val laLenhTaoThemNhanVien = Regex("(?:them|tao|lap)\\b.*\\b(?:nhan vien|ktv|nv|tai khoan|ky thuat vien)\\b").containsMatchIn(norm) ||
+            norm.contains("them nhan vien") || norm.contains("them ktv") || norm.contains("them nv") ||
             norm.contains("tao nhan vien") || norm.contains("tao ktv") || norm.contains("tao nv") ||
             norm.contains("tao tai khoan") || norm.contains("them tai khoan")
-        ) {
+        if (laLenhTaoThemNhanVien) {
             val phoneExplicit = Regex("(?i)(?:sđt|sdt|số điện thoại|so dien thoai|dien thoai|phone|tel)\\s*[:=]?\\s*(\\d{3,12})").find(prompt)?.groupValues?.get(1)
             val phoneStandalone = Regex("\\b(0\\d{8,10}|\\d{9,11}|113|114|115)\\b").find(norm)?.value
             val phone = phoneExplicit?.takeIf { it.isNotBlank() } ?: phoneStandalone?.takeIf { it.isNotBlank() } ?: ""
@@ -4809,6 +4810,20 @@ class SpaStore(context: Context) {
             var rawName = trichXuatTenSauTuKhoa(
                 prompt,
                 listOf(
+                    "tạo cho tôi 1 nhân viên tên là", "tao cho toi 1 nhan vien ten la",
+                    "tạo cho tôi 1 nhân viên tên", "tao cho toi 1 nhan vien ten",
+                    "tạo cho tôi 1 nhân viên", "tao cho toi 1 nhan vien",
+                    "tạo cho tôi nhân viên tên là", "tao cho toi nhan vien ten la",
+                    "tạo cho tôi nhân viên tên", "tao cho toi nhan vien ten",
+                    "thêm cho tôi 1 nhân viên tên là", "them cho toi 1 nhan vien ten la",
+                    "thêm cho tôi 1 nhân viên tên", "them cho toi 1 nhan vien ten",
+                    "thêm cho tôi 1 nhân viên", "them cho toi 1 nhan vien",
+                    "tạo 1 nhân viên tên là", "tao 1 nhan vien ten la",
+                    "tạo 1 nhân viên tên", "tao 1 nhan vien ten",
+                    "tạo 1 nhân viên", "tao 1 nhan vien",
+                    "thêm 1 nhân viên tên là", "them 1 nhan vien ten la",
+                    "thêm 1 nhân viên tên", "them 1 nhan vien ten",
+                    "thêm 1 nhân viên", "them 1 nhan vien",
                     "thêm nhân viên tên là", "them nhan vien ten la", "thêm nhân viên tên", "them nhan vien ten",
                     "thêm ktv tên là", "them ktv ten la", "thêm ktv tên", "them ktv ten",
                     "thêm nv tên là", "them nv ten la", "thêm nv tên", "them nv ten",
@@ -4817,6 +4832,8 @@ class SpaStore(context: Context) {
                     "thêm nhân viên", "them nhan vien", "thêm ktv", "them ktv", "thêm nv", "them nv",
                     "tạo nhân viên", "tao nhan vien", "tạo ktv", "tao ktv", "tạo nv", "tao nv",
                     "tài khoản cho", "tai khoan cho", "tài khoản", "tai khoan",
+                    "nhân viên tên là", "nhan vien ten la", "nhân viên tên", "nhan vien ten",
+                    "ktv tên là", "ktv ten la", "ktv tên", "ktv ten",
                     "nhân viên", "nhan vien", "ktv", "kỹ thuật viên", "tên là", "ten la"
                 )
             )
@@ -6008,8 +6025,11 @@ class SpaStore(context: Context) {
             )
         }
 
-        // 3B. Hỏi về Danh sách Nhân viên KTV / Nhân sự
-        if (norm.contains("ktv") || norm.contains("nhan vien") || norm.contains("nhan su")) {
+        // 3B. Hỏi về Danh sách Nhân viên KTV / Nhân sự (chỉ chạy khi KHÔNG PHẢI lệnh thêm/tạo/xóa/sửa)
+        if ((norm.contains("ktv") || norm.contains("nhan vien") || norm.contains("nhan su")) &&
+            !norm.contains("them") && !norm.contains("tao") && !norm.contains("lap") &&
+            !norm.contains("xoa") && !norm.contains("sua") && !norm.contains("cap nhat")
+        ) {
             val dsNv = if (nvs.isEmpty()) {
                 "Hiện danh sách nhân viên KTV đang trống (0 người)."
             } else {
