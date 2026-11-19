@@ -582,9 +582,10 @@
               <span>🧠</span> Mô Hình Gemini Triển Khai:
             </label>
             <select id="system-gemini-model-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 px-3 text-xs text-white font-mono focus:outline-none focus:border-indigo-500">
-              <option value="gemini-1.5-flash">gemini-1.5-flash (Khuyên dùng — Phản hồi siêu tốc <0.5s, chính xác cao)</option>
-              <option value="gemini-2.0-flash">gemini-2.0-flash (Thế hệ mới — Tối ưu suy luận nhanh)</option>
-              <option value="gemini-1.5-pro">gemini-1.5-pro (Phân tích chuyên sâu phức tạp)</option>
+              <option value="gemini-2.5-flash">gemini-2.5-flash (Khuyên dùng — Đời mới nhất, phản hồi siêu tốc, chính xác cao)</option>
+              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Siêu nhẹ, tiết kiệm hạn mức)</option>
+              <option value="gemini-3.8-flash">gemini-3.8-flash (Thế hệ mới — Suy luận đa tầng)</option>
+              <option value="gemini-2.5-pro">gemini-2.5-pro (Phân tích chuyên sâu phức tạp)</option>
             </select>
             <div class="flex items-center gap-2 pt-1">
               <button type="button" id="btn-test-ai-key" onclick="testGeminiApiKeyConnection()" class="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
@@ -2470,7 +2471,7 @@
       const btnLabel = document.getElementById("btn-save-ai-label");
 
       const apiKey = keyInput ? keyInput.value.trim() : "";
-      const model = modelSelect ? modelSelect.value : "gemini-1.5-flash";
+      const model = modelSelect ? modelSelect.value : "gemini-2.5-flash";
 
       try {
         if (btnSave) btnSave.disabled = true;
@@ -2507,7 +2508,7 @@
       const btnLabel = document.getElementById("btn-test-ai-label");
 
       const apiKey = keyInput ? keyInput.value.trim() : "";
-      const model = modelSelect ? modelSelect.value : "gemini-1.5-flash";
+      const model = modelSelect ? modelSelect.value : "gemini-2.5-flash";
 
       if (!apiKey) {
         if (resultBox && resultText) {

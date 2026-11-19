@@ -40,7 +40,7 @@ function loadAiConfigFromDisk() {
           const fallback = getEnvFallbackApiKey();
           if (fallback) config.apiKey = fallback;
         }
-        if (!config.model) config.model = "gemini-1.5-flash";
+        if (!config.model) config.model = "gemini-2.5-flash";
         return config;
       }
     }
@@ -50,7 +50,7 @@ function loadAiConfigFromDisk() {
   const fallbackKey = getEnvFallbackApiKey();
   return {
     apiKey: fallbackKey,
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     updatedAt: new Date().toISOString()
   };
 }
@@ -59,7 +59,7 @@ function saveAiConfigToDisk(config) {
   try {
     const toSave = {
       apiKey: (config.apiKey || '').trim(),
-      model: (config.model || 'gemini-1.5-flash').trim(),
+      model: (config.model || 'gemini-2.5-flash').trim(),
       updatedAt: new Date().toISOString()
     };
     fs.writeFileSync(AI_CONFIG_FILE, JSON.stringify(toSave, null, 2), 'utf8');
@@ -159,7 +159,7 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify({
         success: true,
         apiKey: config.apiKey || "",
-        model: config.model || "gemini-1.5-flash",
+        model: config.model || "gemini-2.5-flash",
         updatedAt: config.updatedAt || new Date().toISOString()
       }));
       return;

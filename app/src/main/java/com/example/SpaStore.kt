@@ -215,6 +215,7 @@ class SpaStore(context: Context) {
 
     var currentUser by mutableStateOf<TaiKhoan?>(null)
     var isGeminiConnected by mutableStateOf(false)
+    var lastGeminiError by mutableStateOf<String?>(null)
 
     // Multi-Tenant: Trạng thái tenant (Kill-Switch)
     var tenantInfo by mutableStateOf<TenantInfo?>(null)
@@ -333,11 +334,11 @@ class SpaStore(context: Context) {
 
     // Trợ lý AI gehihi: Khởi tạo lazy theo chuẩn Firebase AI Logic
     private val geminiFlashModel by lazy {
-        Firebase.ai.generativeModel(modelName = "gemini-1.5-flash")
+        Firebase.ai.generativeModel(modelName = "gemini-2.5-flash")
     }
 
     private val geminiLiteModel by lazy {
-        Firebase.ai.generativeModel(modelName = "gemini-2.0-flash")
+        Firebase.ai.generativeModel(modelName = "gemini-2.5-flash-lite")
     }
 
     // Trạng thái Đồng bộ Đám mây Thời gian thực (Firebase Cloud Firestore)
@@ -3535,6 +3536,10 @@ class SpaStore(context: Context) {
                     val resp = conn.inputStream.bufferedReader().use { it.readText() }
                     val json = JSONObject(resp)
                     val sysKey = json.optString("apiKey", "").trim()
+                    val sysModel = json.optString("model", "gemini-2.5-flash").trim()
+                    if (sysModel.isNotBlank()) {
+                        prefs.edit().putString("system_gemini_model", sysModel).apply()
+                    }
                     if (sysKey.isNotBlank() && sysKey != "YOUR_GEMINI_API_KEY") {
                         prefs.edit().putString("system_gemini_api_key", sysKey).apply()
                         return@withContext sysKey
@@ -3562,10 +3567,11 @@ class SpaStore(context: Context) {
     private suspend fun goiGeminiApiDirect(
         prompt: String,
         bitmap: Bitmap? = null,
-        modelName: String = "gemini-1.5-flash"
+        modelName: String = "gemini-2.5-flash"
     ): String? = withContext(Dispatchers.IO) {
         val apiKey = layGeminiApiKey()
         if (apiKey.isBlank()) {
+            lastGeminiError = "Chưa cài đặt mã khóa GEMINI_API_KEY"
             return@withContext null
         }
 
@@ -3576,8 +3582,8 @@ class SpaStore(context: Context) {
             conn = (url.openConnection() as java.net.HttpURLConnection).apply {
                 requestMethod = "POST"
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                connectTimeout = 15_000
-                readTimeout = 25_000
+                connectTimeout = 8_000
+                readTimeout = 18_000
                 doOutput = true
                 doInput = true
             }
@@ -3590,8 +3596,8 @@ class SpaStore(context: Context) {
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
                         val base64 = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
                         put(JSONObject().apply {
-                            put("inline_data", JSONObject().apply {
-                                put("mime_type", "image/jpeg")
+                            put("inlineData", JSONObject().apply {
+                                put("mimeType", "image/jpeg")
                                 put("data", base64)
                             })
                         })
@@ -3610,19 +3616,43 @@ class SpaStore(context: Context) {
 
             val code = conn.responseCode
             if (code == 200) {
+                lastGeminiError = null
                 val resp = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                 val json = JSONObject(resp)
                 val candidate = json.optJSONArray("candidates")?.optJSONObject(0)
                 val content = candidate?.optJSONObject("content")
                 val partsArr = content?.optJSONArray("parts")
-                partsArr?.optJSONObject(0)?.optString("text")?.takeIf { it.isNotBlank() }
+                val textBuilder = StringBuilder()
+                if (partsArr != null) {
+                    for (i in 0 until partsArr.length()) {
+                        val p = partsArr.optJSONObject(i)
+                        if (p != null && !p.optBoolean("thought", false)) {
+                            val t = p.optString("text")
+                            if (t.isNotBlank()) textBuilder.append(t)
+                        }
+                    }
+                }
+                val resultText = textBuilder.toString().ifBlank {
+                    partsArr?.optJSONObject(0)?.optString("text").orEmpty()
+                }
+                resultText.takeIf { it.isNotBlank() }
             } else {
-                val err = conn.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                val err = conn.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
                 Log.w(TAG, "Gemini REST API ($modelName) returned code $code: $err")
+                lastGeminiError = when (code) {
+                    429 -> "Mã khóa Gemini đã chạm giới hạn lượt gọi (Quota/Rate Limit 429). Vui lòng thử lại sau ít phút."
+                    403 -> "Mã khóa Gemini không có quyền truy cập hoặc bị giới hạn (Lỗi 403 Forbidden)."
+                    400 -> "Yêu cầu đến mô hình $modelName không hợp lệ ($code): ${err.take(120)}"
+                    404 -> "Mô hình $modelName không tồn tại hoặc đã ngừng hoạt động (Lỗi 404)."
+                    else -> "Lỗi phản hồi Google AI ($code): ${err.take(120)}"
+                }
                 null
             }
         } catch (e: Exception) {
             Log.w(TAG, "Gemini REST API call failed ($modelName): ${e.message}")
+            if (lastGeminiError == null) {
+                lastGeminiError = "Không thể kết nối đến máy chủ Google: ${e.message}"
+            }
             null
         } finally {
             conn?.disconnect()
@@ -3630,21 +3660,27 @@ class SpaStore(context: Context) {
     }
 
     private suspend fun goiGeminiVoiDuPhong(prompt: String, bitmap: Bitmap? = null): String? {
-        // 1. Thử gọi trực tiếp REST Gemini 1.5 Flash (Primary)
-        val resFlash = goiGeminiApiDirect(prompt, bitmap, "gemini-1.5-flash")
-        if (!resFlash.isNullOrBlank()) {
-            return resFlash
-        }
+        val configuredModel = prefs.getString("system_gemini_model", "").orEmpty().trim()
+        val candidateModels = listOf(
+            configuredModel.takeIf { it.isNotBlank() },
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-3.8-flash",
+            "gemini-3.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash"
+        ).filterNotNull().distinct()
 
-        // 2. Thử gọi dự phòng REST Gemini 2.0 Flash (Secondary)
-        val res2Flash = goiGeminiApiDirect(prompt, bitmap, "gemini-2.0-flash")
-        if (!res2Flash.isNullOrBlank()) {
-            return res2Flash
+        for (model in candidateModels) {
+            val res = goiGeminiApiDirect(prompt, bitmap, model)
+            if (!res.isNullOrBlank()) {
+                return res
+            }
         }
 
         // 3. Dự phòng qua Firebase Vertex AI nếu có App Check & Firebase AI SDK
         return try {
-            withTimeout(20_000L) {
+            withTimeout(15_000L) {
                 if (bitmap != null) {
                     val inputContent = content {
                         image(bitmap)
@@ -3660,7 +3696,7 @@ class SpaStore(context: Context) {
             null
         } catch (e1: Exception) {
             try {
-                withTimeout(15_000L) {
+                withTimeout(10_000L) {
                     if (bitmap != null) {
                         val inputContent = content {
                             image(bitmap)
@@ -6072,7 +6108,9 @@ class SpaStore(context: Context) {
         val apiKey = layGeminiApiKey()
         val isMissingKey = apiKey.isBlank()
         val cauTraLoiThongMinh = if (isMissingKey) {
-            "Hiện tại Gehihi cần được cài đặt khóa GEMINI_API_KEY để tra cứu trực tuyến các câu hỏi kiến thức mở từ Google Gemini AI. Bạn hoặc Quản trị viên vui lòng thêm GEMINI_API_KEY vào cấu hình file .env của ứng dụng nhé!\n\nToàn bộ nghiệp vụ tạo vé, tính hoa hồng, bảng lương và báo cáo doanh thu của quán vẫn hoạt động bình thường 100% trên máy."
+            "Hiện tại Gehihi cần được cài đặt khóa GEMINI_API_KEY để tra cứu trực tuyến các câu hỏi kiến thức mở từ Google Gemini AI. Bạn hoặc Quản trị viên vui lòng thêm GEMINI_API_KEY vào cấu hình nhé!\n\nToàn bộ nghiệp vụ tạo vé, tính hoa hồng, bảng lương và báo cáo doanh thu của quán vẫn hoạt động bình thường 100% trên máy."
+        } else if (!lastGeminiError.isNullOrBlank()) {
+            "Gehihi chưa nhận được phản hồi từ Google Gemini: $lastGeminiError\n\nToàn bộ nghiệp vụ quản lý tiệm, mở vé, hoa hồng và sổ quỹ vẫn hoạt động đầy đủ trên máy."
         } else {
             "Thiết bị hiện đang ở chế độ ngoại tuyến hoặc kết nối mạng không ổn định, nên Gehihi chưa thể kết nối tới Google Gemini để tra cứu câu hỏi này. Bạn hãy kiểm tra kết nối Wi-Fi hoặc 4G để tra cứu nhé!\n\nToàn bộ nghiệp vụ quản lý tiệm, mở vé, hoa hồng và sổ quỹ vẫn hoạt động đầy đủ trên máy."
         }
