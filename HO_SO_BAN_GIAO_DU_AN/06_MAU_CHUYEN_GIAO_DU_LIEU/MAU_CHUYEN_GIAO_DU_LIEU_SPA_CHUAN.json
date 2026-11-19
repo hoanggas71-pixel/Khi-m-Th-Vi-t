@@ -1,0 +1,159 @@
+{
+  "backupVersion": 2,
+  "app": "KHIEM_THI_VIET",
+  "exportedAt": "2026-11-19",
+  "dvs": [
+    {
+      "id": "dv_001",
+      "ten": "Trị liệu 30 phút",
+      "phut": 30,
+      "gia": 110000,
+      "moTa": "Xoa bóp bấm huyệt phục hồi cơ bắp toàn thân 30 phút",
+      "chietKhauVnd": 55000,
+      "ck": 55000
+    },
+    {
+      "id": "dv_002",
+      "ten": "Trị liệu 60 phút",
+      "phut": 60,
+      "gia": 180000,
+      "moTa": "Xoa bóp trị liệu chuyên sâu bấm huyệt đả thông kinh lạc 60 phút",
+      "chietKhauVnd": 90000,
+      "ck": 90000
+    },
+    {
+      "id": "dv_003",
+      "ten": "Trị liệu 90 phút",
+      "phut": 90,
+      "gia": 270000,
+      "moTa": "Trị liệu cổ vai gáy thắt lưng kết hợp bấm huyệt 90 phút",
+      "chietKhauVnd": 135000,
+      "ck": 135000
+    },
+    {
+      "id": "dv_004",
+      "ten": "Trị liệu 120 phút",
+      "phut": 120,
+      "gia": 360000,
+      "moTa": "Trọn gói phục hồi chức năng chuyên sâu 120 phút",
+      "chietKhauVnd": 180000,
+      "ck": 180000
+    },
+    {
+      "id": "dv_005",
+      "ten": "Trị liệu 30 phút + xông hơi",
+      "phut": 30,
+      "gia": 160000,
+      "moTa": "Massage trị liệu 30 phút kèm xông hơi thảo dược",
+      "chietKhauVnd": 55000,
+      "ck": 55000
+    },
+    {
+      "id": "dv_006",
+      "ten": "Trị liệu 60 phút + xông hơi",
+      "phut": 60,
+      "gia": 230000,
+      "moTa": "Massage trị liệu 60 phút kèm xông hơi thảo dược",
+      "chietKhauVnd": 90000,
+      "ck": 90000
+    },
+    {
+      "id": "dv_007",
+      "ten": "Trị liệu 90 phút + xông hơi",
+      "phut": 90,
+      "gia": 310000,
+      "moTa": "Trị liệu chuyên sâu 90 phút kèm xông hơi thảo dược",
+      "chietKhauVnd": 135000,
+      "ck": 135000
+    },
+    {
+      "id": "dv_008",
+      "ten": "Trị liệu 120 phút + xông hơi",
+      "phut": 120,
+      "gia": 390000,
+      "moTa": "Phục hồi chức năng toàn diện 120 phút kèm xông hơi",
+      "chietKhauVnd": 180000,
+      "ck": 180000
+    },
+    {
+      "id": "dv_009",
+      "ten": "Cạo gió giác hơi",
+      "phut": 20,
+      "gia": 50000,
+      "moTa": "Cạo gió giải cảm, giác hơi thông khí huyết",
+      "chietKhauVnd": 25000,
+      "ck": 25000
+    },
+    {
+      "id": "dv_010",
+      "ten": "Xông hơi thảo dược",
+      "phut": 20,
+      "gia": 70000,
+      "moTa": "Xông hơi lá thuốc đông y giải độc thanh lọc cơ thể",
+      "chietKhauVnd": 0,
+      "ck": 0
+    }
+  ],
+  "gois": [
+    {
+      "id": "goi_001",
+      "ten": "Liệu trình 10 vé trị liệu 30 phút",
+      "gia": 990000,
+      "soBuoi": 10,
+      "dvIds": ["dv_001"],
+      "moTa": "Gói tiết kiệm 10 buổi trị liệu 30 phút tặng kèm xông hơi"
+    },
+    {
+      "id": "goi_002",
+      "ten": "Liệu trình 10 vé trị liệu 60 phút",
+      "gia": 1600000,
+      "soBuoi": 10,
+      "dvIds": ["dv_002"],
+      "moTa": "Gói chuyên sâu 10 buổi trị liệu 60 phút"
+    },
+    {
+      "id": "goi_003",
+      "ten": "Liệu trình 10 vé trị liệu 90 phút",
+      "gia": 2400000,
+      "soBuoi": 10,
+      "dvIds": ["dv_003"],
+      "moTa": "Gói VIP 10 buổi trị liệu 90 phút đả thông kinh lạc"
+    }
+  ],
+  "nvs": [
+    {
+      "id": "nv_hoai",
+      "ten": "Mai Văn Hoài",
+      "gt": "Nam",
+      "sdt": "0968608795",
+      "gc": "Bấm huyệt trị liệu, phục hồi chức năng cổ vai gáy",
+      "active": true
+    },
+    {
+      "id": "nv_hoa",
+      "ten": "Lê Thị Hoa",
+      "gt": "Nữ",
+      "sdt": "0912345678",
+      "gc": "Massage thảo dược, giác hơi cạo gió",
+      "active": true
+    }
+  ],
+  "khs": [
+    {
+      "id": "kh_minh",
+      "ten": "Anh Minh",
+      "sdt": "0901234567",
+      "ghiChu": "Khách quen ca tối, thích làm lực vừa",
+      "diaChi": "Hà Nội"
+    },
+    {
+      "id": "kh_lan",
+      "ten": "Chị Lan",
+      "sdt": "0987654321",
+      "ghiChu": "Đau mỏi vai gáy văn phòng",
+      "diaChi": "Hà Nội"
+    }
+  ],
+  "luots": [],
+  "tcs": []
+}
