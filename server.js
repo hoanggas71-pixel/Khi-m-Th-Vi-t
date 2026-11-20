@@ -5,7 +5,7 @@ const url = require('url');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const TENANTS_FILE = path.join(PUBLIC_DIR, 'tenants.json');
+const TENANTS_FILE = process.env.TENANTS_FILE || path.join(PUBLIC_DIR, 'tenants.json');
 const AI_CONFIG_FILE = path.join(PUBLIC_DIR, 'ai-config.json');
 
 function getEnvFallbackApiKey() {
@@ -40,7 +40,7 @@ function loadAiConfigFromDisk() {
           const fallback = getEnvFallbackApiKey();
           if (fallback) config.apiKey = fallback;
         }
-        if (!config.model) config.model = "gemini-2.5-flash";
+        if (!config.model) config.model = "gemini-3.5-flash-lite";
         return config;
       }
     }
@@ -50,7 +50,7 @@ function loadAiConfigFromDisk() {
   const fallbackKey = getEnvFallbackApiKey();
   return {
     apiKey: fallbackKey,
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash-lite",
     updatedAt: new Date().toISOString()
   };
 }
@@ -59,7 +59,7 @@ function saveAiConfigToDisk(config) {
   try {
     const toSave = {
       apiKey: (config.apiKey || '').trim(),
-      model: (config.model || 'gemini-2.5-flash').trim(),
+      model: (config.model || 'gemini-3.5-flash-lite').trim(),
       updatedAt: new Date().toISOString()
     };
     fs.writeFileSync(AI_CONFIG_FILE, JSON.stringify(toSave, null, 2), 'utf8');
@@ -87,17 +87,6 @@ const DEFAULT_TENANTS = [
     isActive: true,
     monthlyFee: 500000,
     tempPin: "247208"
-  },
-  {
-    id: "spa_123456789",
-    name: "Spa Suối Nước Nóng",
-    ownerPhone: "123456789",
-    plan: "Gói 1 Tháng",
-    expiryDate: "18/12/2026",
-    daysLeft: 30,
-    isActive: true,
-    monthlyFee: 500000,
-    tempPin: "12345"
   }
 ];
 
@@ -106,7 +95,7 @@ function loadTenantsFromDisk() {
     if (fs.existsSync(TENANTS_FILE)) {
       const data = fs.readFileSync(TENANTS_FILE, 'utf8');
       const list = JSON.parse(data);
-      if (Array.isArray(list) && list.length > 0) return list;
+      if (Array.isArray(list)) return list;
     }
   } catch (e) {
     console.error("Lỗi đọc tenants.json:", e.message);
@@ -216,17 +205,9 @@ const server = http.createServer((req, res) => {
         try {
           const list = JSON.parse(body);
           if (Array.isArray(list)) {
-            // Bảo toàn các cơ sở mặc định quan trọng không bao giờ bị xóa nhầm
-            const currentDisk = loadTenantsFromDisk();
-            const merged = [...list];
-            DEFAULT_TENANTS.forEach(def => {
-              if (!merged.some(t => t.id === def.id || t.ownerPhone === def.ownerPhone)) {
-                merged.unshift(def);
-              }
-            });
-            saveTenantsToDisk(merged);
+            saveTenantsToDisk(list);
             res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-            res.end(JSON.stringify({ success: true, count: merged.length }));
+            res.end(JSON.stringify({ success: true, count: list.length }));
             return;
           }
         } catch (e) {}
@@ -237,6 +218,11 @@ const server = http.createServer((req, res) => {
     } else if (req.method === 'DELETE') {
       const tenantId = parsedUrl.query.id;
       if (tenantId) {
+        if (tenantId === 'khiem_thi_viet') {
+          res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8' });
+          res.end(JSON.stringify({ error: "Không thể xóa cơ sở quản trị hệ thống mặc định" }));
+          return;
+        }
         let list = loadTenantsFromDisk();
         list = list.filter(t => t.id !== tenantId);
         saveTenantsToDisk(list);

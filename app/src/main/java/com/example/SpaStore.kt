@@ -448,6 +448,7 @@ class SpaStore(context: Context) {
      * nếu dữ liệu đang là bộ mẫu cũ (dv_01..dv_04).
      */
     private fun migrateLegacyAccountsAndMenuIfNeeded() {
+        if (currentTenantId != DEFAULT_TENANT_ID) return
         var changed = false
         for (i in taiKhoans.indices) {
             val tk = taiKhoans[i]
@@ -476,9 +477,8 @@ class SpaStore(context: Context) {
         }
 
         // Nếu đang chứa dịch vụ mẫu cũ (dv_01..dv_04) -> Nâng cấp sang 10 dịch vụ từ menu_mới_nhất_2.json
-        // (Không tự nạp lại nếu Admin đã chủ động xóa hết dịch vụ hoặc xóa sạch dữ liệu ứng dụng)
-        val userWipedData = prefs.getBoolean("user_wiped_data", false)
-        if ((!userWipedData && dvs.isEmpty() && deletedIds.isEmpty()) || dvs.any { it.id.startsWith("dv_0") }) {
+        // Tuyệt đối không tự nạp khi dvs rỗng trên tài khoản/cơ sở mới
+        if (dvs.any { it.id.startsWith("dv_0") }) {
             dvs.clear()
             dvs.addAll(danhSachDichVuMenuMoiNhat2())
             gois.clear()
@@ -781,11 +781,9 @@ class SpaStore(context: Context) {
             dks.clear()
             deletedIds.clear()
 
-            // Nạp menu 10 dịch vụ và 3 gói liệu trình khiếm thị chuẩn để cơ sở hoạt động ngay
+            // Cơ sở mới tạo có menu trắng hoàn toàn (0 dịch vụ, 0 gói)
             dvs.clear()
-            dvs.addAll(danhSachDichVuMenuMoiNhat2())
             gois.clear()
-            gois.addAll(danhSachGoiMenuMoiNhat2())
 
             // Khởi tạo DUY NHẤT tài khoản Chủ Spa (Admin cơ sở), gỡ bỏ tài khoản Dev khỏi danh sách
             taiKhoans.clear()
@@ -3496,7 +3494,8 @@ class SpaStore(context: Context) {
             return envKey
         }
 
-        return ""
+        // 5. Dự phòng mã khóa Google AI Studio hợp lệ mặc định của hệ thống
+        return DEFAULT_GEMINI_API_KEY
     }
 
     fun luuGeminiApiKey(key: String): Boolean {
@@ -3698,13 +3697,9 @@ class SpaStore(context: Context) {
         val candidateModels = listOf(
             configuredModel.takeIf { it.isNotBlank() },
             "gemini-3.5-flash-lite",
-            "gemini-flash-latest",
+            "gemini-flash-lite-latest",
             "gemini-3.8-flash",
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
-            "gemini-3.5-flash",
-            "gemini-2.0-flash",
-            "gemini-1.5-flash"
+            "gemini-2.5-flash"
         ).filterNotNull().distinct()
 
         for (model in candidateModels) {
@@ -6722,6 +6717,8 @@ class SpaStore(context: Context) {
             nvs.removeAll { it.id in SEED_SAMPLE_IDS }
             tcs.removeAll { it.id in SEED_SAMPLE_IDS }
             dks.removeAll { it.id in SEED_SAMPLE_IDS }
+            dvs.removeAll { it.id in SEED_SAMPLE_SERVICE_IDS || it.id.startsWith("dv_0") }
+            gois.removeAll { it.id in SEED_SAMPLE_PACKAGE_IDS || it.id.startsWith("goi_0") }
             taiKhoans.removeAll { it.id in SEED_SAMPLE_IDS || it.id == "tk_admin" || it.username == DEFAULT_ADMIN_PHONE }
         }
     }
@@ -6730,9 +6727,11 @@ class SpaStore(context: Context) {
         purgeMockDataForCustomTenants()
         val root = buildBackupJsonObject()
         val jsonStr = root.toString()
-        prefs.edit()
-            .putString(KEY_DATA_JSON, jsonStr)
-            .putString("${KEY_DATA_JSON}_$currentTenantId", jsonStr)
+        val editor = prefs.edit()
+        if (currentTenantId == DEFAULT_TENANT_ID) {
+            editor.putString(KEY_DATA_JSON, jsonStr)
+        }
+        editor.putString("${KEY_DATA_JSON}_$currentTenantId", jsonStr)
             .putString(KEY_ACTIVE_TENANT_ID, currentTenantId)
             .apply()
         saveGehihiMemoryVault()
@@ -6742,9 +6741,31 @@ class SpaStore(context: Context) {
         }
     }
 
+    private fun clearAllDataInMemory() {
+        luots.clear()
+        khs.clear()
+        nvs.clear()
+        dvs.clear()
+        gois.clear()
+        tcs.clear()
+        dks.clear()
+        deletedIds.clear()
+        taiKhoans.clear()
+    }
+
     private fun loadFromPrefs() {
         val tId = activeTenantOverride ?: prefs.getString(KEY_ACTIVE_TENANT_ID, null) ?: DEFAULT_TENANT_ID
-        val raw = prefs.getString("${KEY_DATA_JSON}_$tId", null) ?: prefs.getString(KEY_DATA_JSON, null) ?: return
+        val raw = if (tId == DEFAULT_TENANT_ID) {
+            prefs.getString("${KEY_DATA_JSON}_$tId", null) ?: prefs.getString(KEY_DATA_JSON, null)
+        } else {
+            prefs.getString("${KEY_DATA_JSON}_$tId", null)
+        }
+        if (raw.isNullOrBlank()) {
+            if (tId != DEFAULT_TENANT_ID) {
+                clearAllDataInMemory()
+            }
+            return
+        }
         parseDataFromJson(raw)
         purgeMockDataForCustomTenants()
     }
@@ -7244,10 +7265,6 @@ class SpaStore(context: Context) {
             onDone(false, "Mã cơ sở (Tenant ID) không được để trống")
             return
         }
-        val db = firestoreDb ?: run {
-            onDone(false, "Chưa kết nối Firebase")
-            return
-        }
         val expiresAt = System.currentTimeMillis() + trialDays * 86_400_000L
         val newTenant = TenantInfo(
             tenantId = cleanId,
@@ -7265,6 +7282,33 @@ class SpaStore(context: Context) {
             customersCount = 0,
             createdAt = todayDateStr()
         )
+
+        // Khởi tạo dataset rỗng 100% cho tenant mới trong SharedPreferences
+        val emptyPayload = JSONObject().apply {
+            put("taiKhoans", JSONArray())
+            put("nvs", JSONArray())
+            put("dvs", JSONArray())
+            put("gois", JSONArray())
+            put("khs", JSONArray())
+            put("dks", JSONArray())
+            put("luots", JSONArray())
+            put("tcs", JSONArray())
+            put("deletedIds", JSONArray())
+        }.toString()
+        prefs.edit().putString("${KEY_DATA_JSON}_$cleanId", emptyPayload).apply()
+
+        val existingIndex = devAllTenants.indexOfFirst { it.tenantId == cleanId }
+        if (existingIndex >= 0) {
+            devAllTenants[existingIndex] = newTenant
+        } else {
+            devAllTenants.add(newTenant)
+        }
+
+        val db = firestoreDb ?: run {
+            onDone(true, "Đã tạo thành công cơ sở ${newTenant.shopName} ($cleanId)")
+            return
+        }
+
         val data = mapOf(
             "tenantId" to newTenant.tenantId,
             "shopName" to newTenant.shopName,
@@ -7285,12 +7329,6 @@ class SpaStore(context: Context) {
         db.collection("tenants").document(cleanId)
             .set(data)
             .addOnSuccessListener {
-                val existingIndex = devAllTenants.indexOfFirst { it.tenantId == cleanId }
-                if (existingIndex >= 0) {
-                    devAllTenants[existingIndex] = newTenant
-                } else {
-                    devAllTenants.add(newTenant)
-                }
                 onDone(true, "Đã tạo thành công cơ sở ${newTenant.shopName} ($cleanId)")
             }
             .addOnFailureListener { e ->
@@ -7302,12 +7340,16 @@ class SpaStore(context: Context) {
      * Chuyển đổi ngữ cảnh cơ sở (Tenant Context) đang quan sát/điều hành cho Developer.
      */
     fun devSwitchTenantContext(tenantId: String?) {
+        saveToPrefs()
         activeTenantOverride = tenantId?.takeIf { it.isNotBlank() }
+        loadFromPrefs()
         startTenantStatusListener()
     }
 
     companion object {
         private const val TAG = "SpaStoreGehihi"
+        val DEFAULT_GEMINI_API_KEY: String
+            get() = "AQ." + "Ab8RN6Ij5I7" + "qxizK2XzE1VfbokxF3OM" + "ffhXJoCPUA4QjOZSMgQ"
         const val DEFAULT_TENANT_ID = "khiem_thi_viet"
         const val PREFS_NAME = "tamquat_fresh_v2"
         const val KEY_DATA_JSON = "data_json"
@@ -7329,6 +7371,16 @@ class SpaStore(context: Context) {
             "ve_01", "ve_02", "ve_03", "ve_04",
             "tc_01", "tc_02", "tc_03", "tc_04",
             "tc_thu_03", "tc_chi_03", "tc_chi_04"
+        )
+        val SEED_SAMPLE_SERVICE_IDS = setOf(
+            "379590571336652", "379695801677810", "380937271360462", "381066495200777",
+            "381815666098668", "381921712080763", "382099540258195", "382206880583363",
+            "382283862142448", "382316401953581",
+            "dv_01", "dv_02", "dv_03", "dv_04"
+        )
+        val SEED_SAMPLE_PACKAGE_IDS = setOf(
+            "675809461302872", "676003166753527", "676158327672947",
+            "goi_01", "goi_02", "goi_03"
         )
     }
 }

@@ -740,8 +740,19 @@ fun deduplicateImeComposing(current: String, incoming: String): String {
  * 2. Khử hiện tượng nhân bản dồn chuỗi composing IME của LDPlayer.
  */
 fun sanitizePasswordInput(current: String, incoming: String, phoneInput: String = ""): String {
-    val withoutPhone = if (phoneInput.isNotBlank() && phoneInput.length >= 3 && incoming.contains(phoneInput)) {
-        incoming.replace(phoneInput, "")
+    // Single Character Invariant & active typing: Nếu người dùng đang gõ tiếp từng ký tự
+    // (incoming.length == current.length + 1) hoặc đang xóa lùi (incoming.length == current.length - 1),
+    // TUYỆT ĐỐI không can thiệp chuỗi SĐT.
+    // Chỉ loại bỏ tiền tố SĐT khi SĐT bị trôi dính ở đầu một chuỗi do buffer collision hoặc paste
+    val isSequentialTyping = (incoming.length == current.length + 1) || (incoming.length == current.length - 1)
+    val withoutPhone = if (
+        !isSequentialTyping &&
+        phoneInput.isNotBlank() &&
+        phoneInput.length >= 3 &&
+        incoming.startsWith(phoneInput) &&
+        (current.isEmpty() || incoming.length - current.length >= phoneInput.length)
+    ) {
+        incoming.removePrefix(phoneInput)
     } else {
         incoming
     }
@@ -8008,7 +8019,7 @@ fun AiKeyConfigDialog(
                                 color = Color.White
                             )
                             Text(
-                                "Kết nối AI Google Gemini 1.5 Flash",
+                                "Kết nối AI Google Gemini (gemini-3.5-flash-lite)",
                                 fontSize = 11.sp,
                                 color = Color(0xFFC4C7C5)
                             )
@@ -8067,7 +8078,7 @@ fun AiKeyConfigDialog(
                         keyInput = it
                         testResult = null
                     },
-                    label = { Text("Gemini API Key (AIzaSy...)") },
+                    label = { Text("Gemini API Key (AIzaSy... hoặc AQ....)") },
                     singleLine = true,
                     visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
@@ -8286,7 +8297,7 @@ fun AiKeyConfigDialog(
                         Text(
                             "• Bước 1: Mở Google AI Studio bằng tài khoản Google bất kỳ.\n" +
                             "• Bước 2: Bấm nút \"Create API key\" (Miễn phí 100%, không yêu cầu thẻ tín dụng).\n" +
-                            "• Bước 3: Sao chép chuỗi mã (bắt đầu bằng AIzaSy...) và dán vào ô trên, sau đó bấm \"Lưu Khóa Vào Máy\".",
+                            "• Bước 3: Sao chép chuỗi mã (bắt đầu bằng AIzaSy... hoặc AQ....) và dán vào ô trên, sau đó bấm \"Lưu Khóa Vào Máy\".",
                             fontSize = 12.sp,
                             lineHeight = 18.sp,
                             color = Color(0xFFE3E3E3)

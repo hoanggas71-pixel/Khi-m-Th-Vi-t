@@ -256,6 +256,25 @@ class ImeComposingDeduplicationTest {
         assertEquals("12", phoneWithIme)
     }
 
+    @Test
+    fun testPasswordNotWipedWhenMatchingPhonePrefix() {
+        // R1: Tài khoản/SĐT là "12345", người dùng gõ mật khẩu từng ký tự "1" -> "12" -> "123" -> "1234" -> "12345" -> "123456"
+        // Tuyệt đối không bị xóa trắng tại ký tự thứ 5 ("12345") hoặc bất kỳ ký tự nào
+        val phone = "12345"
+        var pass = ""
+        val keystrokes = listOf("1", "12", "123", "1234", "12345", "123456")
+        for (incoming in keystrokes) {
+            pass = sanitizePasswordInput(current = pass, incoming = incoming, phoneInput = phone)
+        }
+        assertEquals("123456", pass)
+
+        // Kiểm tra xóa lùi (backspace): "123456" -> "12345" -> "1234"
+        pass = sanitizePasswordInput(current = pass, incoming = "12345", phoneInput = phone)
+        assertEquals("12345", pass)
+        pass = sanitizePasswordInput(current = pass, incoming = "1234", phoneInput = phone)
+        assertEquals("1234", pass)
+    }
+
     // =========================================================================
     // 8. TƯƠNG THÍCH VỚI HELPER ImeInputHelper
     // =========================================================================

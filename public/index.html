@@ -1424,7 +1424,7 @@
       apkDownloadUrl: ""
     };
 
-    // Danh sách cơ sở thực tế (Khởi tạo mặc định)
+    // Danh sách cơ sở thực tế (Khởi tạo mặc định - chỉ giữ cơ sở quản trị hệ thống gốc)
     const DEFAULT_TENANTS = [
       {
         id: "khiem_thi_viet",
@@ -1436,17 +1436,6 @@
         isActive: true,
         monthlyFee: 500000,
         tempPin: "247208"
-      },
-      {
-        id: "spa_123456789",
-        name: "Spa Suối Nước Nóng",
-        ownerPhone: "123456789",
-        plan: "Gói 1 Tháng",
-        expiryDate: "18/12/2026",
-        daysLeft: 30,
-        isActive: true,
-        monthlyFee: 500000,
-        tempPin: "12345"
       }
     ];
 
@@ -1512,15 +1501,9 @@
         const raw = localStorage.getItem(STORAGE_KEY_TENANTS);
         if (raw) {
           let parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            parsed = parsed.filter(t => t.id !== "spa_huong_sen" && t.id !== "spa_hoa_ban");
-            // Đảm bảo DEFAULT_TENANTS luôn luôn hiện diện đầy đủ
-            DEFAULT_TENANTS.forEach(def => {
-              if (!parsed.some(t => t.id === def.id || t.ownerPhone === def.ownerPhone)) {
-                parsed.unshift(JSON.parse(JSON.stringify(def)));
-              }
-            });
-            if (parsed.length > 0) return parsed;
+          if (Array.isArray(parsed)) {
+            parsed = parsed.filter(t => t.id !== "spa_huong_sen" && t.id !== "spa_hoa_ban" && t.id !== "spa_123456789");
+            return parsed;
           }
         }
       } catch (e) {}
@@ -1543,12 +1526,8 @@
         const res = await fetch('/api/tenants');
         if (res.ok) {
           const list = await res.json();
-          if (Array.isArray(list) && list.length > 0) {
-            const mergedMap = new Map();
-            DEFAULT_TENANTS.forEach(t => mergedMap.set(t.id, t));
-            tenants.forEach(t => mergedMap.set(t.id, t));
-            list.forEach(t => mergedMap.set(t.id, t));
-            tenants = Array.from(mergedMap.values());
+          if (Array.isArray(list)) {
+            tenants = list.filter(t => t.id !== "spa_123456789");
             localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
             renderTable();
             renderCustomerPricing();
@@ -2265,12 +2244,6 @@
                     tenants[idx] = Object.assign({}, tenants[idx], ct);
                   } else {
                     tenants.push(ct);
-                  }
-                });
-                // Bảo toàn DEFAULT_TENANTS luôn luôn có mặt
-                DEFAULT_TENANTS.forEach(def => {
-                  if (!tenants.some(t => t.id === def.id || t.ownerPhone === def.ownerPhone)) {
-                    tenants.unshift(JSON.parse(JSON.stringify(def)));
                   }
                 });
                 saveTenants();
@@ -3453,6 +3426,10 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
     function requestDeleteTenant(idx) {
       const t = tenants[idx];
       if (!t) return;
+      if (t.id === "khiem_thi_viet") {
+        alert("Không thể xóa cơ sở quản trị hệ thống mặc định!");
+        return;
+      }
       showConfirmDialog({
         title: `🗑️ XÓA CƠ SỞ: ${t.name}`,
         message: `Bạn có chắc chắn muốn XÓA vĩnh viễn cơ sở "${t.name}" khỏi hệ thống?`,
@@ -3464,6 +3441,9 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
           const deletedIdx = idx;
 
           tenants.splice(idx, 1);
+          try {
+            fetch('/api/tenants?id=' + encodeURIComponent(deletedTenant.id), { method: 'DELETE' }).catch(() => {});
+          } catch (e) {}
           saveTenants();
           renderTable();
           checkCustomerSession();
