@@ -3527,6 +3527,7 @@ class SpaStore(context: Context) {
             val url = java.net.URL("https://generativelanguage.googleapis.com/v1beta/models?key=$cleanKey")
             val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
                 requestMethod = "GET"
+                setRequestProperty("X-goog-api-key", cleanKey)
                 connectTimeout = 8000
                 readTimeout = 8000
             }
@@ -3599,7 +3600,7 @@ class SpaStore(context: Context) {
     private suspend fun goiGeminiApiDirect(
         prompt: String,
         bitmap: Bitmap? = null,
-        modelName: String = "gemini-2.5-flash"
+        modelName: String = "gemini-3.5-flash-lite"
     ): String? = withContext(Dispatchers.IO) {
         val apiKey = layGeminiApiKey()
         if (apiKey.isBlank()) {
@@ -3614,6 +3615,7 @@ class SpaStore(context: Context) {
             conn = (url.openConnection() as java.net.HttpURLConnection).apply {
                 requestMethod = "POST"
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                setRequestProperty("X-goog-api-key", apiKey)
                 connectTimeout = 8_000
                 readTimeout = 18_000
                 doOutput = true
@@ -3695,9 +3697,11 @@ class SpaStore(context: Context) {
         val configuredModel = prefs.getString("system_gemini_model", "").orEmpty().trim()
         val candidateModels = listOf(
             configuredModel.takeIf { it.isNotBlank() },
+            "gemini-3.5-flash-lite",
+            "gemini-flash-latest",
+            "gemini-3.8-flash",
             "gemini-2.5-flash",
             "gemini-2.5-flash-lite",
-            "gemini-3.8-flash",
             "gemini-3.5-flash",
             "gemini-2.0-flash",
             "gemini-1.5-flash"

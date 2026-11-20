@@ -4,7 +4,8 @@
   "description": "Khiem Thi Viet Web Portal & API Server",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test_gemini_key_validation.js"
   },
   "engines": {
     "node": ">=18.0.0"

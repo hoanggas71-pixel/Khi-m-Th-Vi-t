@@ -556,7 +556,7 @@
               <span id="ai-key-updated-at" class="text-[10px] text-slate-400 font-mono">Cập nhật: --</span>
             </label>
             <div class="ai-key-input-wrapper relative flex items-center">
-              <input type="password" id="system-gemini-key-input" placeholder="Dán mã khóa AIzaSy... vào đây" class="ai-key-input w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 pl-3 pr-24 text-xs text-white placeholder-slate-500 font-mono focus:outline-none">
+              <input type="password" id="system-gemini-key-input" oninput="handleApiKeyInputChange()" placeholder="Dán mã khóa AIzaSy... vào đây (khoảng 39 ký tự)" class="ai-key-input w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 pl-3 pr-24 text-xs text-white placeholder-slate-500 font-mono focus:outline-none">
               <div class="absolute right-1.5 flex items-center gap-1">
                 <button type="button" onclick="pasteApiKeyFromClipboard()" title="Dán từ Clipboard" class="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg text-xs transition">
                   📋
@@ -569,10 +569,12 @@
                 </button>
               </div>
             </div>
+            <!-- Cảnh báo định dạng API Key theo thời gian thực (Client-side Validation Warning) -->
+            <div id="ai-key-format-hint" class="hidden"></div>
             <!-- Alert phản hồi kiểm tra kết nối -->
-            <div id="ai-test-result" class="hidden p-2.5 rounded-xl text-xs font-medium border flex items-center justify-between">
-              <span id="ai-test-result-text"></span>
-              <button onclick="document.getElementById('ai-test-result').classList.add('hidden')" class="text-xs opacity-75 hover:opacity-100">&times;</button>
+            <div id="ai-test-result" class="hidden p-3 rounded-xl text-xs font-medium border flex items-start justify-between">
+              <span id="ai-test-result-text" class="flex-1"></span>
+              <button onclick="document.getElementById('ai-test-result').classList.add('hidden')" class="text-xs opacity-75 hover:opacity-100 ml-2">&times;</button>
             </div>
           </div>
 
@@ -582,10 +584,11 @@
               <span>🧠</span> Mô Hình Gemini Triển Khai:
             </label>
             <select id="system-gemini-model-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 px-3 text-xs text-white font-mono focus:outline-none focus:border-indigo-500">
-              <option value="gemini-2.5-flash">gemini-2.5-flash (Khuyên dùng — Đời mới nhất, phản hồi siêu tốc, chính xác cao)</option>
-              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Siêu nhẹ, tiết kiệm hạn mức)</option>
+              <option value="gemini-3.5-flash-lite" selected>gemini-3.5-flash-lite (Khuyên dùng — Phản hồi siêu tốc, ổn định 100%, tiết kiệm hạn mức)</option>
+              <option value="gemini-flash-latest">gemini-flash-latest (Bản Flash tiêu chuẩn Google AI Studio)</option>
               <option value="gemini-3.8-flash">gemini-3.8-flash (Thế hệ mới — Suy luận đa tầng)</option>
-              <option value="gemini-2.5-pro">gemini-2.5-pro (Phân tích chuyên sâu phức tạp)</option>
+              <option value="gemini-2.5-flash">gemini-2.5-flash (Bản chuẩn ổn định)</option>
+              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Bản siêu nhẹ)</option>
             </select>
             <div class="flex items-center gap-2 pt-1">
               <button type="button" id="btn-test-ai-key" onclick="testGeminiApiKeyConnection()" class="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
@@ -598,19 +601,25 @@
           </div>
         </div>
 
-        <!-- 3 bước hướng dẫn nhanh tiếng Việt -->
-        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 text-[11px] text-slate-400 grid grid-cols-1 md:grid-cols-3 gap-3 leading-relaxed">
-          <div class="flex items-start gap-2">
-            <span class="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold flex items-center justify-center shrink-0 text-[10px]">1</span>
-            <span>Đăng nhập <strong class="text-slate-200">Google AI Studio</strong> bằng tài khoản Gmail và chọn <strong class="text-slate-200">Get API key</strong>.</span>
+        <!-- Hướng dẫn chi tiết & Cảnh báo phân biệt định dạng API Key -->
+        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 text-[11px] text-slate-400 space-y-3 leading-relaxed">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="flex items-start gap-2">
+              <span class="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold flex items-center justify-center shrink-0 text-[10px]">1</span>
+              <span>Đăng nhập <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-indigo-300 underline font-semibold hover:text-indigo-200">Google AI Studio</a> bằng tài khoản Gmail và chọn <strong class="text-slate-200">Get API key</strong>.</span>
+            </div>
+            <div class="flex items-start gap-2">
+              <span class="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 font-bold flex items-center justify-center shrink-0 text-[10px]">2</span>
+              <span>Bấm <strong class="text-slate-200">Create API key</strong>, sao chép chuỗi mã chuẩn bắt đầu bằng <strong class="text-amber-200 font-mono">AIzaSy...</strong> (khoảng 39 ký tự).</span>
+            </div>
+            <div class="flex items-start gap-2">
+              <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold flex items-center justify-center shrink-0 text-[10px]">3</span>
+              <span>Dán vào ô trên, bấm <strong class="text-emerald-300">Test Kết Nối</strong> (HTTP 200 OK) rồi bấm <strong class="text-white">Lưu Khóa Hệ Thống</strong>.</span>
+            </div>
           </div>
-          <div class="flex items-start gap-2">
-            <span class="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 font-bold flex items-center justify-center shrink-0 text-[10px]">2</span>
-            <span>Tạo key mới hoàn toàn miễn phí, sao chép chuỗi ký tự bắt đầu bằng <strong class="text-amber-200 font-mono">AIzaSy...</strong></span>
-          </div>
-          <div class="flex items-start gap-2">
-            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold flex items-center justify-center shrink-0 text-[10px]">3</span>
-            <span>Dán vào ô trên, bấm <strong class="text-emerald-300">Test Kết Nối</strong> (HTTP 200 OK) rồi bấm <strong class="text-white">Lưu Khóa Hệ Thống</strong>.</span>
+          <div class="pt-2 border-t border-slate-800/80 flex items-start gap-2 text-[11px] text-slate-300">
+            <span class="text-amber-400 font-bold shrink-0">⚠️ Yêu cầu định dạng khóa:</span>
+            <span>Hệ thống sử dụng Google Generative Language API, chỉ chấp nhận mã khóa Google AI Studio tiêu chuẩn bắt đầu bằng <code class="text-emerald-300 font-mono bg-slate-900 px-1 py-0.5 rounded border border-slate-700">AIzaSy...</code>. Các token từ Vertex AI (<code class="text-rose-400 font-mono bg-slate-900 px-1 py-0.5 rounded border border-slate-700">AQ.Ab8...</code>), Google OAuth (<code class="text-rose-400 font-mono bg-slate-900 px-1 py-0.5 rounded border border-slate-700">ya29...</code>) hay Service Account JSON không tương thích và sẽ bị báo lỗi.</span>
           </div>
         </div>
       </div>
@@ -2454,6 +2463,162 @@
     // ==========================================
     // SYSTEM GEMINI AI CONFIGURATION CONTROLLER
     // ==========================================
+    // ==========================================
+    // SYSTEM GEMINI AI CONFIGURATION CONTROLLER
+    // ==========================================
+    function validateGeminiApiKeyFormat(key) {
+      const trimmed = (key || "").trim();
+      if (!trimmed) {
+        return {
+          isValid: false,
+          isEmpty: true,
+          errorType: 'EMPTY',
+          title: 'Chưa nhập API Key',
+          message: 'Vui lòng nhập hoặc dán mã khóa Google AI Studio API Key.',
+          guidance: 'Đăng nhập Google AI Studio để lấy API Key miễn phí.',
+          actionableLink: 'https://aistudio.google.com/app/apikey'
+        };
+      }
+
+      // 1. Token Google OAuth 2.0 (ya29...)
+      if (trimmed.startsWith('ya29.')) {
+        return {
+          isValid: false,
+          isEmpty: false,
+          errorType: 'OAUTH_TOKEN',
+          title: 'Khóa không tương thích: Google OAuth 2.0 Access Token',
+          message: 'Phát hiện token truy cập tạm thời Google OAuth (bắt đầu bằng "ya29."). Hệ thống yêu cầu mã khóa Google API Key cố định.',
+          guidance: 'Vui lòng lấy API Key cố định tại Google AI Studio: https://aistudio.google.com/app/apikey',
+          actionableLink: 'https://aistudio.google.com/app/apikey'
+        };
+      }
+
+      // 2. Token JWT (eyJ...)
+      if (trimmed.startsWith('eyJ')) {
+        return {
+          isValid: false,
+          isEmpty: false,
+          errorType: 'JWT_TOKEN',
+          title: 'Khóa không tương thích: JWT Token',
+          message: 'Chuỗi bạn nhập là JSON Web Token (JWT), không phải Google Gemini API Key.',
+          guidance: 'Yêu cầu mã khóa bắt đầu bằng "AIzaSy..." hoặc "AQ." từ Google AI Studio: https://aistudio.google.com/app/apikey',
+          actionableLink: 'https://aistudio.google.com/app/apikey'
+        };
+      }
+
+      // 3. OpenAI Key (sk-...)
+      if (trimmed.startsWith('sk-')) {
+        return {
+          isValid: false,
+          isEmpty: false,
+          errorType: 'OPENAI_KEY',
+          title: 'Khóa không tương thích: OpenAI API Key',
+          message: 'Chuỗi bạn nhập là API Key của OpenAI (bắt đầu bằng "sk-"). Trợ lý Gehihi sử dụng Google Gemini AI.',
+          guidance: 'Vui lòng lấy Google AI Studio API Key: https://aistudio.google.com/app/apikey',
+          actionableLink: 'https://aistudio.google.com/app/apikey'
+        };
+      }
+
+      // 4. Kiểm tra tiền tố chuẩn của Google: AIzaSy... (Khóa tiêu chuẩn) HOẶC AQ.... (Khóa Authorization Auth Key thế hệ mới)
+      const isStandardKey = trimmed.startsWith('AIzaSy');
+      const isAuthKey = trimmed.startsWith('AQ.');
+
+      if (!isStandardKey && !isAuthKey) {
+        return {
+          isValid: false,
+          isEmpty: false,
+          errorType: 'INVALID_PREFIX',
+          title: 'Định dạng khóa không hợp lệ (Cần bắt đầu bằng AIzaSy... hoặc AQ....)',
+          message: 'Mã khóa không đúng định dạng chuẩn của Google Gemini. Mã khóa hợp lệ của Google AI Studio bắt đầu bằng "AIzaSy..." (Khóa tiêu chuẩn) hoặc "AQ...." (Khóa Auth Key bảo mật mới).',
+          guidance: 'Vui lòng đăng nhập Google AI Studio để tạo API Key: https://aistudio.google.com/app/apikey',
+          actionableLink: 'https://aistudio.google.com/app/apikey'
+        };
+      }
+
+      // 5. Kiểm tra độ dài chuẩn
+      if (isStandardKey && (trimmed.length < 35 || trimmed.length > 45)) {
+        return {
+          isValid: false,
+          isEmpty: false,
+          errorType: 'INVALID_LENGTH',
+          title: 'Độ dài mã khóa tiêu chuẩn không đúng',
+          message: `Mã khóa tiêu chuẩn bắt đầu bằng "AIzaSy" có ${trimmed.length} ký tự (chuẩn là khoảng 39 ký tự). Vui lòng kiểm tra lại xem có bị cắt bớt hoặc sao chép thừa khoảng trắng không.`,
+          guidance: 'Sao chép đầy đủ toàn bộ khoảng 39 ký tự từ Google AI Studio.',
+          actionableLink: 'https://aistudio.google.com/app/apikey'
+        };
+      }
+
+      if (isAuthKey && (trimmed.length < 40 || trimmed.length > 70)) {
+        return {
+          isValid: false,
+          isEmpty: false,
+          errorType: 'INVALID_LENGTH',
+          title: 'Độ dài mã khóa Auth Key không đúng',
+          message: `Mã khóa Auth Key bắt đầu bằng "AQ." có ${trimmed.length} ký tự (chuẩn là khoảng 48-60 ký tự). Vui lòng kiểm tra lại chuỗi sao chép.`,
+          guidance: 'Sao chép đầy đủ toàn bộ ký tự từ Google AI Studio.',
+          actionableLink: 'https://aistudio.google.com/app/apikey'
+        };
+      }
+
+      // 6. Kiểm tra ký tự hợp lệ (A-Z, a-z, 0-9, _, -, .)
+      if (!/^[A-Za-z0-9_\-\.]+$/.test(trimmed)) {
+        return {
+          isValid: false,
+          isEmpty: false,
+          errorType: 'INVALID_CHARACTERS',
+          title: 'Chứa ký tự không hợp lệ',
+          message: 'Mã khóa chứa ký tự đặc biệt không được phép (khoảng trắng hoặc ký tự lạ).',
+          guidance: 'Vui lòng xóa khoảng trắng thừa hoặc sao chép lại mã khóa.',
+          actionableLink: 'https://aistudio.google.com/app/apikey'
+        };
+      }
+
+      const keyTypeLabel = isAuthKey ? 'Auth Key bảo mật mới (AQ....)' : 'Tiêu chuẩn (AIzaSy...)';
+      return {
+        isValid: true,
+        isEmpty: false,
+        key: trimmed,
+        keyType: isAuthKey ? 'AUTH_KEY' : 'STANDARD_KEY',
+        message: `Định dạng Google Gemini API Key hợp lệ (${keyTypeLabel}, ${trimmed.length} ký tự).`
+      };
+    }
+
+    function handleApiKeyInputChange() {
+      const input = document.getElementById("system-gemini-key-input");
+      const hintBox = document.getElementById("ai-key-format-hint");
+      if (!input || !hintBox) return;
+
+      const val = input.value.trim();
+      if (!val) {
+        hintBox.className = "hidden";
+        hintBox.innerHTML = "";
+        return;
+      }
+
+      const check = validateGeminiApiKeyFormat(val);
+      if (!check.isValid) {
+        hintBox.className = "p-2.5 rounded-xl text-xs font-medium border bg-amber-500/10 border-amber-500/40 text-amber-300 block mt-1.5 space-y-1";
+        hintBox.innerHTML = `
+          <div class="flex items-start gap-2">
+            <span class="text-base shrink-0">⚠️</span>
+            <div class="flex-1 space-y-1">
+              <strong class="text-amber-200 block">${check.title}</strong>
+              <p class="text-[11px] text-slate-300 leading-relaxed">${check.message}</p>
+              <div class="pt-1 flex items-center gap-2">
+                <a href="${check.actionableLink}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-[10px] font-bold transition">
+                  <span>🔗</span> Lấy Google AI Studio Key Chuẩn (AIzaSy...)
+                </a>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        const typeStr = check.keyType === 'AUTH_KEY' ? 'AQ.... (Auth Key bảo mật mới)' : 'AIzaSy... (Khóa tiêu chuẩn)';
+        hintBox.className = "p-2 rounded-xl text-xs font-medium border bg-emerald-500/10 border-emerald-500/30 text-emerald-300 flex items-center gap-2 block mt-1.5";
+        hintBox.innerHTML = `<span>✓</span> <span>Định dạng Google Gemini API Key hợp lệ (<strong class="font-mono text-emerald-200">${typeStr}</strong>, ${val.length} ký tự). Sẵn sàng Test Kết Nối.</span>`;
+      }
+    }
+
     async function loadSystemAiConfig() {
       const badge = document.getElementById("ai-status-badge");
       const badgeText = document.getElementById("ai-status-text");
@@ -2478,12 +2643,21 @@
               updatedText.innerText = `Cập nhật: ${dt.toLocaleTimeString('vi-VN')} ${dt.toLocaleDateString('vi-VN')}`;
             }
 
-            if (data.apiKey && data.apiKey.trim().length > 10) {
-              if (badge) badge.className = "badge-ai-ready px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5";
-              if (badgeText) badgeText.innerText = "🟢 Sẵn Sàng (Khóa hợp lệ)";
+            const rawKey = (data.apiKey || "").trim();
+            if (rawKey) {
+              const check = validateGeminiApiKeyFormat(rawKey);
+              if (check.isValid) {
+                if (badge) badge.className = "badge-ai-ready px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5";
+                if (badgeText) badgeText.innerText = "🟢 Sẵn Sàng (Khóa hợp lệ)";
+              } else {
+                if (badge) badge.className = "badge-ai-warning px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5";
+                if (badgeText) badgeText.innerText = "⚠️ Khóa Không Hợp Lệ (Cần AIzaSy...)";
+              }
+              handleApiKeyInputChange();
             } else {
               if (badge) badge.className = "badge-ai-warning px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5";
               if (badgeText) badgeText.innerText = "⚠️ Chưa Cấu Hình Khóa";
+              handleApiKeyInputChange();
             }
             return data;
           }
@@ -2504,6 +2678,14 @@
 
       const apiKey = keyInput ? keyInput.value.trim() : "";
       const model = modelSelect ? modelSelect.value : "gemini-2.5-flash";
+
+      if (apiKey) {
+        const check = validateGeminiApiKeyFormat(apiKey);
+        if (!check.isValid) {
+          const proceed = confirm(`⚠️ CẢNH BÁO ĐỊNH DẠNG KHÓA:\n\n${check.title}\n${check.message}\n\nHệ thống yêu cầu khóa Google AI Studio bắt đầu bằng "AIzaSy...".\n\nBạn có chắc chắn vẫn muốn lưu khóa này lên hệ thống không?`);
+          if (!proceed) return;
+        }
+      }
 
       try {
         if (btnSave) btnSave.disabled = true;
@@ -2542,50 +2724,161 @@
       const apiKey = keyInput ? keyInput.value.trim() : "";
       const model = modelSelect ? modelSelect.value : "gemini-2.5-flash";
 
+      // 1. Kiểm tra rỗng
       if (!apiKey) {
         if (resultBox && resultText) {
-          resultBox.className = "p-2.5 rounded-xl text-xs font-medium border bg-amber-500/10 border-amber-500/30 text-amber-300 flex items-center justify-between";
-          resultText.innerHTML = "⚠️ Vui lòng nhập hoặc dán mã khóa Gemini API Key trước khi kiểm tra!";
+          resultBox.className = "p-3 rounded-xl text-xs font-medium border bg-amber-500/10 border-amber-500/30 text-amber-300 flex items-start justify-between";
+          resultText.innerHTML = `
+            <div class="flex items-start gap-2">
+              <span class="text-base shrink-0">⚠️</span>
+              <div>
+                <strong>Chưa nhập API Key:</strong> Vui lòng nhập hoặc dán mã khóa Google AI Studio API Key (<code class="text-amber-200 font-mono">AIzaSy...</code>) trước khi kiểm tra!
+              </div>
+            </div>
+          `;
           resultBox.classList.remove("hidden");
         }
+        showToast("⚠️ Vui lòng nhập hoặc dán mã khóa Gemini API Key trước khi kiểm tra!");
         return;
       }
 
+      // 2. Client-side Format Validation trước khi ping tới Google
+      const check = validateGeminiApiKeyFormat(apiKey);
+      if (!check.isValid) {
+        if (resultBox && resultText) {
+          resultBox.className = "p-3.5 rounded-xl text-xs font-medium border bg-rose-500/10 border-rose-500/40 text-rose-300 flex items-start justify-between";
+          resultText.innerHTML = `
+            <div class="space-y-1.5">
+              <div class="font-bold text-rose-200 flex items-center gap-1.5">
+                <span>❌</span> <span>${check.title}</span>
+              </div>
+              <p class="text-slate-300 text-[11px] leading-relaxed">${check.message}</p>
+              <div class="pt-1.5 flex flex-wrap items-center gap-2">
+                <a href="${check.actionableLink}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-[11px] font-bold transition">
+                  <span>🔗</span> Nhận Khóa Google AI Studio Mới (AIzaSy...)
+                </a>
+              </div>
+            </div>
+          `;
+          resultBox.classList.remove("hidden");
+        }
+        handleApiKeyInputChange();
+        showToast("❌ Định dạng API Key không hợp lệ! Yêu cầu khóa Google AI Studio bắt đầu bằng AIzaSy...");
+        return;
+      }
+
+      // 3. Khóa hợp lệ về mặt định dạng -> Gửi request kiểm tra tới endpoint Google Gemini
       try {
         if (btnTest) btnTest.disabled = true;
         if (btnLabel) btnLabel.innerText = "Đang ping...";
         if (resultBox && resultText) {
-          resultBox.className = "p-2.5 rounded-xl text-xs font-medium border bg-indigo-500/10 border-indigo-500/30 text-indigo-300 flex items-center justify-between";
-          resultText.innerHTML = "🔄 Đang gửi yêu cầu kiểm tra kết nối tới Google Gemini API (HTTP 200 OK)...";
+          resultBox.className = "p-3 rounded-xl text-xs font-medium border bg-indigo-500/10 border-indigo-500/30 text-indigo-300 flex items-center justify-between";
+          resultText.innerHTML = `
+            <div class="flex items-center gap-2">
+              <span class="animate-spin text-sm">🔄</span>
+              <span>Đang gửi yêu cầu kiểm tra kết nối tới Google Generative Language API (HTTP 200 OK)...</span>
+            </div>
+          `;
           resultBox.classList.remove("hidden");
         }
 
-        // Test API call to Google Gemini endpoint
+        // Test API call to Google Gemini endpoint (Ho tro ca Query Param va Header X-goog-api-key)
         const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}?key=${encodeURIComponent(apiKey)}`;
-        const res = await fetch(testUrl);
+        const res = await fetch(testUrl, {
+          headers: {
+            'X-goog-api-key': apiKey
+          }
+        });
 
         if (res.status === 200) {
           const data = await res.json();
           const displayName = data.displayName || model;
-          resultBox.className = "p-2.5 rounded-xl text-xs font-medium border bg-emerald-500/10 border-emerald-500/30 text-emerald-300 flex items-center justify-between";
-          resultText.innerHTML = `✅ <strong>Kết nối thành công! (HTTP 200 OK)</strong><br><span class="text-[11px] opacity-90">Mô hình: ${displayName} | Sẵn sàng phục vụ toàn bộ app.</span>`;
+          const keyTypeLabel = apiKey.startsWith('AQ.') ? 'Auth Key (AQ....)' : 'Khóa tiêu chuẩn (AIzaSy...)';
+          resultBox.className = "p-3 rounded-xl text-xs font-medium border bg-emerald-500/10 border-emerald-500/30 text-emerald-300 flex items-start justify-between";
+          resultText.innerHTML = `
+            <div class="space-y-1">
+              <div class="font-bold text-emerald-200 flex items-center gap-1.5">
+                <span>✅</span> <span>Kết nối thành công! (HTTP 200 OK)</span>
+              </div>
+              <p class="text-[11px] text-slate-300 leading-relaxed">
+                Mô hình: <strong class="text-emerald-300 font-mono">${displayName}</strong> | Khóa ${keyTypeLabel} hợp lệ và sẵn sàng phục vụ trợ lý AI cho toàn bộ cơ sở Spa.
+              </p>
+            </div>
+          `;
           showToast("🎉 Kết nối Google Gemini API thành công (HTTP 200 OK)!");
         } else {
-          let errDetail = `Mã lỗi HTTP ${res.status}`;
+          // Bóc tách & diễn giải thân thiện mã lỗi từ Google (HTTP 400, 403, 404, 429...)
+          let errJson = null;
           try {
-            const errJson = await res.json();
-            if (errJson.error && errJson.error.message) {
-              errDetail += `: ${errJson.error.message}`;
-            }
+            errJson = await res.json();
           } catch (_) {}
-          resultBox.className = "p-2.5 rounded-xl text-xs font-medium border bg-rose-500/10 border-rose-500/30 text-rose-300 flex items-center justify-between";
-          resultText.innerHTML = `❌ <strong>Kết nối thất bại:</strong> ${errDetail}`;
-          showToast("❌ Kết nối thất bại: " + errDetail);
+
+          let errTitle = `Kết nối thất bại (HTTP ${res.status})`;
+          let errExplanation = "";
+          let errGuidance = "";
+
+          if (res.status === 400 || res.status === 401) {
+            const errorReason = (errJson && errJson.error && errJson.error.details && errJson.error.details[0] && errJson.error.details[0].reason) || "";
+            if (errorReason === 'ACCESS_TOKEN_TYPE_UNSUPPORTED') {
+              errTitle = "Khóa Đang Bị Giới Hạn Quyền (ACCESS_TOKEN_TYPE_UNSUPPORTED)";
+              errExplanation = "Khóa Auth Key của bạn (bắt đầu bằng AQ.) hoàn toàn đúng chuẩn bảo mật mới của Google, nhưng trong Google Cloud Console đang bị giới hạn nhầm vào 'Gemini API' (dành cho Workspace) thay vì 'Generative Language API', hoặc dự án này chưa được bật dịch vụ Generative Language API.";
+              errGuidance = "Khắc phục cực nhanh: Vào Google AI Studio bấm 'Create API key' -> chọn 'Create API key in new project' (Tạo trong dự án mới) để Google tự động mở toàn bộ quyền miễn phí 100%.";
+            } else {
+              errTitle = `Khóa Gemini API Không Hợp Lệ (HTTP ${res.status})`;
+              errExplanation = "Google Generative Language API chưa xác thực được mã khóa này (do khóa mới tạo cần 1-2 phút để đồng bộ trên toàn cầu, hoặc đã bị thu hồi/hết hạn).";
+              errGuidance = "Vui lòng đợi 1-2 phút thử lại, hoặc tạo khóa mới tại Google AI Studio.";
+            }
+          } else if (res.status === 403) {
+            errTitle = "Quyền Truy Cập Bị Từ Chối (HTTP 403: PERMISSION_DENIED)";
+            errExplanation = "Khóa API có thể đã bị giới hạn IP/HTTP Referrer hoặc dịch vụ Generative Language API chưa được bật trên Google Cloud Console.";
+            errGuidance = "Vào Google Cloud Console kiểm tra API restrictions hoặc tạo khóa không bị hạn chế.";
+          } else if (res.status === 404) {
+            errTitle = `Không Tìm Thấy Mô Hình ${model} (HTTP 404: NOT_FOUND)`;
+            errExplanation = `Mô hình "${model}" hiện không có trên phiên bản v1beta của Generative Language API.`;
+            errGuidance = "Vui lòng chọn mô hình đời mới như gemini-3.5-flash-lite hoặc gemini-flash-latest.";
+          } else if (res.status === 429) {
+            errTitle = "Vượt Quá Hạn Mức Yêu Cầu (HTTP 429: RESOURCE_EXHAUSTED)";
+            errExplanation = "Tài khoản của bạn đã đạt giới hạn số lượt gọi API trong một phút hoặc hạn mức ngày của gói miễn phí.";
+            errGuidance = "Vui lòng chờ 1-2 phút hoặc nâng cấp gói trả phí trên Google AI Studio.";
+          } else {
+            const rawMsg = errJson && errJson.error && errJson.error.message ? errJson.error.message : `Lỗi HTTP ${res.status}`;
+            errTitle = `Lỗi Phản Hồi Từ Máy Chủ Google (HTTP ${res.status})`;
+            errExplanation = `Máy chủ Google báo: ${rawMsg}`;
+            errGuidance = "Vui lòng kiểm tra lại cấu hình hoặc thử lại sau.";
+          }
+
+          resultBox.className = "p-3 rounded-xl text-xs font-medium border bg-rose-500/10 border-rose-500/40 text-rose-300 flex items-start justify-between";
+          resultText.innerHTML = `
+            <div class="space-y-1.5">
+              <div class="font-bold text-rose-200 flex items-center gap-1.5">
+                <span>❌</span> <span>${errTitle}</span>
+              </div>
+              <p class="text-slate-300 text-[11px] leading-relaxed">${errExplanation}</p>
+              <div class="pt-1 text-[11px] text-amber-300 flex items-center gap-1.5">
+                <span>💡</span> <span>${errGuidance}</span>
+              </div>
+              <div class="pt-1">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-[10px] font-bold transition">
+                  <span>🔗</span> Mở Google AI Studio
+                </a>
+              </div>
+            </div>
+          `;
+          showToast(`❌ ${errTitle}`);
         }
       } catch (err) {
         if (resultBox && resultText) {
-          resultBox.className = "p-2.5 rounded-xl text-xs font-medium border bg-rose-500/10 border-rose-500/30 text-rose-300 flex items-center justify-between";
-          resultText.innerHTML = `❌ <strong>Lỗi mạng / CORS:</strong> ${err.message || 'Không thể kết nối'}`;
+          resultBox.className = "p-3 rounded-xl text-xs font-medium border bg-rose-500/10 border-rose-500/40 text-rose-300 flex items-start justify-between";
+          resultText.innerHTML = `
+            <div class="space-y-1">
+              <div class="font-bold text-rose-200 flex items-center gap-1.5">
+                <span>❌</span> <span>Lỗi Mạng Hoặc Chặn CORS</span>
+              </div>
+              <p class="text-slate-300 text-[11px] leading-relaxed">Trình duyệt không thể kết nối trực tiếp tới Google API (generativelanguage.googleapis.com). Vui lòng kiểm tra lại kết nối Internet hoặc tiện ích chặn mạng.</p>
+              <p class="text-[10px] text-slate-400 font-mono">Chi tiết: ${err.message || 'NetworkError'}</p>
+            </div>
+          `;
+          resultBox.classList.remove("hidden");
         }
       } finally {
         if (btnTest) btnTest.disabled = false;
@@ -2612,6 +2905,7 @@
         const input = document.getElementById("system-gemini-key-input");
         if (input && text) {
           input.value = text.trim();
+          handleApiKeyInputChange();
           showToast("📋 Đã dán mã khóa từ bộ nhớ tạm!");
         }
       } catch (e) {
@@ -2623,6 +2917,9 @@
       const input = document.getElementById("system-gemini-key-input");
       if (input) {
         input.value = "";
+        handleApiKeyInputChange();
+        const resultBox = document.getElementById("ai-test-result");
+        if (resultBox) resultBox.classList.add("hidden");
         input.focus();
         showToast("🗑️ Đã xóa trắng ô nhập khóa!");
       }
