@@ -3549,6 +3549,9 @@ class SpaStore(context: Context) {
 
     suspend fun fetchSystemAiConfigFromServer(): String? = withContext(Dispatchers.IO) {
         val endpoints = listOf(
+            "https://khienthiviet.onrender.com/api/system/ai-config",
+            "https://stretch-rid-utils-decreased.trycloudflare.com/api/system/ai-config",
+            "http://192.168.1.105:3000/api/system/ai-config",
             "http://10.0.2.2:3000/api/system/ai-config",
             "http://localhost:3000/api/system/ai-config",
             "http://127.0.0.1:3000/api/system/ai-config"
