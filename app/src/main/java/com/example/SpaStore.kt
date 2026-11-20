@@ -431,6 +431,13 @@ class SpaStore(context: Context) {
             }
         }
 
+        // Tự động kích hoạt giám sát trạng thái cơ sở (Kill-Switch / Deletion) nếu đã có phiên đăng nhập
+        if (currentUser != null) {
+            runCatching {
+                startTenantStatusListener()
+            }
+        }
+
         // Tự động lắng nghe trạng thái bảo trì toàn hệ thống từ Firestore
         runCatching {
             startGlobalMaintenanceListener()
@@ -842,14 +849,19 @@ class SpaStore(context: Context) {
         val cleanPass = rawPassword.trim()
 
         // 1. Kiểm tra qua Local API Server & Cloud Tunnel (Hỗ trợ máy ảo Android LDPlayer / Emulator kết nối Web Dev qua cổng 3000 và Internet)
-        val localApiUrls = listOf(
-            "https://khienthiviet.onrender.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
-            "https://stretch-rid-utils-decreased.trycloudflare.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
-            "http://10.0.2.2:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
-            "http://192.168.1.105:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
-            "http://172.16.1.2:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
-            "http://127.0.0.1:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass"
-        )
+        val savedServerBase = prefs.getString("last_server_base_url", null)
+        val localApiUrls = mutableListOf<String>()
+        if (!savedServerBase.isNullOrBlank()) {
+            localApiUrls.add("$savedServerBase/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
+        }
+        localApiUrls.add("https://dialog-particularly-economic-loves.trycloudflare.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
+        localApiUrls.add("https://khienthiviet.onrender.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
+        localApiUrls.add("https://stretch-rid-utils-decreased.trycloudflare.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
+        localApiUrls.add("http://10.0.2.2:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
+        localApiUrls.add("http://192.168.1.105:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
+        localApiUrls.add("http://172.16.1.2:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
+        localApiUrls.add("http://localhost:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
+        localApiUrls.add("http://127.0.0.1:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
         var serverResponded = false
         for (apiUrl in localApiUrls) {
             try {
@@ -864,6 +876,11 @@ class SpaStore(context: Context) {
                     val respText = conn.inputStream.bufferedReader().use { it.readText() }
                     val json = org.json.JSONObject(respText)
                     if (json.optBoolean("success", false)) {
+                        runCatching {
+                            val uri = java.net.URI(apiUrl)
+                            val base = "${uri.scheme}://${uri.authority}"
+                            prefs.edit().putString("last_server_base_url", base).apply()
+                        }
                         val tObj = json.optJSONObject("tenant")
                         if (tObj != null) {
                             val tId = tObj.optString("id", "spa_$cleanPhone")
@@ -1093,7 +1110,11 @@ class SpaStore(context: Context) {
                 .addSnapshotListener { snap, err ->
                     if (err != null) return@addSnapshotListener
                     if (snap == null || !snap.exists()) {
-                        // Không văng phiên nếu tenant chưa đồng bộ lên Firestore hoặc chạy nội bộ
+                        // Nếu cơ sở tùy biến trước đó đã đăng nhập/đồng bộ nay bị xóa khỏi Cloud -> Ngắt phiên ngay lập tức
+                        if (tId != DEFAULT_TENANT_ID && (tenantInfo != null || currentUser != null)) {
+                            facilityTerminationNotice = "Tài khoản cơ sở này đã bị xóa hoặc hủy hoạt động trên Web Portal. Phiên làm việc đã kết thúc."
+                            logout()
+                        }
                         return@addSnapshotListener
                     }
                     val status = snap.getString("status") ?: "ACTIVE"
@@ -1102,7 +1123,7 @@ class SpaStore(context: Context) {
                     val qrUrl = snap.getString("qrPaymentUrl") ?: snap.getString("lockDetails.qrPaymentUrl") ?: ""
 
                     if (status == "DELETED" || status == "DISABLED" || status == "INACTIVE" || status == "CANCELLED") {
-                        facilityTerminationNotice = "Cơ sở này đã bị vô hiệu hóa hoặc ngừng hoạt động trên Web Portal. Phiên làm việc đã kết thúc."
+                        facilityTerminationNotice = "Tài khoản cơ sở này đã bị vô hiệu hóa hoặc ngừng hoạt động trên Web Portal. Phiên làm việc đã kết thúc."
                         logout()
                         return@addSnapshotListener
                     }
@@ -1129,27 +1150,34 @@ class SpaStore(context: Context) {
                 }
         }
 
-        // 2. Định kỳ kiểm tra Local Server API (cổng 3000) để phát hiện tức thì khi Web Dev xóa hoặc khóa cơ sở
+        // 2. Định kỳ kiểm tra Local Server API (cổng 3000) & Cloud Tunnel để phát hiện tức thì khi Web Dev xóa hoặc khóa cơ sở
         localTenantPollJob?.cancel()
         val targetPhone = tenantInfo?.ownerPhone?.ifBlank {
-            currentUser?.username?.let { normalizePhoneDigits(it).takeIf { d -> d.length >= 8 } }
-        } ?: return
+            currentUser?.username?.let { normalizePhoneDigits(it) }
+        }?.ifBlank { currentUser?.username } ?: return
         if (targetPhone.isBlank() || tId == DEFAULT_TENANT_ID) return
 
         localTenantPollJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive && currentUser != null) {
-                kotlinx.coroutines.delay(10000L) // Kiểm tra mỗi 10 giây
+                kotlinx.coroutines.delay(3500L) // Kiểm tra mỗi 3.5 giây để phản hồi lập tức khi Web Admin xóa cơ sở
                 val phone = tenantInfo?.ownerPhone?.ifBlank {
-                    currentUser?.username?.let { normalizePhoneDigits(it).takeIf { d -> d.length >= 8 } }
-                } ?: break
-                val endpoints = listOf(
-                    "https://khienthiviet.onrender.com/api/tenants/status?phone=$phone",
-                    "https://stretch-rid-utils-decreased.trycloudflare.com/api/tenants/status?phone=$phone",
-                    "http://10.0.2.2:3000/api/tenants/status?phone=$phone",
-                    "http://192.168.1.105:3000/api/tenants/status?phone=$phone",
-                    "http://172.16.1.2:3000/api/tenants/status?phone=$phone",
-                    "http://127.0.0.1:3000/api/tenants/status?phone=$phone"
-                )
+                    currentUser?.username?.let { normalizePhoneDigits(it) }
+                }?.ifBlank { currentUser?.username } ?: break
+
+                val savedServerBase = prefs.getString("last_server_base_url", null)
+                val endpoints = mutableListOf<String>()
+                if (!savedServerBase.isNullOrBlank()) {
+                    endpoints.add("$savedServerBase/api/tenants/status?phone=$phone&tenantId=$tId")
+                }
+                endpoints.add("https://dialog-particularly-economic-loves.trycloudflare.com/api/tenants/status?phone=$phone&tenantId=$tId")
+                endpoints.add("https://khienthiviet.onrender.com/api/tenants/status?phone=$phone&tenantId=$tId")
+                endpoints.add("https://stretch-rid-utils-decreased.trycloudflare.com/api/tenants/status?phone=$phone&tenantId=$tId")
+                endpoints.add("http://10.0.2.2:3000/api/tenants/status?phone=$phone&tenantId=$tId")
+                endpoints.add("http://192.168.1.105:3000/api/tenants/status?phone=$phone&tenantId=$tId")
+                endpoints.add("http://172.16.1.2:3000/api/tenants/status?phone=$phone&tenantId=$tId")
+                endpoints.add("http://localhost:3000/api/tenants/status?phone=$phone&tenantId=$tId")
+                endpoints.add("http://127.0.0.1:3000/api/tenants/status?phone=$phone&tenantId=$tId")
+
                 for (urlStr in endpoints) {
                     try {
                         val conn = (java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection).apply {
@@ -1173,7 +1201,7 @@ class SpaStore(context: Context) {
                             } else if (notFound) {
                                 // Chỉ ngắt phiên khi Web Portal xác nhận cơ sở đã bị xóa hoàn toàn khỏi hệ sinh thái
                                 withContext(Dispatchers.Main) {
-                                    facilityTerminationNotice = "Cơ sở này đã bị xóa khỏi hệ sinh thái Khiếm Thị Việt trên Web Portal. Phiên làm việc đã kết thúc."
+                                    facilityTerminationNotice = "Tài khoản cơ sở này đã bị xóa khỏi hệ sinh thái Khiếm Thị Việt trên Web Portal. Phiên làm việc đã kết thúc."
                                     logout()
                                 }
                                 break
@@ -3548,14 +3576,18 @@ class SpaStore(context: Context) {
     }
 
     suspend fun fetchSystemAiConfigFromServer(): String? = withContext(Dispatchers.IO) {
-        val endpoints = listOf(
-            "https://khienthiviet.onrender.com/api/system/ai-config",
-            "https://stretch-rid-utils-decreased.trycloudflare.com/api/system/ai-config",
-            "http://192.168.1.105:3000/api/system/ai-config",
-            "http://10.0.2.2:3000/api/system/ai-config",
-            "http://localhost:3000/api/system/ai-config",
-            "http://127.0.0.1:3000/api/system/ai-config"
-        )
+        val savedServerBase = prefs.getString("last_server_base_url", null)
+        val endpoints = mutableListOf<String>()
+        if (!savedServerBase.isNullOrBlank()) {
+            endpoints.add("$savedServerBase/api/system/ai-config")
+        }
+        endpoints.add("https://dialog-particularly-economic-loves.trycloudflare.com/api/system/ai-config")
+        endpoints.add("https://khienthiviet.onrender.com/api/system/ai-config")
+        endpoints.add("https://stretch-rid-utils-decreased.trycloudflare.com/api/system/ai-config")
+        endpoints.add("http://192.168.1.105:3000/api/system/ai-config")
+        endpoints.add("http://10.0.2.2:3000/api/system/ai-config")
+        endpoints.add("http://localhost:3000/api/system/ai-config")
+        endpoints.add("http://127.0.0.1:3000/api/system/ai-config")
         for (ep in endpoints) {
             try {
                 val url = java.net.URL(ep)

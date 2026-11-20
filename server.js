@@ -237,13 +237,16 @@ const server = http.createServer((req, res) => {
   if (pathname === '/api/tenants/auth' || pathname === '/api/auth' || pathname === '/api/tenants/status') {
     const phone = (parsedUrl.query.phone || '').trim().replace(/[^0-9]/g, '');
     const pin = (parsedUrl.query.pin || '').trim();
+    const queryId = (parsedUrl.query.id || parsedUrl.query.tenantId || '').trim();
 
-    const checkAuth = (p, pass) => {
+    const checkAuth = (p, pass, qId) => {
       const tenants = loadTenantsFromDisk();
       const cleanP = (p || '').replace(/[^0-9]/g, '');
       const t = tenants.find(item => {
         const itemPhone = (item.ownerPhone || '').replace(/[^0-9]/g, '');
-        return itemPhone === cleanP;
+        const matchPhone = cleanP && itemPhone === cleanP;
+        const matchId = qId && item.id === qId;
+        return matchPhone || matchId;
       });
 
       if (!t) {
@@ -268,7 +271,7 @@ const server = http.createServer((req, res) => {
     };
 
     if (req.method === 'GET') {
-      const result = checkAuth(phone, pin);
+      const result = checkAuth(phone, pin, queryId);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
       res.end(JSON.stringify(result));
       return;

@@ -3450,7 +3450,21 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
 
           if (firestoreDb) {
             try {
-              await firestoreDb.collection("tenants").doc(deletedTenant.id).delete();
+              // 1. Đánh dấu status = "DELETED" trước để bắn tín hiệu ngắt phiên app ngay lập tức
+              await firestoreDb.collection("tenants").doc(deletedTenant.id).set({
+                status: "DELETED",
+                isLocked: true,
+                lockedReason: "Cơ sở đã bị xóa trên Web Portal bởi Ban Quản Trị"
+              }, { merge: true });
+              // 2. Xóa vĩnh viễn document sau 6 giây nếu không bị Hoàn tác (Undo)
+              setTimeout(async () => {
+                try {
+                  const checkDoc = await firestoreDb.collection("tenants").doc(deletedTenant.id).get();
+                  if (checkDoc.exists && checkDoc.data()?.status === "DELETED") {
+                    await firestoreDb.collection("tenants").doc(deletedTenant.id).delete();
+                  }
+                } catch (e) {}
+              }, 6000);
             } catch (e) {}
           }
 
@@ -3462,7 +3476,12 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
               renderTable();
               checkCustomerSession();
               if (firestoreDb) {
-                await firestoreDb.collection("tenants").doc(deletedTenant.id).set(deletedTenant);
+                const restored = Object.assign({}, deletedTenant, {
+                  status: deletedTenant.isActive ? "ACTIVE" : "LOCKED",
+                  isLocked: !deletedTenant.isActive,
+                  lockedReason: ""
+                });
+                await firestoreDb.collection("tenants").doc(deletedTenant.id).set(restored);
               }
               showToast(`↩️ Đã khôi phục lại cơ sở ${deletedTenant.name}!`);
             }
