@@ -38,16 +38,16 @@ BẠN LÀ MỘT KỸ SƯ PHẦN MỀM CAO CẤP VÀ AI AGENT. HÃY TIẾP NHẬN
 - CỘT MỐC 4 (Biên dịch Gradle & Xuất xưởng APK):
   + Biên dịch thành công `.\gradlew.bat assembleDebug` (dung lượng 28.9MB, 13 DEX files).
   + Đồng bộ đè vào cả 4 vị trí với mã băm SHA-256 trùng khớp tuyệt đối 100%:
-    Mã SHA-256 mới nhất: 009C8A5EE3AD1B076B41FB275F6F49D185B500A58C60BE7704FC1D82ABD884B9
+    Mã SHA-256 mới nhất: 6D93B06784A7D272F8FF87233ADE0AF5AA1153F10EED59BEF5D305770AFDB157
     1) public/KhiemThiViet-CaiDat.apk
     2) CAI_DAT_APK/KhiemThiViet-CaiDat.apk
     3) KhiemThiViet-CaiDat.apk (thư mục gốc)
     4) C:\Users\Admin\Desktop\HO_SO_BAN_GIAO_KHIEM_THI_VIET\KhiemThiViet-CaiDat.apk
 
-- CỘT MỐC 5 (Sửa dứt điểm Lỗi Ô Mật Khẩu LDPlayer & Đưa lên Web Live):
-  + Sửa dứt điểm lỗi đè text SĐT xuống ô Mật khẩu: Tắt Android Autofill (`view.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS`), lọc triệt để chuỗi `phoneInput` trong `newVal`, đổi `KeyboardType.Text` hỗ trợ cả Gmail.
+- CỘT MỐC 5 (Sửa dứt điểm Lỗi Ô Mật Khẩu LDPlayer & Hỗ trợ Đăng nhập Điện thoại thật):
+  + Sửa dứt điểm lỗi đè text và dồn chữ ô Mật khẩu: Tắt Android Autofill, lọc trùng khớp ghép đôi chuỗi trong `deduplicateImeComposing()` (29/29 Unit Tests PASS).
   + Đưa Web Portal lên Internet qua Cloudflare Tunnel:
-    👉 Link trực tiếp: https://triple-roy-deviant-vii.trycloudflare.com (có HTTPS, tải APK trực tiếp trên điện thoại).
+    👉 Link trực tiếp: https://stretch-rid-utils-decreased.trycloudflare.com (có HTTPS, tải APK trực tiếp trên điện thoại, đồng bộ đăng nhập tenant).
 
 - CỘT MỐC 6 (Sửa Heartbeat Auth, Nâng cấp Gemini 2.5 Flash & Bóc tách Khẩu lệnh KTV):
   + Tách endpoint `/api/tenants/status` trên server, sửa lỗi văng đăng nhập sau 6 giây do so khớp PIN rỗng.

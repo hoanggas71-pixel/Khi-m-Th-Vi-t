@@ -115,3 +115,17 @@ Tài liệu này tổng hợp toàn bộ các phản hồi thực tế từ ngư
   + Nâng cấp sang mô hình chuẩn mới: **`gemini-2.5-flash`** và chuỗi dự phòng (`2.5-flash` $\rightarrow$ `2.5-flash-lite` $\rightarrow$ `3.8-flash`).
   + Bóc tách mã lỗi chính xác từ Google thay vì báo nhầm mất mạng.
   + Nâng cấp regex nhận diện khẩu lệnh tự nhiên tạo nhân viên và loại trừ các lệnh hiển thị danh sách khi có ý định Thêm/Tạo/Sửa/Xóa.
+
+---
+
+### Vấn Đề 10: Đăng nhập trên điện thoại thật báo "Không thể kết nối đến Máy chủ Web Portal" hoặc "Sai mật khẩu"
+- **Hiện tượng thực tế**: Cài APK trên điện thoại thật (kết nối Wi-Fi hoặc 4G), nhập đúng SĐT `123456789`, PIN `12345` nhưng báo *"Không thể kết nối đến Máy chủ Web Portal (cổng 3000 hoặc mạng ngoại tuyến)"* hoặc *"Sai số điện thoại hoặc mật khẩu"*.
+- **Nguyên nhân kỹ thuật**:
+  + IP `10.0.2.2:3000` là IP cục bộ ảo chỉ dành riêng cho Android Emulator / LDPlayer trỏ về PC. Điện thoại thật kết nối qua 4G hoặc khác dải mạng Wi-Fi không thể truy cập `10.0.2.2` hay IP mạng LAN `192.168.1.105`.
+  + Cloudflare Quick Tunnel cũ (`highway-workout-dairy-source.trycloudflare.com`) bị hết hạn và đổi URL khi máy tính hoặc tiến trình nền khởi động lại.
+  + Cơ chế báo lỗi đăng nhập cũ gộp chung lỗi timeout/không có mạng thành "Sai mật khẩu", gây hoang mang cho người dùng.
+- **Giải pháp xử lý**:
+  + Bật lại Cloudflare Tunnel mới: `https://stretch-rid-utils-decreased.trycloudflare.com` (chạy nền ổn định).
+  + Cập nhật URL mới vào cả 2 luồng: `pullLatestFromCloudAndLogin` (dòng 851) và `startTenantStatusListener` (dòng 1150) trong `SpaStore.kt`.
+  + Bổ sung cờ `serverResponded` và biến `lastAuthErrorMessage` để phân định chính xác: Nếu server có phản hồi sai PIN mới báo "Sai mật khẩu", nếu không chạm được server thì báo rõ lỗi kết nối mạng/máy chủ.
+  + Chạy toàn bộ 29/29 Unit Tests PASS, build APK mới (SHA-256: `6D93B06784A7D272F8FF87233ADE0AF5AA1153F10EED59BEF5D305770AFDB157`) và đồng bộ vào 4 vị trí + Desktop.
