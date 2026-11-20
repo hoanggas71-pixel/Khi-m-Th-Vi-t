@@ -845,10 +845,11 @@ class SpaStore(context: Context) {
 
         // 1. Kiểm tra qua Local API Server & Cloud Tunnel (Hỗ trợ máy ảo Android LDPlayer / Emulator kết nối Web Dev qua cổng 3000 và Internet)
         val localApiUrls = listOf(
+            "https://khienthiviet.onrender.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
+            "https://stretch-rid-utils-decreased.trycloudflare.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
             "http://10.0.2.2:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
             "http://192.168.1.105:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
             "http://172.16.1.2:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
-            "https://stretch-rid-utils-decreased.trycloudflare.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass",
             "http://127.0.0.1:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass"
         )
         var serverResponded = false
@@ -1144,10 +1145,11 @@ class SpaStore(context: Context) {
                     currentUser?.username?.let { normalizePhoneDigits(it).takeIf { d -> d.length >= 8 } }
                 } ?: break
                 val endpoints = listOf(
+                    "https://khienthiviet.onrender.com/api/tenants/status?phone=$phone",
+                    "https://stretch-rid-utils-decreased.trycloudflare.com/api/tenants/status?phone=$phone",
                     "http://10.0.2.2:3000/api/tenants/status?phone=$phone",
                     "http://192.168.1.105:3000/api/tenants/status?phone=$phone",
                     "http://172.16.1.2:3000/api/tenants/status?phone=$phone",
-                    "https://stretch-rid-utils-decreased.trycloudflare.com/api/tenants/status?phone=$phone",
                     "http://127.0.0.1:3000/api/tenants/status?phone=$phone"
                 )
                 for (urlStr in endpoints) {
