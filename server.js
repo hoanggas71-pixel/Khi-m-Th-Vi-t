@@ -87,6 +87,17 @@ const DEFAULT_TENANTS = [
     isActive: true,
     monthlyFee: 500000,
     tempPin: "247208"
+  },
+  {
+    id: "spa_123456789",
+    name: "Spa Suối Nước Nóng",
+    ownerPhone: "123456789",
+    plan: "Gói 1 Tháng",
+    expiryDate: "18/12/2026",
+    daysLeft: 30,
+    isActive: true,
+    monthlyFee: 500000,
+    tempPin: "12345"
   }
 ];
 
@@ -205,9 +216,17 @@ const server = http.createServer((req, res) => {
         try {
           const list = JSON.parse(body);
           if (Array.isArray(list)) {
-            saveTenantsToDisk(list);
+            // Bảo toàn các cơ sở mặc định quan trọng không bao giờ bị xóa nhầm
+            const currentDisk = loadTenantsFromDisk();
+            const merged = [...list];
+            DEFAULT_TENANTS.forEach(def => {
+              if (!merged.some(t => t.id === def.id || t.ownerPhone === def.ownerPhone)) {
+                merged.unshift(def);
+              }
+            });
+            saveTenantsToDisk(merged);
             res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-            res.end(JSON.stringify({ success: true, count: list.length }));
+            res.end(JSON.stringify({ success: true, count: merged.length }));
             return;
           }
         } catch (e) {}
@@ -215,6 +234,16 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ error: "Invalid JSON format" }));
       });
       return;
+    } else if (req.method === 'DELETE') {
+      const tenantId = parsedUrl.query.id;
+      if (tenantId) {
+        let list = loadTenantsFromDisk();
+        list = list.filter(t => t.id !== tenantId);
+        saveTenantsToDisk(list);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: true, count: list.length }));
+        return;
+      }
     }
   }
 
