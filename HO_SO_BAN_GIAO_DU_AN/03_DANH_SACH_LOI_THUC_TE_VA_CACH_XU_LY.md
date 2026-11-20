@@ -129,3 +129,22 @@ Tài liệu này tổng hợp toàn bộ các phản hồi thực tế từ ngư
   + Cập nhật URL mới vào cả 2 luồng: `pullLatestFromCloudAndLogin` (dòng 851) và `startTenantStatusListener` (dòng 1150) trong `SpaStore.kt`.
   + Bổ sung cờ `serverResponded` và biến `lastAuthErrorMessage` để phân định chính xác: Nếu server có phản hồi sai PIN mới báo "Sai mật khẩu", nếu không chạm được server thì báo rõ lỗi kết nối mạng/máy chủ.
   + Chạy toàn bộ 29/29 Unit Tests PASS, build APK mới (SHA-256: `6D93B06784A7D272F8FF87233ADE0AF5AA1153F10EED59BEF5D305770AFDB157`) và đồng bộ vào 4 vị trí + Desktop.
+
+---
+
+### Vấn Đề 11: Tạo cơ sở mới trên Web Portal bị mất cơ sở cũ và chuyển đổi dùng thử 3 ngày sang 2 tuần full chức năng
+- **Hiện tượng thực tế**:
+  + Trên Web Portal, tạo 1 cơ sở mới chọn gói 2 tuần thì mất `Spa Suối Nước Nóng`, chỉ còn cơ sở gốc `khiem_thi_viet`. Khi tạo lại `Spa Suối Nước Nóng` thì mất cả cơ sở gốc lẫn cơ sở vừa tạo.
+  + Yêu cầu loại bỏ bản dùng thử 3 ngày không AI, chuyển thành **Dùng thử 2 tuần Full chức năng (mở toàn bộ AI gehihi miễn phí 100%)**.
+- **Nguyên nhân kỹ thuật**:
+  + Trong `public/index.html`: `firestoreDb.collection("tenants").onSnapshot` khi có sự kiện snapshot từ Firestore đã thực hiện gán đè: `tenants = cloudTenants`. Vì Firestore chưa kịp lưu `Spa Suối Nước Nóng` nên snapshot từ Cloud không có `spa_123456789`, dẫn đến xóa cơ sở này khỏi mảng `tenants` rồi gọi `saveTenants()` ghi đè vào `tenants.json` trên máy chủ.
+  + Bộ lọc `currentPlanFilter` trong `renderTable()` giữ trạng thái lọc theo gói, khiến các cơ sở thuộc gói khác bị ẩn đi tạo cảm giác bị mất.
+  + Trong `server.js`: `DEFAULT_TENANTS` ban đầu chỉ khai báo duy nhất `khiem_thi_viet` mà thiếu `spa_123456789`, nên khi client POST danh sách thiếu thì server không có cơ chế bảo toàn.
+- **Giải pháp xử lý**:
+  + **Hợp nhất thông minh (Smart Merge)** trên `public/index.html`: Thay thế hoàn toàn lệnh gán đè bằng cơ chế duyệt merge theo ID/SĐT. Bảo toàn tuyệt đối danh sách `DEFAULT_TENANTS` luôn luôn hiện diện.
+  + Tự động đồng bộ ngược các cơ sở cục bộ lên Firestore khi tạo cơ sở mới.
+  + Tự động reset bộ lọc `currentPlanFilter = "ALL"` và xóa trắng ô tìm kiếm khi bấm Tạo cơ sở mới để bảng hiển thị đầy đủ 100% tất cả các spa ngay lập tức.
+  + **Bảo vệ tại Máy chủ (`server.js`)**: Cập nhật `DEFAULT_TENANTS` gồm cả 2 cơ sở gốc. Khi `POST /api/tenants`, máy chủ tự động bảo toàn các cơ sở mặc định, không bao giờ để client vô tình xóa mất.
+  + **Chuyển đổi Dùng Thử 2 Tuần (0đ) Full Tính Năng**: Cập nhật toàn bộ giao diện Web Portal (Menu, Hero Section, Ghi chú, Bảng giá khách hàng):
+    - Dùng thử 14 ngày (2 tuần) 0đ.
+    - MỞ KHÓA TOÀN BỘ TRỢ LÝ AI GEHIHI ở cả Chủ Spa lẫn KTV.
