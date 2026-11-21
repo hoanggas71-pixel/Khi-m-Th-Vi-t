@@ -1291,6 +1291,7 @@ fun TabVanHanhVe(
     var showMoVeDialog by remember { mutableStateOf(false) }
     var veCanHoanThanh by remember { mutableStateOf<Luot?>(null) }
     var veCanSuaChiTiet by remember { mutableStateOf<Luot?>(null) }
+    var veCanChotXacNhan by remember { mutableStateOf<Luot?>(null) }
 
     val veDangLam = store.luots.filter { it.dangLam }
     val veChoChot = store.luots.filter { it.choChot }
@@ -1400,14 +1401,7 @@ fun TabVanHanhVe(
                         ve = ve,
                         store = store,
                         onHoanThanh = { veCanHoanThanh = ve },
-                        onXacNhanChot = {
-                            store.xacNhanChotVe(ve.id)
-                            Toast.makeText(
-                                context,
-                                "Đã chốt vé và tính hoa hồng cho KTV!",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
+                        onXacNhanChot = { veCanChotXacNhan = ve },
                         onSuaGio = { veCanSuaChiTiet = ve },
                         onXoaVe = {
                             val deleted = store.xoaVe(ve.id)
@@ -1442,6 +1436,14 @@ fun TabVanHanhVe(
         )
     }
 
+    veCanChotXacNhan?.let { ve ->
+        XacNhanChotVeDialog(
+            ve = ve,
+            store = store,
+            onDismiss = { veCanChotXacNhan = null }
+        )
+    }
+
     veCanSuaChiTiet?.let { ve ->
         SuaGioVeDialog(
             ve = ve,
@@ -1462,6 +1464,7 @@ fun VeCardItemMinimal(
 ) {
     val kh = store.khs.firstOrNull { it.id == ve.khId }
     val nv = store.nvs.firstOrNull { it.id == ve.nvId }
+    val tenKhHienThi = kh?.ten ?: ve.khTen.ifBlank { "Khách lẻ" }
     val tenDichVu = store.tenDichVuCuaVe(ve)
     val hoaHong = store.tinhHoaHongVe(ve)
 
@@ -1487,7 +1490,7 @@ fun VeCardItemMinimal(
 
     val talkBackSummary = buildString {
         append("$trangThaiText. ")
-        append("Khách: ${kh?.ten ?: "Khách lẻ"}. ")
+        append("Khách: $tenKhHienThi. ")
         append("KTV: ${nv?.ten ?: "Chưa rõ"}. ")
         append("Dịch vụ: $tenDichVu. ")
         append("$loaiThanhToanText. ")
@@ -1535,7 +1538,7 @@ fun VeCardItemMinimal(
 
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Khách: ${kh?.ten ?: "Khách lẻ"} • KTV: ${nv?.ten ?: "KTV"}",
+                    text = "Khách: $tenKhHienThi • KTV: ${nv?.ten ?: "KTV"}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
@@ -1562,7 +1565,7 @@ fun VeCardItemMinimal(
                             .weight(1f)
                             .height(48.dp)
                             .semantics {
-                                contentDescription = "Hoàn thành vé của khách ${kh?.ten ?: ""}. Chạm đúp để kết thúc giờ làm."
+                                contentDescription = "Hoàn thành vé của khách $tenKhHienThi. Chạm đúp để kết thúc giờ làm."
                             }
                             .testTag("btn_complete_ticket_${ve.id}")
                     ) {
@@ -1577,7 +1580,7 @@ fun VeCardItemMinimal(
                             .weight(1f)
                             .height(48.dp)
                             .semantics {
-                                contentDescription = "Chốt vé của khách ${kh?.ten ?: ""}, thu ${formatVndSpeakable(ve.thu)} và trích hoa hồng ${formatVndSpeakable(hoaHong)} cho KTV ${nv?.ten ?: ""}."
+                                contentDescription = "Chốt vé của khách $tenKhHienThi, thu ${formatVndSpeakable(ve.thu)} và trích hoa hồng ${formatVndSpeakable(hoaHong)} cho KTV ${nv?.ten ?: ""}."
                             }
                             .testTag("btn_confirm_ticket_${ve.id}")
                     ) {
@@ -1630,7 +1633,10 @@ fun VeCardItemMinimal(
 
 @Composable
 fun MoVeMoiDialog(store: SpaStore, onDismiss: () -> Unit) {
+    var isKhachLe by remember { mutableStateOf(store.khs.isEmpty()) }
     var selectedKhId by remember { mutableStateOf(store.khs.firstOrNull()?.id ?: "") }
+    var tenKhachLeInput by remember { mutableStateOf("") }
+    var sdtKhachLeInput by remember { mutableStateOf("") }
     val currentNvId = store.currentUser?.nvId?.takeIf { id -> store.nvs.any { it.id == id } }
     var selectedNvId by remember {
         mutableStateOf(currentNvId ?: store.nvs.firstOrNull()?.id ?: "")
@@ -1730,14 +1736,52 @@ fun MoVeMoiDialog(store: SpaStore, onDismiss: () -> Unit) {
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    FilterChip(
+                        selected = isKhachLe,
+                        onClick = {
+                            isKhachLe = true
+                            selectedKhId = ""
+                        },
+                        label = { Text("Khách vãng lai / Khách lẻ", fontSize = 14.sp) },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Chọn khách vãng lai hoặc khách lẻ"
+                        }
+                    )
                     store.khs.forEach { kh ->
                         FilterChip(
-                            selected = selectedKhId == kh.id,
-                            onClick = { selectedKhId = kh.id },
+                            selected = !isKhachLe && selectedKhId == kh.id,
+                            onClick = {
+                                isKhachLe = false
+                                selectedKhId = kh.id
+                            },
                             label = { Text(kh.ten, fontSize = 14.sp) },
                             modifier = Modifier.semantics {
                                 contentDescription = "Khách hàng ${kh.ten}"
                             }
+                        )
+                    }
+                }
+                if (isKhachLe) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = tenKhachLeInput,
+                            onValueChange = { tenKhachLeInput = it },
+                            label = { Text("Tên khách lẻ") },
+                            placeholder = { Text("Khách lẻ...") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = sdtKhachLeInput,
+                            onValueChange = { sdtKhachLeInput = it },
+                            label = { Text("SĐT (tùy chọn)") },
+                            placeholder = { Text("09...") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -2043,38 +2087,48 @@ fun MoVeMoiDialog(store: SpaStore, onDismiss: () -> Unit) {
         confirmButton = {
             Button(
                 onClick = {
+                    val finalKhId = if (isKhachLe) "" else selectedKhId
+                    val khTenVal = if (isKhachLe) tenKhachLeInput.trim().ifBlank { "Khách lẻ" } else (store.khs.firstOrNull { it.id == selectedKhId }?.ten ?: "")
+                    val khSdtVal = if (isKhachLe) sdtKhachLeInput.trim() else (store.khs.firstOrNull { it.id == selectedKhId }?.sdt ?: "")
+
                     val created = when (loaiVeMode) {
                         1 -> {
                             store.moVeMoi(
-                                khId = selectedKhId,
+                                khId = finalKhId,
                                 nvId = selectedNvId,
                                 selectedDvIds = selectedGoiDvIds.toList(),
                                 dkId = selectedDkId,
                                 tgbd = tgbdInput,
-                                dvNgoai = dvNgoaiInput
+                                dvNgoai = dvNgoaiInput,
+                                khTen = khTenVal,
+                                khSdt = khSdtVal
                             )
                         }
                         2 -> {
-                            val newDk = store.dangKyGoiChoKhach(selectedKhId, selectedNewGoiId)
+                            val newDk = if (finalKhId.isNotBlank()) store.dangKyGoiChoKhach(finalKhId, selectedNewGoiId) else null
                             if (newDk != null) {
                                 store.moVeMoi(
-                                    khId = selectedKhId,
+                                    khId = finalKhId,
                                     nvId = selectedNvId,
                                     selectedDvIds = selectedNewGoiDvIds.toList(),
                                     dkId = newDk.id,
                                     tgbd = tgbdInput,
-                                    dvNgoai = dvNgoaiInput
+                                    dvNgoai = dvNgoaiInput,
+                                    khTen = khTenVal,
+                                    khSdt = khSdtVal
                                 )
                             } else null
                         }
                         else -> {
                             store.moVeMoi(
-                                khId = selectedKhId,
+                                khId = finalKhId,
                                 nvId = selectedNvId,
                                 selectedDvIds = selectedDvIds.toList(),
                                 dkId = "",
                                 tgbd = tgbdInput,
-                                dvNgoai = dvNgoaiInput
+                                dvNgoai = dvNgoaiInput,
+                                khTen = khTenVal,
+                                khSdt = khSdtVal
                             )
                         }
                     }
@@ -2120,6 +2174,7 @@ fun MoVeMoiDialog(store: SpaStore, onDismiss: () -> Unit) {
                         if (tenTrim.isNotBlank()) {
                             val newKh = store.themKhachHang(tenTrim, sdtKhMoiInput.trim())
                             if (newKh != null) {
+                                isKhachLe = false
                                 selectedKhId = newKh.id
                             }
                             showThemKhachNhanh = false
@@ -2146,6 +2201,11 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
     var tienKhachDuaInput by remember { mutableStateOf("") }
     val hoaHongDuKien = store.tinhHoaHongVe(ve)
     var showVietQrDialog by remember { mutableStateOf(false) }
+
+    val existingKh = store.khs.firstOrNull { it.id == ve.khId }
+    var luuKhachHang by remember { mutableStateOf(existingKh != null) }
+    var tenKhInput by remember { mutableStateOf(existingKh?.ten ?: ve.khTen.ifBlank { "Khách mới" }) }
+    var sdtKhInput by remember { mutableStateOf(existingKh?.sdt ?: ve.khSdt) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2250,6 +2310,59 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
                 } else {
                     Text("Vé đi làm Gói (LT): Thu 0 đồng (Đã trả trước lúc đăng ký gói).", fontWeight = FontWeight.SemiBold, color = SpaRosewoodDark)
                 }
+
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Lưu thông tin khách vào mục Khách",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = SpaRosewoodDark,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = luuKhachHang,
+                                onCheckedChange = { luuKhachHang = it },
+                                modifier = Modifier.semantics {
+                                    contentDescription = "Lưu thông tin khách vào mục Khách"
+                                }
+                            )
+                        }
+                        if (luuKhachHang) {
+                            OutlinedTextField(
+                                value = tenKhInput,
+                                onValueChange = { tenKhInput = it },
+                                label = { Text("Họ tên khách hàng") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = sdtKhInput,
+                                onValueChange = { sdtKhInput = it },
+                                label = { Text("Số điện thoại khách") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            Text(
+                                "Vé sẽ được hoàn tất mà không tạo hoặc cập nhật thông tin trong mục Khách.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
                 Text(
                     "Hoa hồng KTV (Sẽ sinh phiếu CHI khi bấm Xác nhận chốt): ${formatVnd(hoaHongDuKien)}",
                     fontSize = 13.sp,
@@ -2264,7 +2377,10 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
                     store.hoanThanhVe(
                         luotId = ve.id,
                         tgktInput = tgktInput,
-                        thucThu = if (ve.dungGoi) 0L else (thucThuInput.toLongOrNull() ?: ve.thu)
+                        thucThu = if (ve.dungGoi) 0L else (thucThuInput.toLongOrNull() ?: ve.thu),
+                        luuKhach = luuKhachHang,
+                        tenKhachMoi = if (luuKhachHang) tenKhInput else null,
+                        sdtKhachMoi = if (luuKhachHang) sdtKhInput else null
                     )
                     onDismiss()
                 },
@@ -2288,7 +2404,10 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
                 store.hoanThanhVe(
                     luotId = ve.id,
                     tgktInput = tgktInput,
-                    thucThu = thucThuInput.toLongOrNull() ?: ve.thu
+                    thucThu = thucThuInput.toLongOrNull() ?: ve.thu,
+                    luuKhach = luuKhachHang,
+                    tenKhachMoi = if (luuKhachHang) tenKhInput else null,
+                    sdtKhachMoi = if (luuKhachHang) sdtKhInput else null
                 )
                 showVietQrDialog = false
                 onDismiss()
@@ -2296,6 +2415,107 @@ fun HoanThanhVeDialog(ve: Luot, store: SpaStore, onDismiss: () -> Unit) {
             onDismiss = { showVietQrDialog = false }
         )
     }
+}
+
+@Composable
+fun XacNhanChotVeDialog(
+    ve: Luot,
+    store: SpaStore,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val existingKh = store.khs.firstOrNull { it.id == ve.khId }
+    var tenKhInput by remember { mutableStateOf(existingKh?.ten ?: ve.khTen.ifBlank { "Khách mới" }) }
+    var sdtKhInput by remember { mutableStateOf(existingKh?.sdt ?: ve.khSdt) }
+    val hoaHong = store.tinhHoaHongVe(ve)
+    val nv = store.nvs.firstOrNull { it.id == ve.nvId }
+    val tenDv = store.tenDichVuCuaVe(ve)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Xác nhận chốt vé", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("Dịch vụ: $tenDv", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text("KTV: ${nv?.ten ?: "Chưa rõ"} • Thời gian: ${ve.tgbd} - ${ve.tgkt.ifBlank { nowTimeStr() }}", fontSize = 13.sp)
+                Text(
+                    "Thực thu: ${if (ve.dungGoi) "0đ (Trừ gói)" else formatVnd(ve.thu)} • Hoa hồng KTV: ${formatVnd(hoaHong)}",
+                    fontWeight = FontWeight.SemiBold,
+                    color = SpaSageGreen,
+                    fontSize = 13.sp
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                Text("Thông tin khách hàng:", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = SpaRosewoodDark)
+
+                OutlinedTextField(
+                    value = tenKhInput,
+                    onValueChange = { tenKhInput = it },
+                    label = { Text("Tên khách hàng") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = sdtKhInput,
+                    onValueChange = { sdtKhInput = it },
+                    label = { Text("Số điện thoại") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    "Chọn 'Lưu khách & Chốt vé' để lưu khách vào mục Khách và theo dõi lịch sử làm dịch vụ. Chọn 'Không lưu (Chỉ chốt vé)' nếu chỉ muốn chốt vé mà không lưu vào mục Khách.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    store.xacNhanChotVe(
+                        luotId = ve.id,
+                        luuKhach = true,
+                        tenKhachMoi = tenKhInput,
+                        sdtKhachMoi = sdtKhInput
+                    )
+                    Toast.makeText(context, "Đã lưu khách & chốt vé thành công!", Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = SpaSageGreen),
+                modifier = Modifier.height(48.dp)
+            ) {
+                Text("Lưu khách & Chốt vé", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = {
+                    store.xacNhanChotVe(
+                        luotId = ve.id,
+                        luuKhach = false,
+                        tenKhachMoi = tenKhInput,
+                        sdtKhachMoi = sdtKhInput
+                    )
+                    Toast.makeText(context, "Đã chốt vé (không lưu khách)!", Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                },
+                modifier = Modifier.height(48.dp)
+            ) {
+                Text("Không lưu (Chỉ chốt vé)")
+            }
+        }
+    )
 }
 
 @Composable
@@ -2691,6 +2911,7 @@ fun TabNguoi(
     var khCanSua by remember { mutableStateOf<KH?>(null) }
     var khXemTienDo by remember { mutableStateOf<KH?>(null) }
     var khDangKyGoi by remember { mutableStateOf<KH?>(null) }
+    var khXemLichSu by remember { mutableStateOf<KH?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(
@@ -2745,7 +2966,10 @@ fun TabNguoi(
                             shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { khXemLichSu = kh }
+                                .testTag("customer_card_${kh.id}")
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Row(
@@ -2757,7 +2981,7 @@ fun TabNguoi(
                                         modifier = Modifier
                                             .weight(1f)
                                             .semantics(mergeDescendants = true) {
-                                                contentDescription = "Khách hàng ${kh.ten}, số điện thoại ${kh.sdt}, đã mua $soGoiDangCo gói liệu trình."
+                                                contentDescription = "Khách hàng ${kh.ten}, số điện thoại ${kh.sdt}, đã mua $soGoiDangCo gói liệu trình. Chạm để xem lịch sử dịch vụ."
                                             }
                                     ) {
                                         Text(kh.ten, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -2792,6 +3016,19 @@ fun TabNguoi(
 
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(
+                                        onClick = { khXemLichSu = kh },
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(48.dp)
+                                            .semantics { contentDescription = "Xem lịch sử dịch vụ của khách ${kh.ten}" }
+                                            .testTag("btn_history_${kh.id}")
+                                    ) {
+                                        Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Lịch sử DV", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    }
                                     if (canManageCustomers) {
                                         OutlinedButton(
                                             onClick = { khDangKyGoi = kh },
@@ -2801,7 +3038,7 @@ fun TabNguoi(
                                                 .height(48.dp)
                                                 .semantics { contentDescription = "Mua gói cho khách ${kh.ten}" }
                                         ) {
-                                            Text("+ Mua Gói", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("+ Mua Gói", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                         }
                                     }
                                     Button(
@@ -2814,7 +3051,7 @@ fun TabNguoi(
                                             .semantics { contentDescription = "Xem tiến độ gói của khách ${kh.ten}" }
                                             .testTag("btn_progress_${kh.id}")
                                     ) {
-                                        Text("Xem tiến độ gói", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        Text("Tiến độ gói", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -3127,6 +3364,202 @@ fun TabNguoi(
             }
         )
     }
+
+    khXemLichSu?.let { kh ->
+        ChiTietLichSuKhachDialog(
+            kh = kh,
+            store = store,
+            onDismiss = { khXemLichSu = null }
+        )
+    }
+}
+
+@Composable
+fun ChiTietLichSuKhachDialog(
+    kh: KH,
+    store: SpaStore,
+    onDismiss: () -> Unit
+) {
+    val lichSuVe = store.layLichSuDichVuCuaKhach(kh.id, kh.sdt)
+    val dsDk = store.dks.filter { it.khId == kh.id }
+    val tongChiTieu = lichSuVe.sumOf { it.thu }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text(
+                    text = "Hồ sơ & Lịch sử: ${kh.ten}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = SpaRosewoodDark
+                )
+                Text(
+                    text = "SĐT: ${kh.sdt.ifBlank { "Chưa có SĐT" }}",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceAround
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Tổng lượt làm", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${lichSuVe.size} lượt", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = SpaRosewoodDark)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Tổng chi tiêu", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(formatVnd(tongChiTieu), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = SpaSageGreen)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Gói đã mua", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${dsDk.size} gói", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = SpaRosewoodDark)
+                        }
+                    }
+                }
+
+                Text(
+                    text = "Lịch sử dịch vụ đã làm (${lichSuVe.size}):",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = SpaRosewoodDark
+                )
+
+                if (lichSuVe.isEmpty()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Khách hàng chưa có lịch sử làm dịch vụ nào.",
+                            fontSize = 13.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(14.dp)
+                        )
+                    }
+                } else {
+                    lichSuVe.forEach { ve ->
+                        val tenDv = store.tenDichVuCuaVe(ve)
+                        val tenKtv = store.nvs.firstOrNull { it.id == ve.nvId }?.ten ?: "KTV"
+                        val timeNote = if (ve.tgkt.isNotBlank()) "${ve.tgbd} - ${ve.tgkt}" else "Bắt đầu lúc ${ve.tgbd} (Đang làm)"
+                        val statusText = when {
+                            ve.daHoanTat -> "Đã chốt"
+                            ve.choChot -> "Chờ chốt"
+                            else -> "Đang làm"
+                        }
+                        val statusColor = when {
+                            ve.daHoanTat -> SpaSageGreen
+                            ve.choChot -> SpaDanger
+                            else -> SpaRosewood
+                        }
+
+                        val talkBackItem = "Dịch vụ $tenDv, ngày ${ve.ngay}, thời gian $timeNote, kỹ thuật viên $tenKtv, thu ${if (ve.dungGoi) "0 đồng trừ gói" else formatVndSpeakable(ve.thu)}, trạng thái $statusText."
+
+                        Card(
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics(mergeDescendants = true) {
+                                    contentDescription = talkBackItem
+                                }
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = tenDv,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = statusColor.copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = statusText,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = statusColor,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = "📅 Ngày: ${ve.ngay} • ⏱️ Giờ: $timeNote",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Text(
+                                    text = "👤 KTV: $tenKtv • 💰 Thu: ${if (ve.dungGoi) "0đ (Trừ gói LT)" else formatVnd(ve.thu)}",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                if (ve.dvNgoai.isNotBlank()) {
+                                    Text(
+                                        text = "📝 Ghi chú: ${ve.dvNgoai}",
+                                        fontSize = 12.sp,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                        color = SpaRosewoodDark
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (dsDk.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Gói liệu trình đã mua (${dsDk.size}):",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = SpaSageGreen
+                    )
+                    dsDk.forEach { dk ->
+                        val goi = store.gois.firstOrNull { it.id == dk.goiId }
+                        if (goi != null) {
+                            Text(
+                                text = "• ${goi.ten}: Đã dùng ${dk.luotDaDung}/${goi.soBuoi} buổi (${if (dk.daDung) "Đã hoàn thành" else "Còn ${goi.soBuoi - dk.luotDaDung} buổi"})",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.height(48.dp)) {
+                Text("Đóng", fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }
 
 // =========================================================================

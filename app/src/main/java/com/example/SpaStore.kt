@@ -2130,6 +2130,18 @@ class SpaStore(context: Context) {
         return true
     }
 
+    /**
+     * Tra cứu lịch sử làm dịch vụ của một khách hàng theo ID hoặc Số điện thoại chuẩn hóa.
+     * Trả về danh sách vé sắp xếp theo ngày và giờ bắt đầu giảm dần.
+     */
+    fun layLichSuDichVuCuaKhach(khId: String, sdt: String = ""): List<Luot> {
+        val cleanDigits = normalizePhoneDigits(sdt)
+        return luots.filter { ve ->
+            (khId.isNotBlank() && ve.khId == khId) ||
+                (cleanDigits.length >= 8 && normalizePhoneDigits(ve.khSdt) == cleanDigits)
+        }.sortedWith(compareByDescending<Luot> { it.ngay }.thenByDescending { it.tgbd })
+    }
+
     fun dangKyGoiChoKhach(khId: String, goiId: String, giaTuyChinh: Long? = null): DK? {
         if (currentUser == null) return null
         val kh = khs.firstOrNull { it.id == khId } ?: return null
@@ -2296,19 +2308,25 @@ class SpaStore(context: Context) {
     // 5. VẬN HÀNH VÉ (LUOT) — HỖ TRỢ DỊCH VỤ LẺ, TRỪ GÓI (LT), TẶNG KÈM 🎁, DV NGOÀI & SNAPSHOT KẾ TOÁN
     // =========================================================================
     fun moVeMoi(
-        khId: String,
+        khId: String = "",
         nvId: String,
         selectedDvIds: List<String>,
         dkId: String = "",
         tgbd: String = nowTimeStr(),
         dvNgoai: String = "",
         thuTuyChinh: Long? = null,
-        hoaHongTuyChinh: Long? = null
+        hoaHongTuyChinh: Long? = null,
+        khTen: String = "",
+        khSdt: String = ""
     ): Luot? {
-        if (khId.isBlank() || nvId.isBlank()) return null
+        if (nvId.isBlank()) return null
         val cleanDvNgoai = dvNgoai.trim()
         val actualDvIds: List<String>
         val duKienThu: Long
+
+        val existingKh = if (khId.isNotBlank()) khs.firstOrNull { it.id == khId } else null
+        val effectiveKhTen = khTen.trim().ifBlank { existingKh?.ten ?: "Khách lẻ" }
+        val effectiveKhSdt = khSdt.trim().ifBlank { existingKh?.sdt ?: "" }
 
         if (dkId.isNotBlank()) {
             val dkIdx = dks.indexOfFirst { it.id == dkId }
@@ -2348,18 +2366,51 @@ class SpaStore(context: Context) {
             daXacNhan = false,
             ngay = todayDateStr(),
             dvNgoai = cleanDvNgoai,
-            hoaHongChot = hoaHongTuyChinh?.coerceAtLeast(0L)
+            hoaHongChot = hoaHongTuyChinh?.coerceAtLeast(0L),
+            khTen = effectiveKhTen,
+            khSdt = effectiveKhSdt
         )
         luots.add(0, luot)
         saveToPrefs()
         return luot
     }
 
-    fun hoanThanhVe(luotId: String, tgktInput: String, thucThu: Long) {
+    fun hoanThanhVe(
+        luotId: String,
+        tgktInput: String,
+        thucThu: Long,
+        luuKhach: Boolean = false,
+        tenKhachMoi: String? = null,
+        sdtKhachMoi: String? = null
+    ) {
         val idx = luots.indexOfFirst { it.id == luotId }
         if (idx < 0) return
         val cur = luots[idx]
         if (!cur.dangLam && !currentUser.canModifyCompletedTicket(cur)) return
+
+        var updatedKhId = cur.khId
+        var updatedKhTen = cur.khTen
+        var updatedKhSdt = cur.khSdt
+
+        if (luuKhach) {
+            val cleanName = tenKhachMoi?.trim()?.takeIf { it.isNotBlank() }
+                ?: cur.khTen.takeIf { it.isNotBlank() }
+                ?: khs.firstOrNull { it.id == cur.khId }?.ten
+                ?: "Khách mới"
+            val cleanPhone = sdtKhachMoi?.trim()?.takeIf { it.isNotBlank() }
+                ?: cur.khSdt.takeIf { it.isNotBlank() }
+                ?: khs.firstOrNull { it.id == cur.khId }?.sdt
+                ?: ""
+            val savedKh = themKhachHang(cleanName, cleanPhone)
+            if (savedKh != null) {
+                updatedKhId = savedKh.id
+                updatedKhTen = savedKh.ten
+                updatedKhSdt = savedKh.sdt
+            }
+        } else {
+            if (!tenKhachMoi.isNullOrBlank()) updatedKhTen = tenKhachMoi.trim()
+            if (!sdtKhachMoi.isNullOrBlank()) updatedKhSdt = sdtKhachMoi.trim()
+        }
 
         val finalTgkt = if (currentUser.hasPermission(QuyenHan.CAN_EDIT_TIME) && tgktInput.isNotBlank()) {
             tgktInput.trim()
@@ -2367,6 +2418,9 @@ class SpaStore(context: Context) {
             nowTimeStr()
         }
         luots[idx] = cur.copy(
+            khId = updatedKhId,
+            khTen = updatedKhTen,
+            khSdt = updatedKhSdt,
             tgkt = finalTgkt,
             thu = if (cur.dungGoi && !currentUser.isAdmin()) 0L else thucThu.coerceAtLeast(0L)
         )
@@ -2460,14 +2514,14 @@ class SpaStore(context: Context) {
 
     private fun taoLyDoPhieuThuVe(ve: Luot): String {
         val tenKtv = nvs.firstOrNull { it.id == ve.nvId }?.ten ?: "KTV"
-        val tenKh = khs.firstOrNull { it.id == ve.khId }?.ten ?: "Khách lẻ"
+        val tenKh = khs.firstOrNull { it.id == ve.khId }?.ten ?: ve.khTen.ifBlank { "Khách lẻ" }
         val tenDv = tenDichVuCuaVe(ve)
         return "Thu vé khách — Khách $tenKh ($tenDv, NV $tenKtv)"
     }
 
     private fun taoLyDoPhieuChiHoaHong(ve: Luot): String {
         val tenKtv = nvs.firstOrNull { it.id == ve.nvId }?.ten ?: "KTV"
-        val tenKh = khs.firstOrNull { it.id == ve.khId }?.ten ?: "Khách"
+        val tenKh = khs.firstOrNull { it.id == ve.khId }?.ten ?: ve.khTen.ifBlank { "Khách" }
         return if (ve.dungGoi) {
             "Chiết khấu DV trong gói liệu trình — NV $tenKtv (Khách $tenKh)"
         } else {
@@ -2635,16 +2689,50 @@ class SpaStore(context: Context) {
         }
     }
 
-    fun xacNhanChotVe(luotId: String) {
+    fun xacNhanChotVe(
+        luotId: String,
+        luuKhach: Boolean = false,
+        tenKhachMoi: String? = null,
+        sdtKhachMoi: String? = null
+    ): KH? {
         val idx = luots.indexOfFirst { it.id == luotId }
-        if (idx < 0) return
+        if (idx < 0) return null
         val ve = luots[idx]
-        if (!currentUser.canModifyCompletedTicket(ve)) return
-        if (ve.daXacNhan) return
+        if (!currentUser.canModifyCompletedTicket(ve)) return null
+        if (ve.daXacNhan) return null
+
+        var updatedKhId = ve.khId
+        var updatedKhTen = ve.khTen
+        var updatedKhSdt = ve.khSdt
+        var resultKh: KH? = null
+
+        if (luuKhach) {
+            val targetName = tenKhachMoi?.trim()?.takeIf { it.isNotBlank() }
+                ?: ve.khTen.takeIf { it.isNotBlank() }
+                ?: khs.firstOrNull { it.id == ve.khId }?.ten
+                ?: "Khách mới"
+            val targetPhone = sdtKhachMoi?.trim()?.takeIf { it.isNotBlank() }
+                ?: ve.khSdt.takeIf { it.isNotBlank() }
+                ?: khs.firstOrNull { it.id == ve.khId }?.sdt
+                ?: ""
+
+            resultKh = themKhachHang(targetName, targetPhone)
+            if (resultKh != null) {
+                updatedKhId = resultKh.id
+                updatedKhTen = resultKh.ten
+                updatedKhSdt = resultKh.sdt
+            }
+        } else {
+            if (!tenKhachMoi.isNullOrBlank()) updatedKhTen = tenKhachMoi.trim()
+            if (!sdtKhachMoi.isNullOrBlank()) updatedKhSdt = sdtKhachMoi.trim()
+        }
 
         val finalTgkt = ve.tgkt.ifBlank { nowTimeStr() }
         val hoaHong = tinhHoaHongVe(ve)
         val confirmedVe = ve.copy(
+            khId = updatedKhId,
+            khTen = updatedKhTen,
+            khSdt = updatedKhSdt,
             tgkt = finalTgkt,
             daXacNhan = true,
             hoaHongChot = hoaHong
@@ -2652,6 +2740,7 @@ class SpaStore(context: Context) {
         luots[idx] = confirmedVe
         dongBoPhieuThuChiCuaVeDaChot(idx, confirmedVe)
         saveToPrefs()
+        return resultKh
     }
 
     fun xoaVe(luotId: String): Boolean {
@@ -6253,7 +6342,7 @@ class SpaStore(context: Context) {
     // =========================================================================
     // 9. LƯU TRỮ JSON THÔ VÀO SHAREDPREFERENCES (tamquat_fresh_v2)
     // =========================================================================
-    private fun buildBackupJsonObject(forCloudSync: Boolean = false): JSONObject {
+    fun buildBackupJsonObject(forCloudSync: Boolean = false): JSONObject {
         val root = JSONObject()
 
         root.put("taiKhoans", JSONArray().apply {
@@ -6358,6 +6447,8 @@ class SpaStore(context: Context) {
                     }
                     put("phieuChiHoaHongId", l.phieuChiHoaHongId)
                     put("phieuThuVeId", l.phieuThuVeId)
+                    put("khTen", l.khTen)
+                    put("khSdt", l.khSdt)
                 })
             }
         })
@@ -6954,7 +7045,9 @@ class SpaStore(context: Context) {
                             ngay = o.optString("ngay", todayDateStr()),
                             hoaHongChot = hoaHongChotVal,
                             phieuChiHoaHongId = o.optString("phieuChiHoaHongId", ""),
-                            phieuThuVeId = o.optString("phieuThuVeId", "")
+                            phieuThuVeId = o.optString("phieuThuVeId", ""),
+                            khTen = o.optString("khTen", ""),
+                            khSdt = o.optString("khSdt", "")
                         )
                     )
                 }

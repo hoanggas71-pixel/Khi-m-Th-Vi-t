@@ -237,7 +237,9 @@ data class Luot(
     val dvNgoai: String = "",
     val hoaHongChot: Long? = null,
     val phieuChiHoaHongId: String = "",
-    val phieuThuVeId: String = ""
+    val phieuThuVeId: String = "",
+    val khTen: String = "",
+    val khSdt: String = ""
 ) {
     val dangLam: Boolean get() = tgkt.isBlank()
     val choChot: Boolean get() = tgkt.isNotBlank() && !daXacNhan

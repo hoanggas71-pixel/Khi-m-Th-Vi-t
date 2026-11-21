@@ -41,7 +41,7 @@ import com.example.data.local.entity.TicketEntity
         CashbookEntity::class,
         TenantEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(SpaConverters::class)
@@ -60,6 +60,13 @@ abstract class SpaDatabase : RoomDatabase() {
     companion object {
         private const val DATABASE_NAME = "khiem_thi_viet_spa.db"
 
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tickets ADD COLUMN khTen TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE tickets ADD COLUMN khSdt TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         @Volatile
         private var INSTANCE: SpaDatabase? = null
 
@@ -70,6 +77,7 @@ abstract class SpaDatabase : RoomDatabase() {
                     SpaDatabase::class.java,
                     DATABASE_NAME
                 )
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
                 .also { INSTANCE = it }

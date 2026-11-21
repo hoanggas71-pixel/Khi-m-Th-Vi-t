@@ -165,7 +165,9 @@ data class TicketEntity(
     val dvNgoai: String = "",
     val hoaHongChot: Long? = null,
     val phieuChiHoaHongId: String = "",
-    val phieuThuVeId: String = "" ,
+    val phieuThuVeId: String = "",
+    val khTen: String = "",
+    val khSdt: String = "",
     val isSynced: Boolean = false,
     val updatedAt: Long = System.currentTimeMillis()
 )
@@ -386,6 +388,8 @@ fun Luot.toEntity(tenantId: String = DEFAULT_TENANT_ID): TicketEntity {
         hoaHongChot = this.hoaHongChot,
         phieuChiHoaHongId = this.phieuChiHoaHongId,
         phieuThuVeId = this.phieuThuVeId,
+        khTen = this.khTen,
+        khSdt = this.khSdt,
         isSynced = false,
         updatedAt = System.currentTimeMillis()
     )
@@ -406,7 +410,9 @@ fun TicketEntity.toDomain(): Luot {
         dvNgoai = this.dvNgoai,
         hoaHongChot = this.hoaHongChot,
         phieuChiHoaHongId = this.phieuChiHoaHongId,
-        phieuThuVeId = this.phieuThuVeId
+        phieuThuVeId = this.phieuThuVeId,
+        khTen = this.khTen,
+        khSdt = this.khSdt
     )
 }
 
