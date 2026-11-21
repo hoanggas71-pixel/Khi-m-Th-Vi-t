@@ -311,7 +311,8 @@ data class AiChatMessage(
     val isUser: Boolean,
     val text: String,
     val actionNote: String = "",
-    val thoiGian: String = "${todayDateStr()} ${nowTimeStr()}"
+    val thoiGian: String = "${todayDateStr()} ${nowTimeStr()}",
+    val accountId: String = ""
 )
 
 enum class LoaiLenhChoXacNhan(val tenHienThi: String) {

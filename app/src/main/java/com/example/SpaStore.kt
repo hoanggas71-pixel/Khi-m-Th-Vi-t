@@ -211,6 +211,8 @@ class SpaStore(context: Context) {
     val tcs = mutableStateListOf<TC>()
     val aiMessages = mutableStateListOf<AiChatMessage>()
     val aiLongTermMemories = mutableStateListOf<String>()
+    val accountChatCache = mutableMapOf<String, MutableList<AiChatMessage>>()
+    var activeChatAccountKey: String? = null
     val deletedIds = mutableStateListOf<String>()
 
     var currentUser by mutableStateOf<TaiKhoan?>(null)
@@ -404,24 +406,14 @@ class SpaStore(context: Context) {
             null
         }
 
+        migrateGehihiChatHistoryIfNeeded()
+        loadChatForAccount(currentUser)
+
         if (aiLongTermMemories.isEmpty()) {
             ghiNhoSuKienDaiHan(
                 "Khởi tạo bộ nhớ vĩnh viễn cho gehihi: Đã nạp ${dvs.size} dịch vụ, ${gois.size} gói liệu trình, ${khs.size} khách hàng, ${nvs.size} nhân viên.",
                 luuNgay = false
             )
-        }
-
-        if (aiMessages.isEmpty()) {
-            aiMessages.add(
-                AiChatMessage(
-                    id = "welcome",
-                    isUser = false,
-                    text = "Xin chào Admin! Tôi là gehihi — trợ lý AI FULL QUYỀN 100% của Khiếm Thị Việt.\n• An toàn tuyệt đối: Mọi lệnh THÊM hoặc XÓA dữ liệu đều được gehihi tóm tắt và hỏi xác nhận lại trước khi thực thi.\n• Bộ nhớ Kép (Hybrid Vault): Lưu trữ tới $MAX_LONG_TERM_MEMORIES sự kiện & $MAX_AI_MESSAGES tin nhắn trên máy kết hợp đồng bộ thông minh lên Đám mây Google!",
-                    actionNote = "gehihi Full Quyền • Bộ nhớ Kép 50.000 sự kiện • Đồng bộ Cloud",
-                    thoiGian = "${todayDateStr()} ${nowTimeStr()}"
-                )
-            )
-            saveGehihiMemoryVault()
         }
 
         // Tự động kích hoạt đồng bộ đám mây thời gian thực nếu máy đã kết nối Google Auth
@@ -718,6 +710,7 @@ class SpaStore(context: Context) {
                 matched
             }
             currentUser = finalMatched
+            switchChatAccount(finalMatched)
             if (rememberMe) {
                 prefs.edit().putString(KEY_LOGGED_IN_ACCOUNT_ID, finalMatched.id).apply()
             } else {
@@ -745,6 +738,7 @@ class SpaStore(context: Context) {
      */
     fun loginBangTaiKhoanDaGanEmail(tk: TaiKhoan): Boolean {
         currentUser = tk
+        switchChatAccount(tk)
         prefs.edit().putString(KEY_LOGGED_IN_ACCOUNT_ID, tk.id).apply()
         syncCurrentUserProfileToCloud()
         startTenantStatusListener()
@@ -1005,6 +999,7 @@ class SpaStore(context: Context) {
     }
 
     fun logout() {
+        switchChatAccount(null)
         currentUser = null
         prefs.edit().remove(KEY_LOGGED_IN_ACCOUNT_ID).apply()
         tenantStatusListener?.remove()
@@ -2103,6 +2098,10 @@ class SpaStore(context: Context) {
             nvs.removeAll { it.id == target.nvId }
         }
         taiKhoans.removeAll { it.id == tkId }
+        val accountChatKey = getAccountChatKey(target)
+        accountChatCache.remove(accountChatKey)
+        runCatching { getAccountVaultFile(accountChatKey).delete() }
+        prefs.edit().remove("${KEY_GEHIHI_CHAT_ACCOUNT_PREFIX}$accountChatKey").apply()
         saveToPrefs()
         return true
     }
@@ -3254,49 +3253,32 @@ class SpaStore(context: Context) {
     }
 
     private fun themTinNhanAi(isUser: Boolean, text: String, actionNote: String = "") {
+        val user = currentUser
         aiMessages.add(
             AiChatMessage(
                 id = "msg_${shortId()}",
                 isUser = isUser,
                 text = text,
                 actionNote = actionNote,
-                thoiGian = "${todayDateStr()} ${nowTimeStr()}"
+                thoiGian = "${todayDateStr()} ${nowTimeStr()}",
+                accountId = user?.id.orEmpty()
             )
         )
         nenTinNhanAiCuonChieu()
         saveGehihiMemoryVault()
     }
 
+    internal fun themTinNhanAiKiemThu(isUser: Boolean, text: String, actionNote: String = "") {
+        themTinNhanAi(isUser = isUser, text = text, actionNote = actionNote)
+    }
+
     /**
-     * Khi chạm ngưỡng 500 tin nhắn:
-     * Tự động gộp 50 tin nhắn cũ nhất thành 1 tin nhắn tóm tắt đầu hội thoại để mở rộng chỗ trống liên tục mà không bị nặng máy.
+     * Giới hạn tin nhắn theo từng tài khoản: MAX_AI_MESSAGES_PER_ACCOUNT (100 tin).
+     * Áp dụng cơ chế FIFO rolling window: tự động loại bỏ tin nhắn cũ nhất khi vượt ngưỡng.
      */
     private fun nenTinNhanAiCuonChieu() {
-        while (aiMessages.size > MAX_AI_MESSAGES) {
-            val batchSize = 50.coerceAtMost(aiMessages.size - 1)
-            if (batchSize <= 1) {
-                aiMessages.removeAt(0)
-                break
-            }
-            val oldBatch = (0 until batchSize).map { aiMessages.removeAt(0) }
-            val userCmdCount = oldBatch.count { it.isUser }
-            val sampleActions = oldBatch.mapNotNull { it.actionNote.takeIf { n -> n.isNotBlank() } }.takeLast(3)
-            val summaryText = buildString {
-                append("📦 [Đã tự động nén ${oldBatch.size} tin nhắn cũ ($userCmdCount lệnh của Admin)] ")
-                if (sampleActions.isNotEmpty()) {
-                    append("Các thao tác tiêu biểu: ${sampleActions.joinToString("; ")}.")
-                }
-            }
-            aiMessages.add(
-                0,
-                AiChatMessage(
-                    id = "compact_${shortId()}",
-                    isUser = false,
-                    text = summaryText,
-                    actionNote = "Tự động nén lịch sử cuốn chiếu",
-                    thoiGian = oldBatch.lastOrNull()?.thoiGian ?: "${todayDateStr()} ${nowTimeStr()}"
-                )
-            )
+        while (aiMessages.size > MAX_AI_MESSAGES_PER_ACCOUNT) {
+            aiMessages.removeAt(0)
         }
     }
 
@@ -3371,16 +3353,25 @@ class SpaStore(context: Context) {
 
     suspend fun guiYeuCauAiBot(
         userPrompt: String,
-        onNavigateTab: (Int) -> Unit,
-        onSwitchTicketSubTab: (Int) -> Unit,
-        onSwitchPeopleSubTab: (Int) -> Unit,
-        onInspectStaffPayroll: (String) -> Unit,
+        onNavigateTab: (Int) -> Unit = {},
+        onSwitchTicketSubTab: (Int) -> Unit = {},
+        onSwitchPeopleSubTab: (Int) -> Unit = {},
+        onInspectStaffPayroll: (String) -> Unit = {},
         onCloseDialogOnAction: (String) -> Unit = {},
         attachedBitmap: Bitmap? = null,
         attachedFileName: String = "",
         attachedFileContent: String = ""
     ) {
         val user = currentUser ?: return
+        if (!user.isAdmin()) {
+            themTinNhanAi(
+                isUser = false,
+                text = "Trợ lý AI gehihi chỉ dành riêng cho Chủ Spa (Admin) và người được phân quyền Quản trị.",
+                actionNote = "Từ chối quyền truy cập AI"
+            )
+            aiIsLoading = false
+            return
+        }
         val rawPrompt = userPrompt.trim()
         val cleanPrompt = when {
             rawPrompt.isNotBlank() -> rawPrompt
@@ -3681,8 +3672,18 @@ class SpaStore(context: Context) {
     }
 
     fun xoaLichSuTroChuyenGehihi() {
+        val currentKey = activeChatAccountKey ?: getAccountChatKey(currentUser)
         aiMessages.clear()
-        saveGehihiMemoryVault()
+        if (currentKey != "anonymous") {
+            accountChatCache.remove(currentKey)
+            runCatching { getAccountVaultFile(currentKey).delete() }
+            prefs.edit().remove("${KEY_GEHIHI_CHAT_ACCOUNT_PREFIX}$currentKey").apply()
+        }
+        if (currentUser?.isAdmin() == true) {
+            loadChatForAccount(currentUser)
+        } else {
+            saveGehihiMemoryVault()
+        }
     }
 
     suspend fun fetchSystemAiConfigFromServer(): String? = withContext(Dispatchers.IO) {
@@ -6584,28 +6585,223 @@ class SpaStore(context: Context) {
         return root
     }
 
+    fun getAccountChatKey(account: TaiKhoan? = currentUser): String {
+        val acc = account ?: return "anonymous"
+        val cleanId = acc.id.ifBlank { acc.username }.ifBlank { "admin_default" }.replace(Regex("[^a-zA-Z0-9_]"), "_")
+        return "${currentTenantId}_$cleanId"
+    }
+
+    private fun getAccountVaultFile(accountKey: String): File {
+        return File(appContext.filesDir, "gehihi_vault_${accountKey}.json")
+    }
+
+    /**
+     * Nạp lịch sử chat cô lập cho tài khoản được chỉ định
+     */
+    fun loadChatForAccount(account: TaiKhoan?) {
+        if (account == null || !account.isAdmin()) {
+            aiMessages.clear()
+            activeChatAccountKey = null
+            return
+        }
+
+        val key = getAccountChatKey(account)
+        activeChatAccountKey = key
+
+        // 1. Kiểm tra Cache RAM trước
+        val cached = accountChatCache[key]
+        if (cached != null) {
+            aiMessages.clear()
+            aiMessages.addAll(cached)
+            return
+        }
+
+        // 2. Đọc từ File riêng hoặc SharedPreferences
+        val file = getAccountVaultFile(key)
+        val rawJson = runCatching {
+            if (file.exists()) file.readText(Charsets.UTF_8) else null
+        }.getOrNull() ?: prefs.getString("${KEY_GEHIHI_CHAT_ACCOUNT_PREFIX}$key", null)
+
+        aiMessages.clear()
+        if (!rawJson.isNullOrBlank()) {
+            try {
+                val obj = JSONObject(rawJson)
+                obj.optJSONArray("aiMessages")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val o = arr.optJSONObject(i) ?: continue
+                        val text = o.optString("text")
+                        if (text.isNotBlank()) {
+                            aiMessages.add(
+                                AiChatMessage(
+                                    id = o.optString("id").ifBlank { "msg_${shortId()}" },
+                                    isUser = o.optBoolean("isUser", false),
+                                    text = text,
+                                    actionNote = o.optString("actionNote", ""),
+                                    thoiGian = o.optString("thoiGian", ""),
+                                    accountId = o.optString("accountId", account.id)
+                                )
+                            )
+                        }
+                    }
+                }
+                nenTinNhanAiCuonChieu()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to parse account chat json for $key", e)
+            }
+        }
+
+        // 3. Nếu tài khoản chưa có tin nhắn nào, tạo tin nhắn chào mừng cá nhân hóa
+        if (aiMessages.isEmpty()) {
+            val name = account.hoTen.ifBlank { "Admin" }
+            aiMessages.add(
+                AiChatMessage(
+                    id = "welcome_${account.id.ifBlank { shortId() }}",
+                    isUser = false,
+                    text = "Xin chào $name! Tôi là gehihi — trợ lý AI FULL QUYỀN 100% của Khiếm Thị Việt.\n• Đoạn chat này là không gian riêng tư được mã hóa dành riêng cho tài khoản ${account.username}.\n• Mọi dữ liệu thao tác thêm/xóa đều được bảo vệ và xác nhận trước khi thực thi.",
+                    actionNote = "gehihi Riêng Tư • Toàn Quyền Admin",
+                    thoiGian = "${todayDateStr()} ${nowTimeStr()}",
+                    accountId = account.id
+                )
+            )
+            saveGehihiMemoryVault()
+        }
+
+        accountChatCache[key] = ArrayList(aiMessages)
+    }
+
+    fun setCurrentUserAndReloadChat(tk: TaiKhoan?) {
+        val prevKey = activeChatAccountKey ?: getAccountChatKey(currentUser)
+        if (currentUser != null && currentUser?.id != tk?.id && prevKey != "anonymous" && currentUser?.isAdmin() == true) {
+            accountChatCache[prevKey] = ArrayList(aiMessages)
+            saveGehihiMemoryVault()
+        }
+        currentUser = tk
+        loadChatForAccount(tk)
+    }
+
+    fun switchChatAccount(newAccount: TaiKhoan?) {
+        setCurrentUserAndReloadChat(newAccount)
+    }
+
+    internal fun migrateGehihiChatHistoryIfNeeded() {
+        val alreadyMigrated = prefs.getBoolean(PREF_KEY_GEHIHI_MIGRATED, false)
+        if (alreadyMigrated) return
+
+        runCatching {
+            val rawFromFile = if (memoryVaultFile.exists()) memoryVaultFile.readText(Charsets.UTF_8) else null
+            val raw = rawFromFile?.takeIf { it.isNotBlank() } ?: prefs.getString(KEY_GEHIHI_MEMORY_JSON, null)
+            if (!raw.isNullOrBlank()) {
+                val vault = JSONObject(raw)
+                val arr = vault.optJSONArray("aiMessages")
+                if (arr != null && arr.length() > 0) {
+                    val ownerAccount = taiKhoans.firstOrNull { it.id == "tk_admin" }
+                        ?: taiKhoans.firstOrNull { it.quyen == VaiTro.OWNER }
+                        ?: currentUser?.takeIf { it.isAdmin() }
+                    if (ownerAccount != null) {
+                        val ownerKey = getAccountChatKey(ownerAccount)
+                        val ownerFile = getAccountVaultFile(ownerKey)
+                        val migratedList = mutableListOf<AiChatMessage>()
+                        for (i in 0 until arr.length()) {
+                            val o = arr.optJSONObject(i) ?: continue
+                            val text = o.optString("text")
+                            if (text.isNotBlank()) {
+                                migratedList.add(
+                                    AiChatMessage(
+                                        id = o.optString("id").ifBlank { "migrated_${shortId()}" },
+                                        isUser = o.optBoolean("isUser", false),
+                                        text = text,
+                                        actionNote = o.optString("actionNote", ""),
+                                        thoiGian = o.optString("thoiGian", ""),
+                                        accountId = ownerAccount.id
+                                    )
+                                )
+                            }
+                        }
+                        if (migratedList.isNotEmpty()) {
+                            accountChatCache[ownerKey] = migratedList
+                            val chatJson = JSONObject().apply {
+                                put("accountKey", ownerKey)
+                                put("updatedAt", "${todayDateStr()} ${nowTimeStr()}")
+                                put("aiMessages", JSONArray().apply {
+                                    migratedList.forEach { m ->
+                                        put(JSONObject().apply {
+                                            put("id", m.id)
+                                            put("isUser", m.isUser)
+                                            put("text", m.text)
+                                            put("actionNote", m.actionNote)
+                                            put("thoiGian", m.thoiGian)
+                                            put("accountId", m.accountId)
+                                        })
+                                    }
+                                })
+                            }.toString()
+                            prefs.edit().putString("${KEY_GEHIHI_CHAT_ACCOUNT_PREFIX}$ownerKey", chatJson).apply()
+                            runCatching { ownerFile.writeText(chatJson, Charsets.UTF_8) }
+                            if (currentUser?.id == ownerAccount.id) {
+                                aiMessages.clear()
+                                aiMessages.addAll(migratedList)
+                            }
+                        }
+                    }
+                }
+            }
+            prefs.edit().putBoolean(PREF_KEY_GEHIHI_MIGRATED, true).apply()
+        }.onFailure { e ->
+            Log.w(TAG, "Migration of legacy gehihi chat warning: ${e.message}")
+        }
+    }
+
     /**
      * Lưu riêng bộ nhớ vĩnh viễn của gehihi vào cả SharedPreferences VÀ file nội bộ gehihi_memory_vault.json
      * để đảm bảo khi thoát app hoặc nhiều tháng không vào thì bộ nhớ của gehihi không bao giờ bị mất.
      */
     fun saveGehihiMemoryVault() {
         try {
+            val currentKey = activeChatAccountKey ?: getAccountChatKey(currentUser)
+            if (currentKey != "anonymous" && currentUser?.isAdmin() == true) {
+                // Cập nhật Cache RAM
+                accountChatCache[currentKey] = ArrayList(aiMessages)
+
+                // Lưu đoạn chat riêng của tài khoản
+                val chatJson = JSONObject().apply {
+                    put("accountKey", currentKey)
+                    put("updatedAt", "${todayDateStr()} ${nowTimeStr()}")
+                    put("aiMessages", JSONArray().apply {
+                        aiMessages.takeLast(MAX_AI_MESSAGES_PER_ACCOUNT).forEach { m ->
+                            put(JSONObject().apply {
+                                put("id", m.id)
+                                put("isUser", m.isUser)
+                                put("text", m.text)
+                                put("actionNote", m.actionNote)
+                                put("thoiGian", m.thoiGian)
+                                put("accountId", m.accountId.ifBlank { currentUser?.id.orEmpty() })
+                            })
+                        }
+                    })
+                }.toString()
+
+                prefs.edit().putString("${KEY_GEHIHI_CHAT_ACCOUNT_PREFIX}$currentKey", chatJson).apply()
+                runCatching { getAccountVaultFile(currentKey).writeText(chatJson, Charsets.UTF_8) }
+            }
+
+            // Lưu bộ nhớ sự kiện dài hạn chung của quán vào vault file
             val vault = JSONObject().apply {
                 put("updatedAt", "${todayDateStr()} ${nowTimeStr()}")
+                put("aiLongTermMemories", JSONArray().apply {
+                    aiLongTermMemories.takeLast(MAX_LONG_TERM_MEMORIES).forEach { note ->
+                        put(note)
+                    }
+                })
                 put("aiMessages", JSONArray().apply {
-                    aiMessages.takeLast(MAX_AI_MESSAGES).forEach { m ->
+                    aiMessages.takeLast(MAX_AI_MESSAGES_PER_ACCOUNT).forEach { m ->
                         put(JSONObject().apply {
                             put("id", m.id)
                             put("isUser", m.isUser)
                             put("text", m.text)
                             put("actionNote", m.actionNote)
                             put("thoiGian", m.thoiGian)
+                            put("accountId", m.accountId.ifBlank { currentUser?.id.orEmpty() })
                         })
-                    }
-                })
-                put("aiLongTermMemories", JSONArray().apply {
-                    aiLongTermMemories.takeLast(MAX_LONG_TERM_MEMORIES).forEach { note ->
-                        put(note)
                     }
                 })
             }
@@ -6634,27 +6830,6 @@ class SpaStore(context: Context) {
                     }
                 }
                 nenBoNhoDaiHanCuonChieu()
-            }
-            vault.optJSONArray("aiMessages")?.let { arr ->
-                if (arr.length() > aiMessages.size) {
-                    aiMessages.clear()
-                    for (i in 0 until arr.length()) {
-                        val o = arr.optJSONObject(i) ?: continue
-                        val text = o.optString("text")
-                        if (text.isNotBlank()) {
-                            aiMessages.add(
-                                AiChatMessage(
-                                    id = o.optString("id").ifBlank { "msg_${shortId()}" },
-                                    isUser = o.optBoolean("isUser", false),
-                                    text = text,
-                                    actionNote = o.optString("actionNote", ""),
-                                    thoiGian = o.optString("thoiGian", "")
-                                )
-                            )
-                        }
-                    }
-                    nenTinNhanAiCuonChieu()
-                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load gehihi memory vault", e)
@@ -7506,6 +7681,9 @@ class SpaStore(context: Context) {
         const val KEY_GEHIHI_MEMORY_JSON = "gehihi_memory_vault_json"
         const val GEHIHI_VAULT_FILE_NAME = "gehihi_memory_vault.json"
         const val KEY_LOGGED_IN_ACCOUNT_ID = "logged_in_account_id"
+        const val MAX_AI_MESSAGES_PER_ACCOUNT = 100
+        const val KEY_GEHIHI_CHAT_ACCOUNT_PREFIX = "gehihi_chat_"
+        const val PREF_KEY_GEHIHI_MIGRATED = "gehihi_migrated_to_per_account_v1"
         // Bộ nhớ Kép (Hybrid Unlimited Vault): 20.000 tin nhắn & 50.000 sự kiện trên máy + đồng bộ thông minh lên Cloud
         const val MAX_AI_MESSAGES = 20000
         const val MAX_LONG_TERM_MEMORIES = 50000

@@ -458,6 +458,13 @@ fun KhiemThiVietApp(store: SpaStore) {
         selectedTab = 0
     }
 
+    // Tự động đóng cửa sổ AI gehihi nếu tài khoản hiện tại không có quyền Admin
+    LaunchedEffect(user.id, isAdmin) {
+        if (!isAdmin && showAiBotDialog) {
+            showAiBotDialog = false
+        }
+    }
+
     BackHandler(enabled = selectedTab != 0) {
         selectedTab = 0
     }
@@ -468,7 +475,11 @@ fun KhiemThiVietApp(store: SpaStore) {
                 store = store,
                 currentUser = user,
                 onOpenSwitchAccount = { showAccountDialog = true },
-                onOpenAiBot = { showAiBotDialog = true },
+                onOpenAiBot = {
+                    if (user.isAdmin()) {
+                        showAiBotDialog = true
+                    }
+                },
                 onOpenAiKeyConfig = if (user.isAdmin()) { { showAiKeyConfigDialog = true } } else null
             )
         },
@@ -635,7 +646,7 @@ fun KhiemThiVietApp(store: SpaStore) {
         )
     }
 
-    if (showAiBotDialog) {
+    if (showAiBotDialog && user.isAdmin()) {
         AdminAiAssistantBotDialog(
             store = store,
             onNavigateTab = { targetTab ->
@@ -1219,17 +1230,18 @@ fun SpaHeaderBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Surface(
-                    onClick = onOpenAiBot,
-                    color = SpaChampagne.copy(alpha = 0.25f),
-                    shape = RoundedCornerShape(50),
-                    border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.7f)),
-                    modifier = Modifier
-                        .semantics {
-                            contentDescription = if (isAdmin) "Mở trợ lý AI gehihi cho Chủ Spa" else "Mở trợ lý AI gehihi cho Kỹ thuật viên"
-                        }
-                        .testTag("btn_ai_assistant")
-                ) {
+                if (isAdmin) {
+                    Surface(
+                        onClick = onOpenAiBot,
+                        color = SpaChampagne.copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(50),
+                        border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.7f)),
+                        modifier = Modifier
+                            .semantics {
+                                contentDescription = "Mở trợ lý AI gehihi cho Chủ Spa"
+                            }
+                            .testTag("btn_ai_assistant")
+                    ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -1250,6 +1262,7 @@ fun SpaHeaderBar(
                                 softWrap = false
                             )
                         }
+                    }
                 }
 
                 if (isAdmin && onOpenAiKeyConfig != null) {
@@ -9269,6 +9282,12 @@ fun AdminAiAssistantBotDialog(
     onOpenAiKeyConfig: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    if (!store.currentUser.isAdmin()) {
+        LaunchedEffect(Unit) {
+            onDismiss()
+        }
+        return
+    }
     val view = LocalView.current
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
@@ -9349,27 +9368,16 @@ fun AdminAiAssistantBotDialog(
     val currentUser = store.currentUser
     val isAdmin = currentUser.isAdmin()
 
-    val quickCommands = if (isAdmin) {
-        listOf(
-            "Chuyển hướng tới mục nhân viên",
-            "Mai là thứ mấy?",
-            "Báo cáo doanh thu hôm nay",
-            "Sửa mail admin",
-            "Sửa dịch vụ Chườm đá nóng giá 80k hoa hồng 30k",
-            "Hoàn thành tất cả vé đang làm",
-            "Chốt tất cả vé đang chờ",
-            "Bảng lương hoa hồng KTV tháng này"
-        )
-    } else {
-        listOf(
-            "Hôm nay tôi đã làm được mấy vé?",
-            "Hoa hồng hôm nay của tôi là bao nhiêu?",
-            "Mai là thứ mấy?",
-            "Gợi ý kỹ thuật massage bấm huyệt cổ vai gáy",
-            "Mẹo chăm sóc khách hàng giúp khách thư giãn",
-            "Danh sách dịch vụ của quán"
-        )
-    }
+    val quickCommands = listOf(
+        "Chuyển hướng tới mục nhân viên",
+        "Mai là thứ mấy?",
+        "Báo cáo doanh thu hôm nay",
+        "Sửa mail admin",
+        "Sửa dịch vụ Chườm đá nóng giá 80k hoa hồng 30k",
+        "Hoàn thành tất cả vé đang làm",
+        "Chốt tất cả vé đang chờ",
+        "Bảng lương hoa hồng KTV tháng này"
+    )
 
     val handleActionAutoClose: (String) -> Unit = { summary ->
         Toast.makeText(
@@ -9401,18 +9409,18 @@ fun AdminAiAssistantBotDialog(
     if (showClearConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showClearConfirmDialog = false },
-            title = { Text("Xóa Lịch Sử Trò Chuyện?", fontWeight = FontWeight.Bold) },
-            text = { Text("Hành động này sẽ làm sạch các tin nhắn hội thoại của gehihi trên thiết bị này. Bộ nhớ tri thức vĩnh viễn của quán vẫn được bảo toàn.") },
+            title = { Text("Bắt đầu đoạn chat mới?", fontWeight = FontWeight.Bold) },
+            text = { Text("Đoạn chat hiện tại của bạn sẽ được làm mới. Bộ nhớ sự kiện và dữ liệu của cơ sở vẫn được bảo toàn an toàn tuyệt đối.") },
             confirmButton = {
                 Button(
                     onClick = {
                         store.xoaLichSuTroChuyenGehihi()
                         showClearConfirmDialog = false
-                        Toast.makeText(context, "Đã làm sạch lịch sử trò chuyện gehihi!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Đã bắt đầu đoạn chat mới cho tài khoản của bạn!", Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SpaDanger)
                 ) {
-                    Text("Xóa lịch sử", color = Color.White)
+                    Text("Bắt đầu chat mới", color = Color.White)
                 }
             },
             dismissButton = {
@@ -9491,7 +9499,7 @@ fun AdminAiAssistantBotDialog(
                                     border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.6f))
                                 ) {
                                     Text(
-                                        text = if (isAdmin) "Chủ Spa • ${store.aiLongTermMemories.size} nhớ" else "KTV • Trợ lý",
+                                        text = "Chủ Spa • ${store.aiLongTermMemories.size} nhớ",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = SpaChampagne,
@@ -9545,12 +9553,12 @@ fun AdminAiAssistantBotDialog(
                                     )
                                 }
 
-                                // Nút Xóa lịch sử trò chuyện
+                                // Nút Xóa lịch sử trò chuyện / Bắt đầu đoạn chat mới
                                 IconButton(
                                     onClick = { showClearConfirmDialog = true },
                                     modifier = Modifier
                                         .size(48.dp)
-                                        .semantics { contentDescription = "Xóa lịch sử trò chuyện gehihi" }
+                                        .semantics { contentDescription = "Bắt đầu đoạn chat mới, làm sạch lịch sử hội thoại hiện tại" }
                                         .testTag("btn_clear_chat_history")
                                 ) {
                                     Icon(
@@ -9698,7 +9706,7 @@ fun AdminAiAssistantBotDialog(
                                     .fillMaxWidth(0.85f)
                                     .semantics(mergeDescendants = true) {
                                         liveRegion = LiveRegionMode.Polite
-                                        contentDescription = "${if (isAdmin) "Chủ Spa" else "Kỹ thuật viên"}: $displayMsgText"
+                                        contentDescription = "Chủ Spa: $displayMsgText"
                                     }
                             ) {
                                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
@@ -10272,7 +10280,7 @@ fun AdminAiAssistantBotDialog(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
-                                        text = if (isAdmin) "Full Quyền ▾" else "KTV ▾",
+                                        text = "Full Quyền ▾",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = geminiTextPrimary
@@ -10303,50 +10311,31 @@ fun AdminAiAssistantBotDialog(
                                                 norm.contains("nhap api key") || norm.contains("nhập api key")
 
                                             if (isKeyConfigIntent && bmpToSend == null && fileContentToSend.isBlank()) {
-                                                if (!store.currentUser.isAdmin()) {
-                                                    store.aiMessages.add(
-                                                        AiChatMessage(
-                                                            id = UUID.randomUUID().toString(),
-                                                            isUser = true,
-                                                            text = textToSend,
-                                                            thoiGian = "${todayDateStr()} ${nowTimeStr()}"
-                                                        )
-                                                    )
-                                                    store.aiMessages.add(
-                                                        AiChatMessage(
-                                                            id = UUID.randomUUID().toString(),
-                                                            isUser = false,
-                                                            text = "Dạ, tính năng Cài Đặt Gemini API Key chỉ dành riêng cho Chủ Spa (Quản trị viên) để bảo mật hệ thống. Bạn vui lòng liên hệ Chủ Spa để được hỗ trợ nhé!",
-                                                            actionNote = "Từ chối quyền cấu hình Key",
-                                                            thoiGian = "${todayDateStr()} ${nowTimeStr()}"
-                                                        )
-                                                    )
-                                                    store.saveGehihiMemoryVault()
+                                                if (onOpenAiKeyConfig != null) {
+                                                    onOpenAiKeyConfig()
                                                 } else {
-                                                    if (onOpenAiKeyConfig != null) {
-                                                        onOpenAiKeyConfig()
-                                                    } else {
-                                                        showKeyConfigInBot = true
-                                                    }
-                                                    store.aiMessages.add(
-                                                        AiChatMessage(
-                                                            id = UUID.randomUUID().toString(),
-                                                            isUser = true,
-                                                            text = textToSend,
-                                                            thoiGian = "${todayDateStr()} ${nowTimeStr()}"
-                                                        )
-                                                    )
-                                                    store.aiMessages.add(
-                                                        AiChatMessage(
-                                                            id = UUID.randomUUID().toString(),
-                                                            isUser = false,
-                                                            text = "Dạ, em đã mở hộp thoại Cài Đặt Gemini API Key để bạn cấu hình khóa trực quan rồi nhé! Bạn có thể dán mã khóa, kiểm tra kết nối 200 OK và lưu vào máy.",
-                                                            actionNote = "Cài đặt Gemini API Key",
-                                                            thoiGian = "${todayDateStr()} ${nowTimeStr()}"
-                                                        )
-                                                    )
-                                                    store.saveGehihiMemoryVault()
+                                                    showKeyConfigInBot = true
                                                 }
+                                                store.aiMessages.add(
+                                                    AiChatMessage(
+                                                        id = UUID.randomUUID().toString(),
+                                                        isUser = true,
+                                                        text = textToSend,
+                                                        thoiGian = "${todayDateStr()} ${nowTimeStr()}",
+                                                        accountId = store.currentUser?.id.orEmpty()
+                                                    )
+                                                )
+                                                store.aiMessages.add(
+                                                    AiChatMessage(
+                                                        id = UUID.randomUUID().toString(),
+                                                        isUser = false,
+                                                        text = "Dạ, em đã mở hộp thoại Cài Đặt Gemini API Key để bạn cấu hình khóa trực quan rồi nhé! Bạn có thể dán mã khóa, kiểm tra kết nối 200 OK và lưu vào máy.",
+                                                        actionNote = "Cài đặt Gemini API Key",
+                                                        thoiGian = "${todayDateStr()} ${nowTimeStr()}",
+                                                        accountId = store.currentUser?.id.orEmpty()
+                                                    )
+                                                )
+                                                store.saveGehihiMemoryVault()
                                             } else {
                                                 scope.launch {
                                                     store.guiYeuCauAiBot(
