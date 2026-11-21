@@ -211,7 +211,7 @@ class SpaStore(context: Context) {
     val tcs = mutableStateListOf<TC>()
     val aiMessages = mutableStateListOf<AiChatMessage>()
     val aiLongTermMemories = mutableStateListOf<String>()
-    val accountChatCache = mutableMapOf<String, MutableList<AiChatMessage>>()
+    internal val accountChatCache = mutableMapOf<String, MutableList<AiChatMessage>>()
     var activeChatAccountKey: String? = null
     val deletedIds = mutableStateListOf<String>()
 
@@ -333,7 +333,7 @@ class SpaStore(context: Context) {
 
     // Lệnh THÊM / SỬA / XÓA đang chờ Admin xác nhận lại trước khi thực thi thật
     var pendingAiConfirmation by mutableStateOf<LenhChoXacNhanGehihi?>(null)
-        private set
+        internal set
 
     // Trợ lý AI gehihi: Khởi tạo lazy theo chuẩn Firebase AI Logic
     private val geminiFlashModel by lazy {
@@ -999,6 +999,7 @@ class SpaStore(context: Context) {
     }
 
     fun logout() {
+        pendingAiConfirmation = null
         switchChatAccount(null)
         currentUser = null
         prefs.edit().remove(KEY_LOGGED_IN_ACCOUNT_ID).apply()
@@ -3315,6 +3316,10 @@ class SpaStore(context: Context) {
         onInspectStaffPayroll: (String) -> Unit = {},
         onCloseDialogOnAction: (String) -> Unit = {}
     ): KetQuaAiBot? {
+        if (currentUser?.isAdmin() != true) {
+            pendingAiConfirmation = null
+            return null
+        }
         val pending = pendingAiConfirmation ?: return null
         pendingAiConfirmation = null
         val kq = pending.thucThi.invoke()
@@ -6599,6 +6604,12 @@ class SpaStore(context: Context) {
      * Nạp lịch sử chat cô lập cho tài khoản được chỉ định
      */
     fun loadChatForAccount(account: TaiKhoan?) {
+        val caller = currentUser
+        if (caller == null || !caller.isAdmin()) {
+            aiMessages.clear()
+            activeChatAccountKey = null
+            return
+        }
         if (account == null || !account.isAdmin()) {
             aiMessages.clear()
             activeChatAccountKey = null
@@ -6670,6 +6681,7 @@ class SpaStore(context: Context) {
     }
 
     fun setCurrentUserAndReloadChat(tk: TaiKhoan?) {
+        pendingAiConfirmation = null
         val prevKey = activeChatAccountKey ?: getAccountChatKey(currentUser)
         if (currentUser != null && currentUser?.id != tk?.id && prevKey != "anonymous" && currentUser?.isAdmin() == true) {
             accountChatCache[prevKey] = ArrayList(aiMessages)
@@ -6680,6 +6692,7 @@ class SpaStore(context: Context) {
     }
 
     fun switchChatAccount(newAccount: TaiKhoan?) {
+        pendingAiConfirmation = null
         setCurrentUserAndReloadChat(newAccount)
     }
 

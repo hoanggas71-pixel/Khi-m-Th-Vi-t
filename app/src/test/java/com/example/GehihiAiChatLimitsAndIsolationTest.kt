@@ -352,4 +352,82 @@ class GehihiAiChatLimitsAndIsolationTest {
             store.aiMessages.first { it.text.contains("Lệnh cũ của Admin trước khi nâng cấp hệ thống") }.accountId
         )
     }
+
+    // =========================================================================
+    // 6. KIỂM THỬ BẢO MẬT LỆNH CHỜ XÁC NHẬN & PHÂN QUYỀN GỌI LOAD CHAT
+    // =========================================================================
+
+    @Test
+    fun testPendingAiConfirmation_invalidatedOnAccountSwitchAndLogout() {
+        // 1. Admin đăng nhập và kích hoạt lệnh chờ xác nhận xóa vé
+        store.setCurrentUserAndReloadChat(rootAdmin)
+        store.phanTichPhanHoiGeminiVaThucThi(
+            rawText = "Đang chuẩn bị xóa vé [ACTION:DELETE_TICKETS|scope=ALL]",
+            originalPrompt = "Xóa toàn bộ vé"
+        )
+        assertNotNull("Admin phải tạo được lệnh chờ xác nhận", store.pendingAiConfirmation)
+
+        // 2. Chuyển sang tài khoản KTV thường -> pendingAiConfirmation phải bị vô hiệu hóa (null)
+        store.switchChatAccount(staffUser)
+        assertFalse(store.currentUser.isAdmin())
+        assertTrue("Lệnh chờ phải bị xóa khi đổi tài khoản sang KTV", store.pendingAiConfirmation == null)
+
+        // 3. Admin đăng nhập lại và tạo lệnh chờ xác nhận mới
+        store.setCurrentUserAndReloadChat(rootAdmin)
+        store.phanTichPhanHoiGeminiVaThucThi(
+            rawText = "Đang chuẩn bị xóa nhân viên [ACTION:DELETE_STAFF|target=ALL]",
+            originalPrompt = "Xóa toàn bộ nhân viên"
+        )
+        assertNotNull("Admin tạo lệnh chờ mới", store.pendingAiConfirmation)
+
+        // 4. Admin đăng xuất -> pendingAiConfirmation phải bị vô hiệu hóa (null)
+        store.logout()
+        assertTrue("Lệnh chờ phải bị xóa khi đăng xuất", store.pendingAiConfirmation == null)
+    }
+
+    @Test
+    fun testNonAdminCannotExecutePendingAiConfirmation() {
+        // 1. Admin tạo một lệnh chờ xác nhận hành động nguy hiểm
+        store.setCurrentUserAndReloadChat(rootAdmin)
+        var actionExecuted = false
+        store.pendingAiConfirmation = LenhChoXacNhanGehihi(
+            id = "pending_test_01",
+            loai = LoaiLenhChoXacNhan.XOA,
+            tieuDeTomTat = "Xóa toàn bộ vé",
+            chiTietXacNhan = "Kiểm tra quyền thực thi lệnh xác nhận",
+            thucThi = {
+                actionExecuted = true
+                KetQuaAiBot(cauTraLoi = "Đã thực thi trái phép", hanhDongThucThi = "Nguy hiểm")
+            }
+        )
+        assertNotNull(store.pendingAiConfirmation)
+
+        // 2. Giả lập một tài khoản non-admin hoặc currentUser = staffUser cố gọi xacNhanThucThiLenhGehihi
+        store.currentUser = staffUser
+        val result = store.xacNhanThucThiLenhGehihi()
+
+        // 3. Kết quả phải là null, block không được chạy, pendingAiConfirmation bị hủy
+        assertTrue("Non-admin xác nhận phải trả về null", result == null)
+        assertFalse("Block thực thi tuyệt đối không được kích hoạt", actionExecuted)
+        assertTrue("pendingAiConfirmation phải bị dọn dẹp", store.pendingAiConfirmation == null)
+    }
+
+    @Test
+    fun testNonAdminCallingLoadChatForAccount_rejectedAndCleared() {
+        // 1. Admin nạp chat và có tin nhắn riêng tư
+        store.setCurrentUserAndReloadChat(rootAdmin)
+        store.themTinNhanAiKiemThu(isUser = true, text = "Báo cáo tài chính tuyệt mật của Chủ cơ sở")
+        assertTrue(store.aiMessages.any { it.text.contains("tuyệt mật") })
+
+        // 2. Chuyển sang tài khoản KTV thường
+        store.setCurrentUserAndReloadChat(staffUser)
+        assertEquals(0, store.aiMessages.size)
+
+        // 3. KTV hoặc mã độc cố tình gọi trực tiếp loadChatForAccount(rootAdmin)
+        store.loadChatForAccount(rootAdmin)
+
+        // Phải bị từ chối và aiMessages bị dọn sạch (clear)
+        assertEquals("Tin nhắn của Admin không được nạp khi caller là non-admin", 0, store.aiMessages.size)
+        assertTrue("activeChatAccountKey phải là null khi bị từ chối", store.activeChatAccountKey == null)
+    }
 }
