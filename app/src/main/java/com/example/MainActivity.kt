@@ -122,6 +122,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -178,10 +183,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.SpaChampagne
+import com.example.ui.theme.SpaChampagneLight
 import com.example.ui.theme.SpaDanger
+import com.example.ui.theme.SpaDangerLight
 import com.example.ui.theme.SpaRosewood
 import com.example.ui.theme.SpaRosewoodDark
 import com.example.ui.theme.SpaSageGreen
+import com.example.ui.theme.SpaSageLight
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -474,14 +482,36 @@ fun KhiemThiVietApp(store: SpaStore) {
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 6.dp
             ) {
+                val soVeDangPhucVu = store.luots.count { it.dangLam }
+                val soVeChoChot = store.luots.count { it.choChot }
+                val tongVeCanChuY = soVeDangPhucVu + soVeChoChot
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Default.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    icon = {
+                        if (tongVeCanChuY > 0) {
+                            BadgedBox(
+                                badge = {
+                                    Badge(
+                                        containerColor = if (soVeChoChot > 0) SpaDanger else SpaSageGreen,
+                                        contentColor = Color.White
+                                    ) {
+                                        Text("$tongVeCanChuY", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            ) {
+                                Icon(Icons.Default.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(20.dp))
+                            }
+                        } else {
+                            Icon(Icons.Default.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(20.dp))
+                        }
+                    },
                     label = { Text("Vé", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1) },
                     alwaysShowLabel = true,
                     modifier = Modifier
-                        .semantics { contentDescription = "Tab 1: Quản lý Vé phục vụ" }
+                        .semantics {
+                            contentDescription = "Tab 1: Quản lý Vé phục vụ${if (tongVeCanChuY > 0) ", đang có $soVeDangPhucVu vé đang làm và $soVeChoChot vé chờ chốt" else ""}"
+                        }
                         .testTag("tab_ve")
                 )
                 NavigationBarItem(
@@ -1281,6 +1311,166 @@ fun SpaHeaderBar(
 // Nhân viên chỉ thêm vé, hoàn thành vé đang làm, xóa vé đang làm.
 // Vé đã hoàn thành (Chờ chốt / Đã chốt) bị khóa sửa/xóa đối với nhân viên thường!
 // =========================================================================
+
+@Composable
+fun SpaDashboardCockpitBar(
+    store: SpaStore,
+    veDangLamCount: Int,
+    veChoChotCount: Int,
+    veDaChotCount: Int,
+    mucVeChon: Int,
+    onSelectMucVe: (Int) -> Unit
+) {
+    val canViewRevenue = store.currentUser.isAdmin() || store.currentUser.hasPermission(QuyenHan.CAN_VIEW_REVENUE)
+    val doanhThuHomNay = store.luots.filter { it.daHoanTat && it.ngay == todayDateStr() }.sumOf { it.thu }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Cockpit Item 1: Đang làm
+        Surface(
+            onClick = { onSelectMucVe(0) },
+            shape = RoundedCornerShape(12.dp),
+            color = if (mucVeChon == 0) SpaSageLight else MaterialTheme.colorScheme.surface,
+            border = BorderStroke(
+                width = if (mucVeChon == 0) 1.5.dp else 1.dp,
+                color = if (mucVeChon == 0) SpaSageGreen else Color(0xFFEADBCE)
+            ),
+            tonalElevation = if (mucVeChon == 0) 2.dp else 0.dp,
+            modifier = Modifier
+                .weight(1f)
+                .semantics {
+                    contentDescription = "Mục đang phục vụ: $veDangLamCount khách đang làm. Chạm đúp để xem."
+                }
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(SpaSageGreen, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Đang làm",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (mucVeChon == 0) Color(0xFF283629) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "$veDangLamCount",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (mucVeChon == 0) Color(0xFF1B5E20) else MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        // Cockpit Item 2: Chờ chốt
+        Surface(
+            onClick = { onSelectMucVe(1) },
+            shape = RoundedCornerShape(12.dp),
+            color = if (mucVeChon == 1) SpaDangerLight else MaterialTheme.colorScheme.surface,
+            border = BorderStroke(
+                width = if (mucVeChon == 1) 1.5.dp else 1.dp,
+                color = if (mucVeChon == 1) SpaDanger else Color(0xFFEADBCE)
+            ),
+            tonalElevation = if (mucVeChon == 1) 2.dp else 0.dp,
+            modifier = Modifier
+                .weight(1f)
+                .semantics {
+                    contentDescription = "Mục chờ chốt tiền: $veChoChotCount vé chờ thanh toán. Chạm đúp để xem."
+                }
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(SpaDanger, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Chờ chốt",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (mucVeChon == 1) Color(0xFF5C1F1F) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "$veChoChotCount",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (mucVeChon == 1) SpaDanger else MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        // Cockpit Item 3: Doanh thu / Đã chốt hôm nay
+        Surface(
+            onClick = { onSelectMucVe(2) },
+            shape = RoundedCornerShape(12.dp),
+            color = if (mucVeChon == 2) SpaChampagneLight else MaterialTheme.colorScheme.surface,
+            border = BorderStroke(
+                width = if (mucVeChon == 2) 1.5.dp else 1.dp,
+                color = if (mucVeChon == 2) SpaChampagne else Color(0xFFEADBCE)
+            ),
+            tonalElevation = if (mucVeChon == 2) 2.dp else 0.dp,
+            modifier = Modifier
+                .weight(1.2f)
+                .semantics {
+                    contentDescription = if (canViewRevenue) {
+                        "Doanh thu hôm nay: ${formatVndSpeakable(doanhThuHomNay)}, đã chốt $veDaChotCount vé. Chạm đúp để xem."
+                    } else {
+                        "Đã chốt hôm nay: $veDaChotCount vé xong. Chạm đúp để xem."
+                    }
+                }
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (canViewRevenue) Icons.Default.AccountBalanceWallet else Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = SpaRosewood,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (canViewRevenue) "Doanh thu" else "Đã chốt",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (mucVeChon == 2) SpaRosewoodDark else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = if (canViewRevenue) formatVnd(doanhThuHomNay) else "$veDaChotCount vé",
+                    fontSize = if (canViewRevenue) 13.5.sp else 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = SpaRosewoodDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun TabVanHanhVe(
     store: SpaStore,
@@ -1316,7 +1506,7 @@ fun TabVanHanhVe(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp)
+                        .height(52.dp)
                         .semantics {
                             contentDescription = "Mở vé mới. Chạm đúp để chọn khách hàng, kỹ thuật viên và dịch vụ."
                         }
@@ -1324,59 +1514,77 @@ fun TabVanHanhVe(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(22.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("MỞ VÉ PHỤC VỤ MỚI", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("MỞ VÉ PHỤC VỤ MỚI", fontWeight = FontWeight.Bold, fontSize = 15.5.sp)
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                TabRow(
-                    selectedTabIndex = mucVeChon,
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = SpaRosewoodDark,
+                // Thanh Cockpit thống kê vận hành (phong cách Fresha / Boulevard)
+                SpaDashboardCockpitBar(
+                    store = store,
+                    veDangLamCount = veDangLam.size,
+                    veChoChotCount = veChoChot.size,
+                    veDaChotCount = veDaChotHomNay.size,
+                    mucVeChon = mucVeChon,
+                    onSelectMucVe = onChangeMucVe
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Tab(
-                        selected = mucVeChon == 0,
-                        onClick = { onChangeMucVe(0) },
-                        text = {
-                            Text(
-                                "Đang làm (${veDangLam.size})",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                        },
-                        modifier = Modifier.semantics {
-                            contentDescription = "Mục vé đang làm: có ${veDangLam.size} vé"
-                        }
-                    )
-                    Tab(
-                        selected = mucVeChon == 1,
-                        onClick = { onChangeMucVe(1) },
-                        text = {
-                            Text(
-                                "Chờ chốt (${veChoChot.size})",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                        },
-                        modifier = Modifier.semantics {
-                            contentDescription = "Mục vé chờ chốt: có ${veChoChot.size} vé"
-                        }
-                    )
-                    Tab(
-                        selected = mucVeChon == 2,
-                        onClick = { onChangeMucVe(2) },
-                        text = {
-                            Text(
-                                "Đã chốt (${veDaChotHomNay.size})",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                        },
-                        modifier = Modifier.semantics {
-                            contentDescription = "Mục vé đã chốt hôm nay: có ${veDaChotHomNay.size} vé"
-                        }
-                    )
+                    TabRow(
+                        selectedTabIndex = mucVeChon,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = SpaRosewoodDark,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Tab(
+                            selected = mucVeChon == 0,
+                            onClick = { onChangeMucVe(0) },
+                            text = {
+                                Text(
+                                    "Đang làm (${veDangLam.size})",
+                                    fontWeight = if (mucVeChon == 0) FontWeight.ExtraBold else FontWeight.Medium,
+                                    fontSize = 13.sp
+                                )
+                            },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Mục vé đang làm: có ${veDangLam.size} vé"
+                            }
+                        )
+                        Tab(
+                            selected = mucVeChon == 1,
+                            onClick = { onChangeMucVe(1) },
+                            text = {
+                                Text(
+                                    "Chờ chốt (${veChoChot.size})",
+                                    fontWeight = if (mucVeChon == 1) FontWeight.ExtraBold else FontWeight.Medium,
+                                    fontSize = 13.sp
+                                )
+                            },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Mục vé chờ chốt: có ${veChoChot.size} vé"
+                            }
+                        )
+                        Tab(
+                            selected = mucVeChon == 2,
+                            onClick = { onChangeMucVe(2) },
+                            text = {
+                                Text(
+                                    "Đã chốt (${veDaChotHomNay.size})",
+                                    fontWeight = if (mucVeChon == 2) FontWeight.ExtraBold else FontWeight.Medium,
+                                    fontSize = 13.sp
+                                )
+                            },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Mục vé đã chốt hôm nay: có ${veDaChotHomNay.size} vé"
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -1497,15 +1705,48 @@ fun VeCardItemMinimal(
         append("Hoa hồng KTV: ${formatVndSpeakable(hoaHong)}.")
     }
 
+    val initialChar = tenKhHienThi.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "K"
+
+    val badgeBg: Color
+    val badgeBorder: Color
+    val badgeText: Color
+    val badgeIcon: androidx.compose.ui.graphics.vector.ImageVector
+    val badgeLabel: String
+
+    when {
+        ve.dangLam -> {
+            badgeBg = SpaSageLight
+            badgeBorder = SpaSageGreen
+            badgeText = Color(0xFF283629)
+            badgeIcon = Icons.Default.PlayArrow
+            badgeLabel = "Đang làm • ${ve.tgbd}"
+        }
+        ve.choChot -> {
+            badgeBg = SpaDangerLight
+            badgeBorder = SpaDanger
+            badgeText = Color(0xFF5C1F1F)
+            badgeIcon = Icons.Default.Schedule
+            badgeLabel = "Chờ chốt • ${ve.tgkt}"
+        }
+        else -> {
+            badgeBg = SpaChampagneLight
+            badgeBorder = SpaChampagne
+            badgeText = SpaRosewoodDark
+            badgeIcon = Icons.Default.CheckCircle
+            badgeLabel = "Đã chốt"
+        }
+    }
+
     Card(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, Color(0xFFEADBCE)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("ticket_card_${ve.id}")
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1513,40 +1754,141 @@ fun VeCardItemMinimal(
                         contentDescription = talkBackSummary
                     }
             ) {
+                // Hàng 1: Avatar chữ cái + Tên Khách & KTV + Huy hiệu trạng thái cao cấp
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = trangThaiText,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = when {
-                            ve.dangLam -> SpaRosewood
-                            ve.choChot -> SpaDanger
-                            else -> SpaSageGreen
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(38.dp),
+                            shape = CircleShape,
+                            color = SpaRosewood.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, SpaRosewood.copy(alpha = 0.25f))
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = initialChar,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 17.sp,
+                                    color = SpaRosewoodDark
+                                )
+                            }
                         }
-                    )
-                    Text(
-                        text = if (ve.dungGoi) "0đ (LT)" else formatVnd(ve.thu),
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 16.sp,
-                        color = SpaRosewoodDark
-                    )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = tenKhHienThi,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp),
+                                    tint = SpaRosewood
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "KTV: ${nv?.ten ?: "Chưa chỉ định"}",
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+
+                    // Huy hiệu trạng thái chuẩn phong cách Fresha / Boulevard
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = badgeBg,
+                        border = BorderStroke(1.dp, badgeBorder),
+                        modifier = Modifier.padding(start = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = badgeIcon,
+                                contentDescription = null,
+                                tint = badgeBorder,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = badgeLabel,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = badgeText
+                            )
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Khách: $tenKhHienThi • KTV: ${nv?.ten ?: "KTV"}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-                Text(
-                    text = "$tenDichVu • Hoa hồng: ${formatVnd(hoaHong)}",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(color = Color(0xFFF1EAE4), thickness = 1.dp)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Hàng 2: Chi tiết dịch vụ + Hoa hồng + Giá tiền nổi bật
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Spa,
+                            contentDescription = null,
+                            tint = SpaChampagne,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Text(
+                                text = tenDichVu,
+                                fontSize = 14.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Hoa hồng KTV: ${formatVnd(hoaHong)}",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (ve.dungGoi) SpaSageLight else SpaRosewood.copy(alpha = 0.08f)
+                    ) {
+                        Text(
+                            text = if (ve.dungGoi) "0đ (LT)" else formatVnd(ve.thu),
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 15.sp,
+                            color = if (ve.dungGoi) Color(0xFF283629) else SpaRosewoodDark,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -1560,7 +1902,7 @@ fun VeCardItemMinimal(
                     Button(
                         onClick = onHoanThanh,
                         colors = ButtonDefaults.buttonColors(containerColor = SpaChampagne),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp)
@@ -1569,13 +1911,15 @@ fun VeCardItemMinimal(
                             }
                             .testTag("btn_complete_ticket_${ve.id}")
                     ) {
+                        Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text("Hoàn thành vé", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 } else if (ve.choChot && canModifyCompleted) {
                     Button(
                         onClick = onXacNhanChot,
                         colors = ButtonDefaults.buttonColors(containerColor = SpaSageGreen),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp)
@@ -1600,7 +1944,7 @@ fun VeCardItemMinimal(
                 if (canEditTicket) {
                     OutlinedButton(
                         onClick = onSuaGio,
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .height(48.dp)
                             .semantics {
@@ -2962,9 +3306,13 @@ fun TabNguoi(
 
                     items(store.khs, key = { it.id }) { kh ->
                         val soGoiDangCo = store.dks.count { it.khId == kh.id }
+                        val initialChar = kh.ten.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "K"
+                        val lichSuKh = store.layLichSuDichVuCuaKhach(kh.id, kh.sdt)
+
                         Card(
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, Color(0xFFEADBCE)),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -2977,19 +3325,81 @@ fun TabNguoi(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(
+                                    Row(
                                         modifier = Modifier
                                             .weight(1f)
-                                            .semantics(mergeDescendants = true) {
-                                                contentDescription = "Khách hàng ${kh.ten}, số điện thoại ${kh.sdt}, đã mua $soGoiDangCo gói liệu trình. Chạm để xem lịch sử dịch vụ."
-                                            }
+                                            .padding(end = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(kh.ten, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                        Text(
-                                            "SĐT: ${kh.sdt} • Gói đã mua: $soGoiDangCo",
-                                            fontSize = 13.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        Surface(
+                                            modifier = Modifier.size(40.dp),
+                                            shape = CircleShape,
+                                            color = SpaChampagneLight,
+                                            border = BorderStroke(1.dp, SpaChampagne.copy(alpha = 0.5f))
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = initialChar,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 18.sp,
+                                                    color = SpaRosewoodDark
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Column(
+                                            modifier = Modifier.semantics(mergeDescendants = true) {
+                                                contentDescription = "Khách hàng ${kh.ten}, số điện thoại ${kh.sdt}, đã làm ${lichSuKh.size} lượt dịch vụ, có $soGoiDangCo gói liệu trình. Chạm để xem chi tiết lịch sử."
+                                            }
+                                        ) {
+                                            Text(kh.ten, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.Phone,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(13.dp),
+                                                    tint = SpaRosewood
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = kh.sdt.ifBlank { "Chưa có SĐT" },
+                                                    fontSize = 13.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    if (soGoiDangCo > 0) {
+                                        Surface(
+                                            shape = RoundedCornerShape(20.dp),
+                                            color = SpaChampagneLight,
+                                            border = BorderStroke(1.dp, SpaChampagne)
+                                        ) {
+                                            Text(
+                                                text = "$soGoiDangCo gói",
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = SpaRosewoodDark,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                            )
+                                        }
+                                    } else if (lichSuKh.isNotEmpty()) {
+                                        Surface(
+                                            shape = RoundedCornerShape(20.dp),
+                                            color = SpaSageLight,
+                                            border = BorderStroke(1.dp, SpaSageGreen)
+                                        ) {
+                                            Text(
+                                                text = "${lichSuKh.size} lượt",
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF283629),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                            )
+                                        }
                                     }
 
                                     if (canManageCustomers) {
@@ -3015,10 +3425,13 @@ fun TabNguoi(
                                 }
 
                                 Spacer(modifier = Modifier.height(10.dp))
+                                HorizontalDivider(color = Color(0xFFF1EAE4), thickness = 1.dp)
+                                Spacer(modifier = Modifier.height(10.dp))
+
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     OutlinedButton(
                                         onClick = { khXemLichSu = kh },
-                                        shape = RoundedCornerShape(10.dp),
+                                        shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(48.dp)
@@ -3032,7 +3445,7 @@ fun TabNguoi(
                                     if (canManageCustomers) {
                                         OutlinedButton(
                                             onClick = { khDangKyGoi = kh },
-                                            shape = RoundedCornerShape(10.dp),
+                                            shape = RoundedCornerShape(12.dp),
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .height(48.dp)
@@ -3044,7 +3457,7 @@ fun TabNguoi(
                                     Button(
                                         onClick = { khXemTienDo = kh },
                                         colors = ButtonDefaults.buttonColors(containerColor = SpaChampagne),
-                                        shape = RoundedCornerShape(10.dp),
+                                        shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(48.dp)
@@ -3095,9 +3508,16 @@ fun TabNguoi(
                     items(store.nvs, key = { it.id }) { nv ->
                         val linkedTk = store.taiKhoans.firstOrNull { it.nvId == nv.id }
                         val coMacAdmin = linkedTk.isAdmin()
+                        val initialChar = nv.ten.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "T"
+
+                        // Trạng thái vận hành thực tế tại sàn (Live Floor Status phong cách Vagaro / Boulevard)
+                        val veDangLamCuaNv = store.luots.firstOrNull { it.dangLam && it.nvId == nv.id }
+                        val dangBan = veDangLamCuaNv != null
+
                         Card(
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, Color(0xFFEADBCE)),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -3108,41 +3528,93 @@ fun TabNguoi(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(
+                                Row(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .semantics(mergeDescendants = true) {
-                                            contentDescription = "Nhân viên ${nv.ten}, giới tính ${nv.gt}, số điện thoại đăng nhập ${linkedTk?.username ?: nv.sdt}${if (coMacAdmin) ", có mác Admin" else ""}."
-                                        }
+                                        .padding(end = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("${nv.ten} (${nv.gt})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                        if (coMacAdmin) {
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Surface(
-                                                color = SpaChampagne,
-                                                shape = RoundedCornerShape(6.dp)
-                                            ) {
-                                                Text(
-                                                    text = "Admin",
-                                                    color = Color.White,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
+                                    Surface(
+                                        modifier = Modifier.size(42.dp),
+                                        shape = CircleShape,
+                                        color = if (dangBan) SpaSageLight else Color(0xFFF1EAE4),
+                                        border = BorderStroke(1.dp, if (dangBan) SpaSageGreen else Color(0xFFD6C8BC))
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = initialChar,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 18.sp,
+                                                color = if (dangBan) Color(0xFF1B5E20) else SpaRosewoodDark
+                                            )
                                         }
                                     }
-                                    Text(
-                                        "SĐT đăng nhập: ${linkedTk?.username ?: nv.sdt}",
-                                        fontSize = 13.sp,
-                                        color = SpaRosewood
-                                    )
-                                    if (nv.gc.isNotBlank()) {
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(
+                                        modifier = Modifier
+                                            .semantics(mergeDescendants = true) {
+                                                contentDescription = "Nhân viên ${nv.ten}, giới tính ${nv.gt}, số điện thoại đăng nhập ${linkedTk?.username ?: nv.sdt}${if (coMacAdmin) ", có mác Admin" else ""}. Trạng thái: ${if (dangBan) "đang phục vụ khách ${veDangLamCuaNv?.khTen}" else "đang rảnh"}."
+                                            }
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("${nv.ten} (${nv.gt})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            if (coMacAdmin) {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Surface(
+                                                    color = SpaChampagne,
+                                                    shape = RoundedCornerShape(6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "Admin",
+                                                        color = Color.White,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(2.dp))
+
                                         Text(
-                                            nv.gc,
+                                            "SĐT đăng nhập: ${linkedTk?.username ?: nv.sdt}",
                                             fontSize = 13.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = SpaRosewood
+                                        )
+
+                                        if (nv.gc.isNotBlank()) {
+                                            Text(
+                                                nv.gc,
+                                                fontSize = 12.5.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = if (dangBan) SpaSageLight else Color(0xFFF5EBE0),
+                                    border = BorderStroke(1.dp, if (dangBan) SpaSageGreen else Color(0xFFD6C8BC))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(7.dp)
+                                                .background(if (dangBan) SpaSageGreen else Color(0xFF9E9E9E), CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = if (dangBan) "Đang làm" else "Đang rảnh",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (dangBan) Color(0xFF1B5E20) else Color(0xFF6E5D5D)
                                         )
                                     }
                                 }
