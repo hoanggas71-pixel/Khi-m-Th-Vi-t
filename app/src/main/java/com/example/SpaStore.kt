@@ -454,7 +454,7 @@ class SpaStore(context: Context) {
      * Tự động nâng cấp tài khoản cũ và nạp 10 dịch vụ + 3 gói chuẩn từ file menu_mới_nhất_2.json
      * nếu dữ liệu đang là bộ mẫu cũ (dv_01..dv_04).
      */
-    private fun migrateLegacyAccountsAndMenuIfNeeded() {
+    internal fun migrateLegacyAccountsAndMenuIfNeeded() {
         if (currentTenantId != DEFAULT_TENANT_ID) return
         var changed = false
         for (i in taiKhoans.indices) {
@@ -469,10 +469,10 @@ class SpaStore(context: Context) {
                 changed = true
             } else if (tk.nvId.isNotBlank()) {
                 val linkedNv = nvs.firstOrNull { it.id == tk.nvId }
-                val phoneDigits = linkedNv?.sdt?.filter { it.isDigit() }.orEmpty()
-                if (phoneDigits.length >= 8 && !tk.username.all { it.isDigit() }) {
+                if (tk.username.isBlank()) {
+                    val phoneDigits = linkedNv?.sdt?.filter { it.isDigit() }.orEmpty()
                     taiKhoans[i] = tk.copy(
-                        username = phoneDigits,
+                        username = if (phoneDigits.length >= 8) phoneDigits else (linkedNv?.sdt?.takeIf { it.isNotBlank() } ?: "090000000$i"),
                         matKhauHienThi = tk.matKhauHienThi.ifBlank { "123456" }
                     )
                     changed = true
@@ -1892,7 +1892,8 @@ class SpaStore(context: Context) {
                 (cleanSdt.length >= 7 && normalizePhoneDigits(it.username) == cleanSdt)
         }
         val existingNvIdx = nvs.indexOfFirst {
-            cleanSdt.length >= 7 && normalizePhoneDigits(it.sdt) == cleanSdt
+            it.sdt.equals(usernamePhone, ignoreCase = true) ||
+                (cleanSdt.length >= 7 && normalizePhoneDigits(it.sdt) == cleanSdt)
         }
 
         val nv: NV
@@ -1953,6 +1954,26 @@ class SpaStore(context: Context) {
 
         saveToPrefs()
         return nv
+    }
+
+    fun themTaiKhoanMoi(
+        hoTen: String,
+        tenDangNhap: String,
+        matKhau: String = "123456",
+        laAdmin: Boolean = false,
+        email: String = "",
+        gioiTinh: String = "Nam",
+        ghiChu: String = ""
+    ): NV? {
+        return themNhanVien(
+            ten = hoTen,
+            gt = gioiTinh,
+            sdt = tenDangNhap,
+            gc = ghiChu,
+            matKhauKhoiTao = matKhau,
+            laAdmin = laAdmin,
+            email = email
+        )
     }
 
     fun adminCapNhatTaiKhoanVaNhanVien(
@@ -4096,8 +4117,8 @@ class SpaStore(context: Context) {
                 val phoneFound = Regex("(0\\d{8,10})")
                     .findAll(norm).map { it.value }.lastOrNull { it != targetTk.username }
                 val passFound = if (norm.contains("mat khau") || norm.contains("mk") || norm.contains("pass")) {
-                    Regex("(?:mat khau|mk|pass|thanh|la|moi|:|=)\\s*([a-zA-Z0-9]{4,16})\\s*$")
-                        .find(norm)?.groupValues?.get(1)
+                    Regex("(?i)(?:mat khau|mật khẩu|mk|pass|password|thanh|thành|la|là|moi|mới|:|=)\\s*([a-zA-Z0-9_@#\$%^&*!.-]{3,30})\\s*$")
+                        .find(prompt)?.groupValues?.get(1)
                 } else null
                 val nameFound = Regex("(?i)(?:tên thành|ten thanh|tên mới là|ten moi la|đổi tên là|doi ten la)\\s+([\\p{L}\\s]{2,25})")
                     .find(prompt)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
@@ -4948,11 +4969,11 @@ class SpaStore(context: Context) {
             norm.contains("tao nhan vien") || norm.contains("tao ktv") || norm.contains("tao nv") ||
             norm.contains("tao tai khoan") || norm.contains("them tai khoan")
         if (laLenhTaoThemNhanVien) {
-            val phoneExplicit = Regex("(?i)(?:sđt|sdt|số điện thoại|so dien thoai|dien thoai|phone|tel)\\s*[:=]?\\s*(\\d{3,12})").find(prompt)?.groupValues?.get(1)
+            val userExplicit = Regex("(?i)(?:tên đăng nhập|ten dang nhap|tài khoản|tai khoan|username|tk|user|sđt|sdt|số điện thoại|so dien thoai|dien thoai|phone|tel)\\s*(?:\\b(?:là|la|thành|thanh)\\b|[:=])?\\s*([a-zA-Z0-9_.-]{3,30})").find(prompt)?.groupValues?.get(1)
             val phoneStandalone = Regex("\\b(0\\d{8,10}|\\d{9,11}|113|114|115)\\b").find(norm)?.value
-            val phone = phoneExplicit?.takeIf { it.isNotBlank() } ?: phoneStandalone?.takeIf { it.isNotBlank() } ?: ""
+            val phone = userExplicit?.takeIf { it.isNotBlank() } ?: phoneStandalone?.takeIf { it.isNotBlank() } ?: ""
 
-            val passMatch = Regex("(?:mat khau|mk|pass)\\s*[:=]?\\s*([a-zA-Z0-9]{4,15})").find(norm)
+            val passMatch = Regex("(?i)(?:mật khẩu|mat khau|mk|password|pass)\\s*(?:\\b(?:là|la|thành|thanh)\\b|[:=])?\\s*([a-zA-Z0-9_@#\$%^&*!.-]{3,30})").find(prompt)
             val pass = passMatch?.groupValues?.get(1) ?: "123456"
             val gt = if (Regex("(?i)(?:giới tính|gioi tinh)?\\s*[:=]?\\s*(?:nu|nữ)").containsMatchIn(prompt)) "Nữ" else "Nam"
             val laAdmin = norm.contains("admin")
@@ -4989,14 +5010,14 @@ class SpaStore(context: Context) {
                     "nhân viên", "nhan vien", "ktv", "kỹ thuật viên", "tên là", "ten la"
                 )
             )
-            val splitKeywords = listOf("giới tính", "gioi tinh", "sdt", "sđt", "số điện thoại", "so dien thoai", "mật khẩu", "mat khau", "mk", "pass", "mail", "email", "admin")
+            val splitKeywords = listOf("giới tính", "gioi tinh", "tên đăng nhập", "ten dang nhap", "tài khoản", "tai khoan", "username", "tk", "sdt", "sđt", "số điện thoại", "so dien thoai", "mật khẩu", "mat khau", "mk", "pass", "mail", "email", "admin")
             val cutIdx = splitKeywords.map { kw -> rawName.lowercase().indexOf(kw) }.filter { it >= 0 }.minOrNull()
             if (cutIdx != null && cutIdx > 0) {
                 rawName = rawName.substring(0, cutIdx)
             }
             val nameExtracted = rawName
                 .replace(Regex("(?i)0\\d{8,10}"), "")
-                .replace(Regex("(?i)tên\\s+là|ten\\s+la|tên|ten|sđt|sdt|số điện thoại|so dien thoai|admin|nam|nữ|nu|cho|-|,|:"), "")
+                .replace(Regex("(?i)tên\\s+là|ten\\s+la|tên|ten|sđt|sdt|số điện thoại|so dien thoai|tài khoản|tai khoan|username|tk|admin|nam|nữ|nu|cho|-|,|:"), "")
                 .trim()
                 .split(" ")
                 .filter { it.isNotBlank() }
@@ -5005,8 +5026,8 @@ class SpaStore(context: Context) {
 
             if (phone.isBlank()) {
                 return KetQuaAiBot(
-                    cauTraLoi = "Để thêm nhân viên \"$nameExtracted\", bạn vui lòng cung cấp Số điện thoại (dùng làm tên đăng nhập tài khoản). Ví dụ:\n👉 \"Thêm nv $nameExtracted sđt 0912345678 giới tính $gt\"",
-                    hanhDongThucThi = "Cần SĐT để tạo tài khoản KTV",
+                    cauTraLoi = "Để thêm nhân viên \"$nameExtracted\", bạn vui lòng cung cấp Số điện thoại hoặc Tên đăng nhập (dùng làm tên đăng nhập tài khoản). Ví dụ:\n👉 \"Thêm nv $nameExtracted sđt 0912345678 giới tính $gt\"",
+                    hanhDongThucThi = "Cần SĐT/Tên đăng nhập để tạo tài khoản KTV",
                     chuyenTab = 1,
                     chuyenMucNguoi = 1
                 )
@@ -5014,8 +5035,8 @@ class SpaStore(context: Context) {
 
             return taoYeuCauXacNhanGehihi(
                 loai = LoaiLenhChoXacNhan.THEM,
-                tieuDeTomTat = "Tạo tài khoản & KTV $nameExtracted (SĐT: $phone)",
-                chiTietXacNhan = "Bạn đang yêu cầu tạo nhân viên & tài khoản mới: Họ tên \"$nameExtracted\" ($gt), SĐT đăng nhập \"$phone\", mật khẩu \"$pass\"${if (emailFound.isNotBlank()) ", Gmail: $emailFound" else ""}${if (laAdmin) ", cấp mác Admin" else ""}."
+                tieuDeTomTat = "Tạo tài khoản & KTV $nameExtracted (${if (phone.all { it.isDigit() }) "SĐT" else "Tài khoản"}: $phone)",
+                chiTietXacNhan = "Bạn đang yêu cầu tạo nhân viên & tài khoản mới: Họ tên \"$nameExtracted\" ($gt), SĐT / Tên đăng nhập \"$phone\", mật khẩu \"$pass\"${if (emailFound.isNotBlank()) ", Gmail: $emailFound" else ""}${if (laAdmin) ", cấp mác Admin" else ""}."
             ) {
                 val nv = themNhanVien(
                     ten = nameExtracted,
@@ -5357,7 +5378,7 @@ class SpaStore(context: Context) {
             appendLine()
             appendLine("2. NĂNG LỰC HIỂU KHẨU LỆNH TỰ NHIÊN (KHÔNG CẦN ĐÚNG CÚ PHÁP):")
             appendLine("   Khi Admin ra lệnh quản lý (viết tắt, tiếng lóng, ghép câu, nói nhanh: 'thêm nv...', 'mở vé...', 'chốt ca...', 'chi 150k mua...', 'sửa giá...'), hãy tự động bóc tách đúng ý định và gắn ĐÚNG 1 THẺ LỆNH duy nhất ở cuối câu trả lời:")
-            appendLine("   - Thêm nhân viên: [ACTION:ADD_STAFF|ten=HọTên|sdt=SĐT|gt=Nam/Nữ|mk=123456|email=Gmail|admin=false]")
+            appendLine("   - Thêm nhân viên: [ACTION:ADD_STAFF|ten=HọTên|sdt=SĐT|tk=TênĐăngNhập|gt=Nam/Nữ|mk=MậtKhẩu|email=Gmail|admin=false]")
             appendLine("   - Mở vé mới: [ACTION:OPEN_TICKET|kh=TênKhách|nv=TênKTV|dv=TênDịchVụ|dunggoi=true/false]")
             appendLine("   - Chốt vé: [ACTION:CONFIRM_TICKETS|scope=ALL/DANG_LAM/CHO_CHOT/TênKTV]")
             appendLine("   - Hoàn thành vé: [ACTION:COMPLETE_TICKET]")
@@ -5374,8 +5395,8 @@ class SpaStore(context: Context) {
             appendLine("3. NGUYÊN TẮC PHÂN BIỆT Ý ĐỊNH & BÓC TÁCH THÔNG TIN CỦA GEMINI (CỰC KỲ QUAN TRỌNG):")
             appendLine("   - Khi Admin yêu cầu THÊM NHÂN VIÊN MỚI (Ví dụ: 'thêm nhân viên Mai Văn Hoài, giới tính nam, số điện thoại 0968608795, mail chưa cập nhật'):")
             appendLine("     + Xác định chính xác đây là lệnh THÊM (ADD_STAFF). TUYỆT ĐỐI KHÔNG nhận nhầm sang lệnh sửa hay xóa người khác.")
-            appendLine("     + Bóc tách trường chuẩn xác: Họ tên = Mai Văn Hoài; SĐT = 0968608795; Giới tính = Nam (chữ 'nam' ở đây là giới tính nam, không phải tên thợ khác!); Email = để rỗng khi ghi 'chưa cập nhật' hoặc 'chưa có'.")
-            appendLine("     + Gắn thẻ lệnh duy nhất: [ACTION:ADD_STAFF|ten=Mai Văn Hoài|sdt=0968608795|gt=Nam|mk=123456|email=].")
+            appendLine("     + Bóc tách trường chuẩn xác: Họ tên = Mai Văn Hoài; SĐT = 0968608795; Tên đăng nhập (tk - bóc tách chính xác tên đăng nhập/username nếu người dùng chỉ định, nếu không thì lấy SĐT); Mật khẩu (mk - bóc tách chính xác mật khẩu nếu người dùng chỉ định, chỉ để mk=123456 nếu không có thông tin); Giới tính = Nam (chữ 'nam' ở đây là giới tính nam, không phải tên thợ khác!); Email = để rỗng khi ghi 'chưa cập nhật' hoặc 'chưa có'.")
+            appendLine("     + Gắn thẻ lệnh duy nhất: [ACTION:ADD_STAFF|ten=Mai Văn Hoài|sdt=0968608795|tk=0968608795|gt=Nam|mk=123456|email=].")
             appendLine("   - Khi Admin ra lệnh SỬA hoặc XÓA: CHỈ khi người dùng nêu đích danh ai đó cần sửa/xóa. Tuyệt đối không tự sửa ai khác khi người dùng đang muốn thêm mới.")
             appendLine("   - Khi Admin hỏi han, tra cứu doanh thu, tâm sự, hỏi tư vấn chiến lược kinh doanh spa, tính toán hoặc hỏi lịch ngày giờ:")
             appendLine("     + Trả lời tự nhiên, thông minh, sâu sắc, giải thích tận tình và TUYỆT ĐỐI KHÔNG gắn bất kỳ thẻ [ACTION:...] nào.")
@@ -5420,7 +5441,7 @@ class SpaStore(context: Context) {
         }
     }
 
-    private fun phanTichPhanHoiGeminiVaThucThi(rawText: String, originalPrompt: String): KetQuaAiBot {
+    internal fun phanTichPhanHoiGeminiVaThucThi(rawText: String, originalPrompt: String = ""): KetQuaAiBot {
         val actionRegex = Regex("\\[ACTION:([^\\]]+)\\]")
         val match = actionRegex.find(rawText)
         val cleanReply = rawText.replace(actionRegex, "").replace("**", "").trim()
@@ -5822,7 +5843,10 @@ class SpaStore(context: Context) {
                 }
                 "ADD_STAFF" -> {
                     val ten = params["ten"].orEmpty().trim().ifBlank { "KTV Mới" }
-                    val sdt = params["sdt"]?.filter { it.isDigit() }?.trim().orEmpty()
+                    val userOrPhone = params["tk"]?.trim()?.takeIf { it.isNotBlank() }
+                        ?: params["sdt"]?.trim()?.takeIf { it.isNotBlank() }
+                        ?: ""
+                    val sdt = normalizePhoneDigits(userOrPhone).ifBlank { userOrPhone }
                     val gt = params["gt"]?.trim()?.takeIf { it.isNotBlank() } ?: "Nam"
                     val mk = params["mk"].orEmpty().trim().ifBlank { "123456" }
                     val email = params["email"]?.trim()?.takeIf { it.contains("@") }.orEmpty()
@@ -5830,8 +5854,8 @@ class SpaStore(context: Context) {
 
                     if (sdt.isBlank()) {
                         return KetQuaAiBot(
-                            cauTraLoi = "Để thêm nhân viên \"$ten\", bạn vui lòng cung cấp Số điện thoại (dùng làm tên đăng nhập tài khoản). Ví dụ:\n👉 \"Thêm nv $ten sđt 0912345678 giới tính $gt\"",
-                            hanhDongThucThi = "Cần SĐT để tạo tài khoản KTV",
+                            cauTraLoi = "Để thêm nhân viên \"$ten\", bạn vui lòng cung cấp Số điện thoại hoặc Tên đăng nhập (dùng để đăng nhập tài khoản). Ví dụ:\n👉 \"Thêm nv $ten sđt 0912345678 giới tính $gt\"",
+                            hanhDongThucThi = "Cần SĐT/Tên đăng nhập để tạo tài khoản KTV",
                             chuyenTab = 1,
                             chuyenMucNguoi = 1
                         )
@@ -5839,8 +5863,8 @@ class SpaStore(context: Context) {
 
                     return taoYeuCauXacNhanGehihi(
                         loai = LoaiLenhChoXacNhan.THEM,
-                        tieuDeTomTat = "Tạo tài khoản & KTV $ten (SĐT: $sdt)",
-                        chiTietXacNhan = "Bạn đang yêu cầu tạo nhân viên & tài khoản mới: Họ tên \"$ten\" ($gt), SĐT đăng nhập \"$sdt\", mật khẩu \"$mk\"${if (email.isNotBlank()) ", Gmail: $email" else ""}${if (laAdmin) ", cấp mác Admin" else ""}."
+                        tieuDeTomTat = "Tạo tài khoản & KTV $ten (${if (sdt.all { it.isDigit() }) "SĐT" else "Tài khoản"}: $sdt)",
+                        chiTietXacNhan = "Bạn đang yêu cầu tạo nhân viên & tài khoản mới: Họ tên \"$ten\" ($gt), SĐT / Tên đăng nhập \"$sdt\", mật khẩu \"$mk\"${if (email.isNotBlank()) ", Gmail: $email" else ""}${if (laAdmin) ", cấp mác Admin" else ""}."
                     ) {
                         val nv = themNhanVien(
                             ten = ten,

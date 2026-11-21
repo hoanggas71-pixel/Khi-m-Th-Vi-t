@@ -173,12 +173,17 @@ data class TaiKhoan(
 }
 
 fun normalizePhoneDigits(raw: String): String {
-    val trimmed = raw.trim().replace(" ", "").replace(".", "").replace("-", "")
+    val trimmed = raw.trim().replace(" ", "")
+    if (trimmed.isBlank()) return ""
     val digitsOnly = trimmed.filter { it.isDigit() }
-    if (digitsOnly.startsWith("84") && digitsOnly.length >= 10) {
-        return "0" + digitsOnly.removePrefix("84")
+    val withoutSeparators = trimmed.replace(".", "").replace("-", "")
+    if (digitsOnly.length == withoutSeparators.length || (withoutSeparators.startsWith("+") && digitsOnly.length == withoutSeparators.length - 1)) {
+        if (digitsOnly.startsWith("84") && digitsOnly.length >= 10) {
+            return "0" + digitsOnly.removePrefix("84")
+        }
+        return digitsOnly
     }
-    return digitsOnly.ifBlank { trimmed.lowercase() }
+    return trimmed // Preserve alphanumeric custom username
 }
 
 data class NV(
@@ -501,8 +506,16 @@ fun normalizeVietnameseText(input: String): String {
 }
 
 fun normalizePhoneOrUsername(sdt: String, fallbackName: String, fallbackIndex: Int): String {
-    val digitsOnly = sdt.filter { it.isDigit() }
-    if (digitsOnly.length >= 6) return digitsOnly
+    val trimmed = sdt.trim().replace(" ", "")
+    if (trimmed.isNotBlank()) {
+        if (trimmed.all { it.isDigit() }) {
+            if (trimmed.startsWith("84") && trimmed.length >= 10) {
+                return "0" + trimmed.removePrefix("84")
+            }
+            return trimmed
+        }
+        return trimmed // Preserve alphanumeric custom username
+    }
     val slug = normalizeVietnameseText(fallbackName).replace(Regex("[^a-z0-9]"), "")
     return if (slug.isNotBlank()) slug else "090000000$fallbackIndex"
 }

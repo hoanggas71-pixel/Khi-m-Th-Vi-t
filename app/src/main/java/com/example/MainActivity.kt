@@ -172,6 +172,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -3555,7 +3556,7 @@ fun TabNguoi(
                                     Column(
                                         modifier = Modifier
                                             .semantics(mergeDescendants = true) {
-                                                contentDescription = "Nhân viên ${nv.ten}, giới tính ${nv.gt}, số điện thoại đăng nhập ${linkedTk?.username ?: nv.sdt}${if (coMacAdmin) ", có mác Admin" else ""}. Trạng thái: ${if (dangBan) "đang phục vụ khách ${veDangLamCuaNv?.khTen}" else "đang rảnh"}."
+                                                contentDescription = "Nhân viên ${nv.ten}, giới tính ${nv.gt}, số điện thoại đăng nhập ${linkedTk?.username ?: nv.sdt}${if (coMacAdmin) ", được cấp quyền Admin" else ""}. Trạng thái: ${if (dangBan) "đang phục vụ khách ${veDangLamCuaNv?.khTen}" else "đang rảnh"}."
                                             }
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -3564,7 +3565,10 @@ fun TabNguoi(
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Surface(
                                                     color = SpaChampagne,
-                                                    shape = RoundedCornerShape(6.dp)
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    modifier = Modifier.semantics {
+                                                        contentDescription = "Được cấp quyền Admin"
+                                                    }
                                                 ) {
                                                     Text(
                                                         text = "Admin",
@@ -6049,7 +6053,12 @@ fun TabQuyenHanAdmin(
 
         when (adminSubTab) {
             0 -> {
-                val staffAccounts = store.taiKhoans.filter { it.id != "tk_admin" && it.quyen != VaiTro.OWNER }
+                val rootAdminTk = store.taiKhoans.firstOrNull {
+                    it.id == "tk_admin" || it.id.startsWith("tk_owner_") || (it.quyen == VaiTro.OWNER && it.nvId.isBlank())
+                } ?: store.taiKhoans.firstOrNull { it.id == "tk_admin" } ?: store.currentUser
+                val staffAccounts = store.taiKhoans.filter {
+                    it.id != rootAdminTk?.id && it.id != "tk_admin" && !it.id.startsWith("tk_owner_")
+                }
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
@@ -6181,7 +6190,7 @@ fun TabQuyenHanAdmin(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .semantics(mergeDescendants = true) {
-                                                contentDescription = "Nhân viên ${tk.hoTen}. Số điện thoại đăng nhập: ${tk.username}. Mật khẩu hiện tại: $passText. Trạng thái: ${if (isTkAdmin) "Đang có quyền ngang bằng Admin" else "Nhân viên thường, đã mở ${tk.cacQuyenDuocCap.size} quyền phụ"}."
+                                                contentDescription = "Nhân viên ${tk.hoTen}. Số điện thoại đăng nhập: ${tk.username}. Mật khẩu hiện tại: $passText. Trạng thái: ${if (isTkAdmin) "Được cấp quyền Admin" else "Nhân viên thường, đã mở ${tk.cacQuyenDuocCap.size} quyền phụ"}."
                                             }
                                     ) {
                                         Row(
@@ -6200,7 +6209,10 @@ fun TabQuyenHanAdmin(
                                                     Spacer(modifier = Modifier.width(8.dp))
                                                     Surface(
                                                         color = SpaChampagne,
-                                                        shape = RoundedCornerShape(6.dp)
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        modifier = Modifier.semantics {
+                                                            contentDescription = "Được cấp quyền Admin"
+                                                        }
                                                     ) {
                                                         Text(
                                                             text = "Admin",
@@ -6330,6 +6342,7 @@ fun TabQuyenHanAdmin(
                                             },
                                             modifier = Modifier.semantics {
                                                 contentDescription = "Cấp hoặc thu hồi quyền ngang bằng Admin cho ${tk.hoTen}"
+                                                stateDescription = if (isTkAdmin) "Đang có quyền ngang bằng Admin" else "Nhân viên thường"
                                             }
                                         )
                                     }
@@ -6407,9 +6420,9 @@ fun TabQuyenHanAdmin(
             }
 
             1 -> {
-                val rootAdminTk = store.taiKhoans.firstOrNull { it.quyen == VaiTro.OWNER }
-                    ?: store.currentUser
-                    ?: store.taiKhoans.firstOrNull { it.id == "tk_admin" }
+                val rootAdminTk = store.taiKhoans.firstOrNull {
+                    it.id == "tk_admin" || it.id.startsWith("tk_owner_") || (it.quyen == VaiTro.OWNER && it.nvId.isBlank())
+                } ?: store.taiKhoans.firstOrNull { it.id == "tk_admin" } ?: store.currentUser
                 if (rootAdminTk != null) {
                     var hoTenAdmin by remember(rootAdminTk.id) { mutableStateOf(rootAdminTk.hoTen) }
                     var sdtAdmin by remember(rootAdminTk.id) { mutableStateOf(rootAdminTk.username) }
@@ -7559,8 +7572,8 @@ fun TabQuyenHanAdmin(
                     OutlinedTextField(
                         value = sdt,
                         onValueChange = { sdt = it },
-                        label = { Text("Số điện thoại (Tên đăng nhập)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        label = { Text("Số điện thoại hoặc Tên đăng nhập") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -7619,13 +7632,13 @@ fun TabQuyenHanAdmin(
                                 store.forcePushCurrentStateToCloud()
                                 Toast.makeText(
                                     context,
-                                    "Đã tạo & đồng bộ đám mây TK ${nv.ten} (SĐT: ${nv.sdt}, MK: $passFinal)",
+                                    "Đã tạo & đồng bộ đám mây TK ${nv.ten} (${if (nv.sdt.all { it.isDigit() }) "SĐT" else "Tài khoản"}: ${nv.sdt}, MK: $passFinal)",
                                     Toast.LENGTH_LONG
                                 ).show()
                                 showCreateAccountDialog = false
                             }
                         } else {
-                            Toast.makeText(context, "Vui lòng nhập Họ tên và Số điện thoại!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Vui lòng nhập Họ tên và Số điện thoại / Tên đăng nhập!", Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SpaRosewood),
@@ -7664,8 +7677,8 @@ fun TabQuyenHanAdmin(
                     OutlinedTextField(
                         value = sdtMoi,
                         onValueChange = { sdtMoi = it },
-                        label = { Text("Số điện thoại đăng nhập") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        label = { Text("Số điện thoại hoặc Tên đăng nhập") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
