@@ -30,7 +30,6 @@ service cloud.firestore {
         request.auth.token.get('role', '') == 'DEVELOPER' ||
         (request.auth.token.get('email_verified', false) == true &&
          request.auth.token.get('email', '') in ['admin@khiemthiviet.vn', 'developer@khiemthiviet.vn', 'dev@khiemthiviet.vn']) ||
-        request.auth.uid in ['dev_admin_uid', 'dev_super_admin'] ||
         exists(/databases/$(database)/documents/dev_registry/$(request.auth.uid)) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'DEVELOPER')
@@ -43,8 +42,7 @@ service cloud.firestore {
         isDev() ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
          (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('primaryTenantId', '') == tenantId ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('tenantId', '') == tenantId)) ||
-        tenantId == 'khiem_thi_viet'
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('tenantId', '') == tenantId))
       );
     }
 
@@ -56,12 +54,20 @@ service cloud.firestore {
       );
     }
 
+    function isExistingTenantActive(tenantId) {
+      let tenantPath = /databases/$(database)/documents/tenants/$(tenantId);
+      return isDev() || (
+        exists(tenantPath) &&
+        get(tenantPath).data.get('status', 'ACTIVE') == 'ACTIVE' &&
+        get(tenantPath).data.get('isLocked', false) == false
+      );
+    }
+
     function isTenantOwner(tenantId) {
       return isTenantMember(tenantId) && (
         isDev() ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in ['OWNER', 'DEVELOPER'] ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('spaRole', '') == 'ADMIN'))
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in ['OWNER', 'DEVELOPER'])
       );
     }
 
@@ -124,22 +130,21 @@ service cloud.firestore {
     }
 
     match /dev_registry/{devUid} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (request.auth.uid == devUid || isDev());
       allow write: if isDev();
     }
 
     // --- USERS (Ánh xạ Firebase Auth → Tenant & Role + Chống leo thang quyền) ---
     match /users/{userId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isDev());
-      // Người dùng bình thường không được tự gắn role DEVELOPER
+      // Người dùng bình thường không được tự gắn role, tenantId hoặc primaryTenantId
       allow create: if isDev() || (
-        isSignedIn() && request.auth.uid == userId && 
-        request.resource.data.get('role', '') != 'DEVELOPER'
+        isSignedIn() && request.auth.uid == userId &&
+        !incoming().keys().hasAny(['role', 'tenantId', 'primaryTenantId'])
       );
       allow update: if isDev() || (
-        isSignedIn() && request.auth.uid == userId && 
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) ||
-         request.resource.data.get('role', '') != 'DEVELOPER')
+        isSignedIn() && request.auth.uid == userId &&
+        !incoming().diff(existing()).affectedKeys().hasAny(['role', 'tenantId', 'primaryTenantId'])
       );
       allow delete: if isDev();
     }
@@ -155,44 +160,44 @@ service cloud.firestore {
       );
       allow delete: if isDev();
 
-      // Sub-collections: Chỉ ghi khi tenant ACTIVE
+      // Sub-collections: Chỉ ghi khi tenant tồn tại và ACTIVE
       match /staff/{staffId} {
         allow read: if isTenantMember(tenantId);
-        allow write: if isTenantOwner(tenantId) && isTenantActive(tenantId);
+        allow write: if isTenantOwner(tenantId) && isExistingTenantActive(tenantId);
       }
       match /accounts/{accountId} {
         allow read: if isTenantMember(tenantId);
-        allow write: if isTenantOwner(tenantId) && isTenantActive(tenantId);
+        allow write: if isTenantOwner(tenantId) && isExistingTenantActive(tenantId);
       }
       match /services/{serviceId} {
         allow read: if isTenantMember(tenantId);
-        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+        allow write: if isTenantMember(tenantId) && isExistingTenantActive(tenantId);
       }
       match /service_packages/{packageId} {
         allow read: if isTenantMember(tenantId);
-        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+        allow write: if isTenantMember(tenantId) && isExistingTenantActive(tenantId);
       }
       match /customers/{customerId} {
         allow read: if isTenantMember(tenantId);
-        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+        allow write: if isTenantMember(tenantId) && isExistingTenantActive(tenantId);
       }
       match /package_subscriptions/{subId} {
         allow read: if isTenantMember(tenantId);
-        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+        allow write: if isTenantMember(tenantId) && isExistingTenantActive(tenantId);
       }
       match /tickets/{ticketId} {
         allow read: if isTenantMember(tenantId);
-        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+        allow write: if isTenantMember(tenantId) && isExistingTenantActive(tenantId);
       }
       match /cashbook/{entryId} {
         allow read: if isTenantMember(tenantId);
-        allow write: if isTenantMember(tenantId) && isTenantActive(tenantId);
+        allow write: if isTenantMember(tenantId) && isExistingTenantActive(tenantId);
       }
       match /ai_conversations/{sessionId} {
-        allow read, write: if isTenantOwner(tenantId) && isTenantActive(tenantId);
+        allow read, write: if isTenantOwner(tenantId) && isExistingTenantActive(tenantId);
       }
       match /ai_memories/{memoryId} {
-        allow read, write: if isTenantOwner(tenantId) && isTenantActive(tenantId);
+        allow read, write: if isTenantOwner(tenantId) && isExistingTenantActive(tenantId);
       }
       match /subscription_invoices/{invoiceId} {
         allow read: if isDev() || isTenantOwner(tenantId);
@@ -203,7 +208,8 @@ service cloud.firestore {
     // --- TẦNG ĐỒNG BỘ ĐÁM MÂY: SPA WORKSPACES ---
     // Phục vụ SpaStore.kt realtime sync, bảo vệ schema, kiểm soát Kill-Switch và chống xóa
     match /spa_workspaces/{workspaceId} {
-      allow get, list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if isDev();
       allow create: if isSignedIn() 
                     && isValidSpaWorkspace(workspaceId) 
                     && isWorkspaceTenantActive(workspaceId);

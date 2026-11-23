@@ -284,6 +284,10 @@
             </div>
           </div>
 
+          <div id="cust-empty-tenants-notice" class="hidden p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 leading-relaxed">
+            ℹ️ Hiện hệ thống chưa có cơ sở Spa nào được kích hoạt. Quý khách vui lòng tải bản dùng thử 14 ngày miễn phí hoặc liên hệ Dev qua Zalo <strong class="font-mono text-emerald-300">0397772963</strong> để mở tài khoản.
+          </div>
+
           <div id="cust-login-error" class="hidden p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 font-medium">
             ⚠️ Số điện thoại hoặc mật khẩu không chính xác! Vui lòng thử lại hoặc liên hệ Dev qua Zalo 0397772963.
           </div>
@@ -445,9 +449,9 @@
           </p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <button onclick="openCloudConfigModal()" id="cloud-status-badge" class="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium flex items-center gap-1.5 hover:bg-emerald-500/20 transition cursor-pointer">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 status-pulse"></span>
-            <span id="cloud-status-text">Firestore Cloud: Sẵn Sàng</span>
+          <button onclick="openCloudConfigModal()" id="cloud-status-badge" class="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium flex items-center gap-1.5 hover:bg-amber-500/20 transition cursor-pointer">
+            <span id="cloud-status-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span id="cloud-status-text">Chế độ Local (Chưa nối Cloud)</span>
             <span class="text-[10px] opacity-75">⚙️</span>
           </button>
         </div>
@@ -460,7 +464,7 @@
             <span>Tổng Cơ Sở Thực Tế</span>
             <span class="text-lg">🏢</span>
           </div>
-          <div class="text-2xl font-black text-white" id="stat-total">1</div>
+          <div class="text-2xl font-black text-white" id="stat-total">0</div>
           <div class="text-[11px] text-slate-400">Khách hàng đang thuê</div>
         </div>
 
@@ -469,7 +473,7 @@
             <span>Spa Đang Hoạt Động</span>
             <span class="text-lg">🟢</span>
           </div>
-          <div class="text-2xl font-black text-emerald-400" id="stat-active">1</div>
+          <div class="text-2xl font-black text-emerald-400" id="stat-active">0</div>
           <div class="text-[11px] text-emerald-400/80">Thuê bao còn hạn hợp lệ</div>
         </div>
 
@@ -487,7 +491,7 @@
             <span>Doanh Thu SaaS Của Dev</span>
             <span class="text-lg">💰</span>
           </div>
-          <div class="text-2xl font-black text-amber-400" id="stat-revenue">500.000 đ</div>
+          <div class="text-2xl font-black text-amber-400" id="stat-revenue">0 đ</div>
           <div class="text-[11px] text-slate-400">Tiền thuê phần mềm / tháng</div>
         </div>
       </div>
@@ -632,10 +636,13 @@
             <h3 class="text-sm font-bold text-white">Danh Sách Cơ Sở Spa Thực Tế Đang Thuê Ứng Dụng</h3>
             <p class="text-xs text-slate-400 mt-0.5">Quản lý giấy phép bản quyền, gia hạn ngày sử dụng và điều khiển công tắc khóa từ xa</p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <input type="text" id="search-input" oninput="renderTable()" placeholder="Tìm theo tên spa, SĐT chủ quán..." class="bg-slate-950 border border-slate-800 text-xs rounded-xl px-3 py-1.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
             <button onclick="syncFromCloud()" class="px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 text-xs font-semibold rounded-xl border border-indigo-500/40 transition" title="Đồng bộ danh sách mới nhất từ Cloud">
               🔄 Đồng bộ Cloud
+            </button>
+            <button onclick="requestDeleteAllTenants()" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 text-xs font-semibold rounded-xl border border-rose-500/30 transition" title="Xóa toàn bộ danh sách cơ sở">
+              🗑️ Xóa Tất Cả
             </button>
           </div>
         </div>
@@ -1425,20 +1432,8 @@
       apkDownloadUrl: ""
     };
 
-    // Danh sách cơ sở thực tế (Khởi tạo mặc định - chỉ giữ cơ sở quản trị hệ thống gốc)
-    const DEFAULT_TENANTS = [
-      {
-        id: "khiem_thi_viet",
-        name: "Spa Trị Liệu Sen Việt (Cơ sở 1)",
-        ownerPhone: "0397772963",
-        plan: "VIP 1 Năm",
-        expiryDate: "18/11/2027",
-        daysLeft: 365,
-        isActive: true,
-        monthlyFee: 500000,
-        tempPin: "247208"
-      }
-    ];
+    // Danh sách cơ sở thực tế (Mặc định trống [], không tự tạo dữ liệu mẫu)
+    const DEFAULT_TENANTS = [];
 
     // Dọn dẹp cache mock cũ nếu có
     (function purgeLegacyMockData() {
@@ -1449,6 +1444,15 @@
         }
       } catch (e) {}
     })();
+
+    function escapeHtml(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
 
     // ==========================================
     // Cấu hình Bảng Giá SaaS & Ngân Hàng Dev
@@ -1628,8 +1632,8 @@
         return;
       }
 
-      const expectedPin = (found.tempPin || "247208").trim();
-      if (pinInput !== expectedPin && pinInput !== "247208" && pinInput !== "1234") {
+      const expectedPin = String(found.tempPin || "").trim();
+      if (!expectedPin || pinInput !== expectedPin) {
         errBox.innerText = "⚠️ Mật khẩu PIN không chính xác! Vui lòng kiểm tra lại.";
         errBox.classList.remove("hidden");
         return;
@@ -1668,7 +1672,7 @@
 
       const navBtn = document.getElementById("nav-login-btn");
       if (navBtn) {
-        navBtn.innerHTML = `<span>🏢</span> <span class="hidden sm:inline">${tenant.name.substring(0, 16)}</span>`;
+        navBtn.innerHTML = `<span>🏢</span> <span class="hidden sm:inline">${escapeHtml((tenant.name || "Spa").substring(0, 16))}</span>`;
       }
     }
 
@@ -1687,6 +1691,10 @@
     }
 
     function checkCustomerSession() {
+      const emptyNotice = document.getElementById("cust-empty-tenants-notice");
+      if (emptyNotice) {
+        emptyNotice.classList.toggle("hidden", tenants.length > 0);
+      }
       const savedTenantId = sessionStorage.getItem(STORAGE_KEY_CUSTOMER_SESSION);
       if (savedTenantId) {
         const found = tenants.find(t => t.id === savedTenantId);
@@ -1694,6 +1702,12 @@
           renderCustomerPortal(found);
           return;
         }
+        sessionStorage.removeItem(STORAGE_KEY_CUSTOMER_SESSION);
+      }
+      currentCustomerTenant = null;
+      const navBtn = document.getElementById("nav-login-btn");
+      if (navBtn) {
+        navBtn.innerHTML = `<span>🔑</span> <span class="hidden sm:inline">Chủ Spa</span> Đăng Nhập`;
       }
       document.getElementById("customer-login-box").classList.remove("hidden");
       document.getElementById("customer-dashboard-box").classList.add("hidden");
@@ -1757,8 +1771,8 @@
       `;
       grid.appendChild(trialCard);
 
-      // Render các gói trả phí
-      pricingPlans.filter(p => p.enabled).forEach(p => {
+      // Render các gói trả phí (không lặp lại thẻ dùng thử 2_weeks)
+      pricingPlans.filter(p => p.enabled && p.id !== "2_weeks").forEach(p => {
         const card = document.createElement("div");
         const isHighlight = p.id === "6_months" || p.id === "1_year";
         card.className = `bg-slate-900 border ${isHighlight ? 'border-indigo-500/60 shadow-indigo-950/30' : 'border-slate-800'} rounded-3xl p-6 space-y-5 flex flex-col justify-between shadow-xl hover:border-indigo-500/50 transition relative`;
@@ -1767,16 +1781,16 @@
           <div class="space-y-4">
             <div class="flex items-center justify-between">
               <span class="text-xs font-bold uppercase tracking-wider ${isHighlight ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'bg-slate-800 text-slate-300'} px-3 py-1 rounded-full">
-                ${p.tag || p.name}
+                ${escapeHtml(p.tag || p.name)}
               </span>
               <span class="text-2xl">${p.id === '1_year' ? '👑' : (p.id === '6_months' ? '🔥' : '📦')}</span>
             </div>
             <div>
-              <h3 class="text-xl font-bold text-white">${p.name}</h3>
-              <p class="text-xs text-slate-400 mt-1">Thời hạn sử dụng: <strong class="text-slate-200">+${p.days} ngày</strong></p>
+              <h3 class="text-xl font-bold text-white">${escapeHtml(p.name)}</h3>
+              <p class="text-xs text-slate-400 mt-1">Thời hạn sử dụng: <strong class="text-slate-200">+${Number(p.days) || 0} ngày</strong></p>
             </div>
             <div class="flex items-baseline gap-1 pt-1">
-              <span class="text-3xl font-black ${isHighlight ? 'text-amber-400' : 'text-white'}">${p.fee.toLocaleString('vi-VN')} đ</span>
+              <span class="text-3xl font-black ${isHighlight ? 'text-amber-400' : 'text-white'}">${(Number(p.fee) || 0).toLocaleString('vi-VN')} đ</span>
             </div>
             <ul class="space-y-2.5 text-xs text-slate-300 border-t border-slate-800 pt-4">
               <li class="flex items-center gap-2">
@@ -1803,11 +1817,12 @@
             </ul>
           </div>
           <div class="pt-4 border-t border-slate-800">
-            <button onclick="handlePricingSelectPlan('${p.id}')" class="w-full py-3 ${isHighlight ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'} font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-1.5">
+            <button data-plan-btn class="w-full py-3 ${isHighlight ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'} font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-1.5">
               <span>💳</span> Đăng Ký / Gia Hạn Gói Này
             </button>
           </div>
         `;
+        card.querySelector("[data-plan-btn]")?.addEventListener("click", () => handlePricingSelectPlan(p.id));
         grid.appendChild(card);
       });
     }
@@ -1888,10 +1903,10 @@
         btn.className = "p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-indigo-500 text-left transition flex flex-col justify-between";
         btn.innerHTML = `
           <div class="flex items-center justify-between">
-            <span class="font-bold text-white text-xs">${p.name}</span>
-            <span class="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-mono">+${p.days}d</span>
+            <span class="font-bold text-white text-xs">${escapeHtml(p.name)}</span>
+            <span class="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-mono">+${Number(p.days) || 0}d</span>
           </div>
-          <div class="text-xs text-amber-300 font-bold mt-1.5">${p.fee.toLocaleString('vi-VN')} đ</div>
+          <div class="text-xs text-amber-300 font-bold mt-1.5">${(Number(p.fee) || 0).toLocaleString('vi-VN')} đ</div>
         `;
         grid.appendChild(btn);
       });
@@ -2003,16 +2018,16 @@
             <input type="checkbox" id="plan-enable-${idx}" ${p.enabled ? 'checked' : ''} class="w-4 h-4 rounded text-indigo-600 bg-slate-900 border-slate-700">
             <div>
               <div class="font-bold text-white flex items-center gap-2">
-                <span>${p.name}</span>
-                <span class="text-[10px] font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.2 rounded-full">${p.tag || ''}</span>
+                <span>${escapeHtml(p.name)}</span>
+                <span class="text-[10px] font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.2 rounded-full">${escapeHtml(p.tag || '')}</span>
               </div>
-              <div class="text-[11px] text-slate-400">Thời hạn: <strong class="text-slate-200">${p.days} ngày</strong></div>
+              <div class="text-[11px] text-slate-400">Thời hạn: <strong class="text-slate-200">${Number(p.days) || 0} ngày</strong></div>
             </div>
           </div>
           <div class="flex items-center gap-2">
             <label class="text-[11px] text-slate-400 shrink-0">Giá bán:</label>
             <div class="relative">
-              <input type="number" id="plan-fee-${idx}" value="${p.fee}" step="10000" class="w-32 bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-right font-mono font-bold text-amber-300 text-xs">
+              <input type="number" id="plan-fee-${idx}" value="${Number(p.fee) || 0}" step="10000" class="w-32 bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-right font-mono font-bold text-amber-300 text-xs">
               <span class="text-[10px] text-slate-400 ml-1">đ</span>
             </div>
           </div>
@@ -2038,7 +2053,9 @@
             if (feeInput) p.fee = parseInt(feeInput.value, 10) || p.fee;
           });
 
-          bankConfig.bankCode = document.getElementById("cfg-bank-code").value;
+          const bankSelect = document.getElementById("cfg-bank-code");
+          bankConfig.bankCode = bankSelect.value;
+          bankConfig.bankName = bankSelect.options[bankSelect.selectedIndex]?.text || bankSelect.value;
           bankConfig.accountNo = document.getElementById("cfg-bank-account").value.trim();
           bankConfig.accountName = document.getElementById("cfg-bank-name").value.trim().toUpperCase();
           const apkInput = document.getElementById("cfg-apk-url");
@@ -2074,8 +2091,11 @@
         return `📥 LINK TẢI ỨNG DỤNG ANDROID (APK):
 👉 ${customUrl}`;
       }
+      const origin = (window.location && /^https?:/.test(window.location.protocol))
+        ? window.location.origin
+        : "https://khienthiviet.onrender.com";
       return `📥 CÀI ĐẶT ỨNG DỤNG ANDROID (FILE APK):
-• Tải trực tiếp từ Cổng Khách Hàng: http://localhost:3000/KhiemThiViet-CaiDat.apk (hoặc mở web bấm Tải Bộ Cài)
+• Tải trực tiếp từ Cổng Khách Hàng: ${origin}/KhiemThiViet-CaiDat.apk (hoặc mở web bấm Tải Bộ Cài)
 • File cài đặt Android APK (28.7MB) sẵn sàng gửi trực tiếp qua Zalo.`;
     }
 
@@ -2083,7 +2103,7 @@
       const createSelect = document.getElementById("new-plan");
       const editSelect = document.getElementById("edit-plan");
       const optionsHtml = pricingPlans.filter(p => p.enabled).map(p => `
-        <option value="${p.id}">${p.name} (+${p.days} ngày - ${p.fee.toLocaleString('vi-VN')} đ)</option>
+        <option value="${escapeHtml(p.id)}">${escapeHtml(p.name)} (+${Number(p.days) || 0} ngày - ${(Number(p.fee) || 0).toLocaleString('vi-VN')} đ)</option>
       `).join("");
 
       if (createSelect) createSelect.innerHTML = optionsHtml;
@@ -2098,8 +2118,8 @@
     function showConfirmDialog({ title, message, details, confirmText, confirmClass, onConfirm }) {
       document.getElementById("confirm-title").innerText = title || "Xác Nhận Thao Tác";
       document.getElementById("confirm-message-box").innerHTML = `
-        <div class="font-medium text-white">${message || "Bạn có chắc chắn muốn thực hiện hành động này?"}</div>
-        ${details ? `<div class="text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">${details}</div>` : ''}
+        <div class="font-medium text-white">${escapeHtml(message || "Bạn có chắc chắn muốn thực hiện hành động này?")}</div>
+        ${details ? `<div class="text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">${escapeHtml(details)}</div>` : ''}
       `;
       const btn = document.getElementById("confirm-action-btn");
       btn.innerText = confirmText || "Xác Nhận";
@@ -2168,24 +2188,32 @@
         const savedRaw = localStorage.getItem(STORAGE_KEY_FIREBASE_CONFIG);
         let config = savedRaw ? JSON.parse(savedRaw) : { projectId: DEFAULT_FIREBASE_PROJECT };
 
-        if (config && config.projectId && window.firebase) {
+        if (config && config.projectId && config.apiKey && window.firebase) {
           if (!firebase.apps.length) {
             firebase.initializeApp(config);
           }
           firestoreDb = firebase.firestore();
-          updateCloudStatusBadge(true, `Firestore: ${config.projectId.substring(0, 16)}...`);
+          const currentUser = firebase.auth ? firebase.auth().currentUser : null;
+          if (currentUser) {
+            updateCloudStatusBadge(true, `Firestore: ${config.projectId.substring(0, 16)}...`);
+          } else {
+            updateCloudStatusBadge(false, "Firestore: Đã nạp Key (Chưa đăng nhập Auth)");
+          }
           startCloudListeners();
         } else {
-          updateCloudStatusBadge(false, "Lưu trữ cục bộ (Chờ nạp Cloud Config)");
+          firestoreDb = null;
+          updateCloudStatusBadge(false, "Chế độ Local (Chưa cấu hình Cloud API Key)");
         }
       } catch (e) {
+        firestoreDb = null;
         console.warn("Chưa khởi tạo Firestore:", e.message);
-        updateCloudStatusBadge(false, "Lưu trữ cục bộ (Offline)");
+        updateCloudStatusBadge(false, "Chế độ Local (Offline)");
       }
     }
 
     function updateCloudStatusBadge(online, text) {
       const badge = document.getElementById("cloud-status-badge");
+      const dot = document.getElementById("cloud-status-dot");
       const label = document.getElementById("cloud-status-text");
       if (label) label.innerText = text;
 
@@ -2196,6 +2224,11 @@
           badge.className = "px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium flex items-center gap-1.5 hover:bg-amber-500/20 transition cursor-pointer";
         }
       }
+      if (dot) {
+        dot.className = online
+          ? "w-2 h-2 rounded-full bg-emerald-400 status-pulse"
+          : "w-2 h-2 rounded-full bg-amber-400";
+      }
     }
 
     function startCloudListeners() {
@@ -2203,6 +2236,7 @@
       try {
         firestoreDb.collection("system_status").document("global")
           .onSnapshot((doc) => {
+            updateCloudStatusBadge(true, "Firestore Cloud: Đã Kết Nối");
             if (doc && doc.exists) {
               const data = doc.data();
               if (data.globalMaintenance !== undefined) {
@@ -2215,16 +2249,32 @@
               }
               updateMaintenanceUI();
             }
+          }, () => {
+            updateCloudStatusBadge(false, "Firestore: Chưa xác thực / Lỗi kết nối");
           });
       } catch (e) {}
 
       try {
         firestoreDb.collection("tenants")
           .onSnapshot((snapshot) => {
-            if (snapshot && !snapshot.empty) {
+            updateCloudStatusBadge(true, "Firestore Cloud: Đã Kết Nối");
+            if (snapshot) {
               const cloudTenants = [];
+              const deletedIds = new Set();
+              if (typeof snapshot.docChanges === "function") {
+                snapshot.docChanges().forEach(change => {
+                  if (change.type === "removed" && change.doc) {
+                    deletedIds.add(change.doc.id);
+                  }
+                });
+              }
               snapshot.forEach(doc => {
                 const d = doc.data();
+                if (d && d.status === "DELETED") {
+                  deletedIds.add(doc.id);
+                  return;
+                }
+                if (!d) return;
                 cloudTenants.push({
                   id: doc.id,
                   name: d.shopName || d.name || "Hệ Thống Spa & Wellness",
@@ -2234,9 +2284,17 @@
                   daysLeft: d.daysLeft || 365,
                   isActive: d.isLocked !== true && d.status !== "LOCKED",
                   monthlyFee: d.monthlyFee || 500000,
-                  tempPin: d.tempPin || "247208"
+                  tempPin: String(d.tempPin || "").trim()
                 });
               });
+              let changed = false;
+              if (deletedIds.size > 0) {
+                const prevLen = tenants.length;
+                tenants = tenants.filter(t => !deletedIds.has(t.id));
+                if (tenants.length !== prevLen) {
+                  changed = true;
+                }
+              }
               if (cloudTenants.length > 0) {
                 // HỢP NHẤT THÔNG MINH: Cập nhật hoặc thêm từ cloud, KHÔNG xóa đè mất cơ sở cục bộ
                 cloudTenants.forEach(ct => {
@@ -2247,11 +2305,16 @@
                     tenants.push(ct);
                   }
                 });
+                changed = true;
+              }
+              if (changed) {
                 saveTenants();
                 renderTable();
                 checkCustomerSession();
               }
             }
+          }, () => {
+            updateCloudStatusBadge(false, "Firestore: Chưa xác thực / Lỗi kết nối");
           });
       } catch (e) {}
     }
@@ -2272,7 +2335,7 @@
               planId: t.plan,
               status: t.isActive ? "ACTIVE" : "LOCKED",
               isLocked: !t.isActive,
-              tempPin: t.tempPin,
+              tempPin: String(t.tempPin || "").trim(),
               updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
           }
@@ -2281,6 +2344,7 @@
           const list = [];
           snap.forEach(doc => {
             const d = doc.data();
+            if (!d || d.status === "DELETED") return;
             list.push({
               id: doc.id,
               name: d.shopName || d.name || "Spa",
@@ -2290,7 +2354,7 @@
               daysLeft: d.daysLeft || 365,
               isActive: d.isLocked !== true && d.status !== "LOCKED",
               monthlyFee: d.monthlyFee || 500000,
-              tempPin: d.tempPin || "247208"
+              tempPin: String(d.tempPin || "").trim()
             });
           });
           tenants = list;
@@ -2558,6 +2622,9 @@
     }
 
     function handleApiKeyInputChange() {
+      const esc = typeof escapeHtml === "function"
+        ? escapeHtml
+        : (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
       const input = document.getElementById("system-gemini-key-input");
       const hintBox = document.getElementById("ai-key-format-hint");
       if (!input || !hintBox) return;
@@ -2576,10 +2643,10 @@
           <div class="flex items-start gap-2">
             <span class="text-base shrink-0">⚠️</span>
             <div class="flex-1 space-y-1">
-              <strong class="text-amber-200 block">${check.title}</strong>
-              <p class="text-[11px] text-slate-300 leading-relaxed">${check.message}</p>
+              <strong class="text-amber-200 block">${esc(check.title)}</strong>
+              <p class="text-[11px] text-slate-300 leading-relaxed">${esc(check.message)}</p>
               <div class="pt-1 flex items-center gap-2">
-                <a href="${check.actionableLink}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-[10px] font-bold transition">
+                <a href="${esc(check.actionableLink)}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-[10px] font-bold transition">
                   <span>🔗</span> Lấy Google AI Studio Key Chuẩn (AIzaSy...)
                 </a>
               </div>
@@ -2589,7 +2656,7 @@
       } else {
         const typeStr = check.keyType === 'AUTH_KEY' ? 'AQ.... (Auth Key bảo mật mới)' : 'AIzaSy... (Khóa tiêu chuẩn)';
         hintBox.className = "p-2 rounded-xl text-xs font-medium border bg-emerald-500/10 border-emerald-500/30 text-emerald-300 flex items-center gap-2 block mt-1.5";
-        hintBox.innerHTML = `<span>✓</span> <span>Định dạng Google Gemini API Key hợp lệ (<strong class="font-mono text-emerald-200">${typeStr}</strong>, ${val.length} ký tự). Sẵn sàng Test Kết Nối.</span>`;
+        hintBox.innerHTML = `<span>✓</span> <span>Định dạng Google Gemini API Key hợp lệ (<strong class="font-mono text-emerald-200">${esc(typeStr)}</strong>, ${val.length} ký tự). Sẵn sàng Test Kết Nối.</span>`;
       }
     }
 
@@ -2688,6 +2755,9 @@
     }
 
     async function testGeminiApiKeyConnection() {
+      const esc = typeof escapeHtml === "function"
+        ? escapeHtml
+        : (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
       const keyInput = document.getElementById("system-gemini-key-input");
       const modelSelect = document.getElementById("system-gemini-model-select");
       const resultBox = document.getElementById("ai-test-result");
@@ -2724,11 +2794,11 @@
           resultText.innerHTML = `
             <div class="space-y-1.5">
               <div class="font-bold text-rose-200 flex items-center gap-1.5">
-                <span>❌</span> <span>${check.title}</span>
+                <span>❌</span> <span>${esc(check.title)}</span>
               </div>
-              <p class="text-slate-300 text-[11px] leading-relaxed">${check.message}</p>
+              <p class="text-slate-300 text-[11px] leading-relaxed">${esc(check.message)}</p>
               <div class="pt-1.5 flex flex-wrap items-center gap-2">
-                <a href="${check.actionableLink}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-[11px] font-bold transition">
+                <a href="${esc(check.actionableLink)}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-[11px] font-bold transition">
                   <span>🔗</span> Nhận Khóa Google AI Studio Mới (AIzaSy...)
                 </a>
               </div>
@@ -2775,7 +2845,7 @@
                 <span>✅</span> <span>Kết nối thành công! (HTTP 200 OK)</span>
               </div>
               <p class="text-[11px] text-slate-300 leading-relaxed">
-                Mô hình: <strong class="text-emerald-300 font-mono">${displayName}</strong> | Khóa ${keyTypeLabel} hợp lệ và sẵn sàng phục vụ trợ lý AI cho toàn bộ cơ sở Spa.
+                Mô hình: <strong class="text-emerald-300 font-mono">${esc(displayName)}</strong> | Khóa ${esc(keyTypeLabel)} hợp lệ và sẵn sàng phục vụ trợ lý AI cho toàn bộ cơ sở Spa.
               </p>
             </div>
           `;
@@ -2825,11 +2895,11 @@
           resultText.innerHTML = `
             <div class="space-y-1.5">
               <div class="font-bold text-rose-200 flex items-center gap-1.5">
-                <span>❌</span> <span>${errTitle}</span>
+                <span>❌</span> <span>${esc(errTitle)}</span>
               </div>
-              <p class="text-slate-300 text-[11px] leading-relaxed">${errExplanation}</p>
+              <p class="text-slate-300 text-[11px] leading-relaxed">${esc(errExplanation)}</p>
               <div class="pt-1 text-[11px] text-amber-300 flex items-center gap-1.5">
-                <span>💡</span> <span>${errGuidance}</span>
+                <span>💡</span> <span>${esc(errGuidance)}</span>
               </div>
               <div class="pt-1">
                 <a href="https://aistudio.google.com/app/apikey" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-[10px] font-bold transition">
@@ -2849,7 +2919,7 @@
                 <span>❌</span> <span>Lỗi Mạng Hoặc Chặn CORS</span>
               </div>
               <p class="text-slate-300 text-[11px] leading-relaxed">Trình duyệt không thể kết nối trực tiếp tới Google API (generativelanguage.googleapis.com). Vui lòng kiểm tra lại kết nối Internet hoặc tiện ích chặn mạng.</p>
-              <p class="text-[10px] text-slate-400 font-mono">Chi tiết: ${err.message || 'NetworkError'}</p>
+              <p class="text-[10px] text-slate-400 font-mono">Chi tiết: ${esc(err.message || 'NetworkError')}</p>
             </div>
           `;
           resultBox.classList.remove("hidden");
@@ -2951,6 +3021,7 @@
       const el1M = document.getElementById("filter-count-1month"); if (el1M) el1M.innerText = count1Month;
       const elTr = document.getElementById("filter-count-trial"); if (elTr) elTr.innerText = countTrial;
 
+      let renderedCount = 0;
       tenants.forEach((t, idx) => {
         if (t.isActive) {
           activeCount++;
@@ -2970,31 +3041,33 @@
           }
         }
 
-        if (search && !t.name.toLowerCase().includes(search) && !t.ownerPhone.includes(search) && !t.id.includes(search)) {
+        if (search && !(t.name || "").toLowerCase().includes(search) && !(t.ownerPhone || "").includes(search) && !(t.id || "").includes(search)) {
           return;
         }
 
+        const daysLeftNum = Number(t.daysLeft) || 0;
+        const displayPin = String(t.tempPin || "").trim();
         const tr = document.createElement("tr");
         tr.className = "hover:bg-slate-800/40 transition";
         tr.innerHTML = `
           <td class="py-3 px-4">
-            <div class="font-bold text-white">${t.name}</div>
-            <div class="text-[10px] text-slate-500 font-mono">ID: /tenants/${t.id}</div>
+            <div class="font-bold text-white">${escapeHtml(t.name)}</div>
+            <div class="text-[10px] text-slate-500 font-mono">ID: /tenants/${escapeHtml(t.id)}</div>
           </td>
           <td class="py-3 px-4">
-            <div class="text-slate-200 font-mono font-semibold">${t.ownerPhone}</div>
+            <div class="text-slate-200 font-mono font-semibold">${escapeHtml(t.ownerPhone)}</div>
             <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
               <span>PIN:</span>
-              <span class="font-mono bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-bold border border-slate-800">${t.tempPin || '247208'}</span>
+              <span class="font-mono bg-slate-950 px-1.5 py-0.5 rounded ${displayPin ? 'text-amber-300' : 'text-slate-500'} font-bold border border-slate-800">${escapeHtml(displayPin || 'Chưa đặt')}</span>
             </div>
           </td>
           <td class="py-3 px-4">
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">${t.plan}</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">${escapeHtml(t.plan)}</span>
           </td>
           <td class="py-3 px-4">
-            <div class="font-medium ${t.daysLeft > 0 ? 'text-slate-200' : 'text-rose-400'}">${t.expiryDate}</div>
-            <div class="text-[10px] ${t.daysLeft > 15 ? 'text-emerald-400' : (t.daysLeft > 0 ? 'text-amber-400' : 'text-rose-400 font-semibold')}">
-              ${t.daysLeft > 0 ? `Còn ${t.daysLeft} ngày` : `Quá hạn ${Math.abs(t.daysLeft)} ngày`}
+            <div class="font-medium ${daysLeftNum > 0 ? 'text-slate-200' : 'text-rose-400'}">${escapeHtml(t.expiryDate)}</div>
+            <div class="text-[10px] ${daysLeftNum > 15 ? 'text-emerald-400' : (daysLeftNum > 0 ? 'text-amber-400' : 'text-rose-400 font-semibold')}">
+              ${daysLeftNum > 0 ? `Còn ${daysLeftNum} ngày` : `Quá hạn ${Math.abs(daysLeftNum)} ngày`}
             </div>
           </td>
           <td class="py-3 px-4 text-center">
@@ -3017,7 +3090,7 @@
             <button onclick="openExtendModal(${idx})" class="px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/40 rounded-lg text-xs font-bold transition" title="Gia hạn gói">
               ➕ Gia Hạn
             </button>
-            <button onclick="openZaloWelcomeModal(tenants[${idx}], tenants[${idx}].tempPin || '247208')" class="px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold transition" title="Mở tin nhắn Zalo bàn giao">
+            <button onclick="openZaloWelcomeModal(tenants[${idx}], tenants[${idx}].tempPin || '')" class="px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold transition" title="Mở tin nhắn Zalo bàn giao">
               📱 Zalo
             </button>
             <button onclick="requestDeleteTenant(${idx})" class="px-2 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-semibold transition" title="Xóa cơ sở">
@@ -3025,8 +3098,21 @@
             </button>
           </td>
         `;
+        renderedCount++;
         tbody.appendChild(tr);
       });
+
+      if (renderedCount === 0) {
+        const emptyTr = document.createElement("tr");
+        emptyTr.innerHTML = `
+          <td colspan="6" class="py-10 px-4 text-center text-slate-400">
+            ${tenants.length === 0
+              ? '📭 Hiện chưa có cơ sở Spa nào trong hệ thống. Bấm <strong class="text-indigo-300">➕ Thêm Chủ Spa Mới</strong> để khởi tạo.'
+              : '🔍 Không tìm thấy cơ sở Spa nào phù hợp với bộ lọc hoặc từ khóa tìm kiếm.'}
+          </td>
+        `;
+        tbody.appendChild(emptyTr);
+      }
 
       const statTotal = document.getElementById("stat-total");
       const statActive = document.getElementById("stat-active");
@@ -3041,6 +3127,7 @@
 
     function requestToggleKillSwitch(idx) {
       const t = tenants[idx];
+      if (!t) return;
       const willLock = t.isActive;
       showConfirmDialog({
         title: willLock ? `🔒 KHÓA CƠ SỞ: ${t.name}` : `🟢 MỞ KHÓA CƠ SỞ: ${t.name}`,
@@ -3095,8 +3182,9 @@
     let selectedPlan = null;
 
     function openExtendModal(idx) {
-      selectedTenantIdx = idx;
       const t = tenants[idx];
+      if (!t) return;
+      selectedTenantIdx = idx;
       document.getElementById("modal-spa-name").innerText = t.name;
       document.getElementById("modal-owner-phone").innerText = t.ownerPhone;
       document.getElementById("modal-current-expiry").innerText = t.expiryDate || "Chưa xác định";
@@ -3130,11 +3218,11 @@
         btn.className = "p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-indigo-500/50 text-left transition flex flex-col justify-between";
         btn.innerHTML = `
           <div class="flex items-center justify-between">
-            <span class="font-bold text-white text-xs">${p.name}</span>
-            <span class="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-mono">+${p.days}d</span>
+            <span class="font-bold text-white text-xs">${escapeHtml(p.name)}</span>
+            <span class="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-mono">+${Number(p.days) || 0}d</span>
           </div>
-          <div class="text-xs text-amber-300 font-bold mt-1.5">${p.fee.toLocaleString('vi-VN')} đ</div>
-          <div class="text-[10px] text-slate-400 mt-0.5">${p.tag || ''}</div>
+          <div class="text-xs text-amber-300 font-bold mt-1.5">${(Number(p.fee) || 0).toLocaleString('vi-VN')} đ</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">${escapeHtml(p.tag || '')}</div>
         `;
         grid.appendChild(btn);
       });
@@ -3156,6 +3244,7 @@
       });
 
       const t = tenants[selectedTenantIdx];
+      if (!t) return;
       const baseDays = Math.max(0, t.daysLeft || 0);
       const newTotalDays = baseDays + plan.days;
       const futureDate = new Date(Date.now() + newTotalDays * 86400000);
@@ -3264,6 +3353,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
     function requestConfirmExtend() {
       const t = tenants[selectedTenantIdx];
       const plan = selectedPlan;
+      if (!t || !plan) return;
       const baseDays = Math.max(0, t.daysLeft || 0);
       const newTotalDays = baseDays + plan.days;
       const futureDate = new Date(Date.now() + newTotalDays * 86400000);
@@ -3334,13 +3424,14 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
     let editTenantIdx = null;
 
     function openEditModal(idx) {
-      editTenantIdx = idx;
       const t = tenants[idx];
+      if (!t) return;
+      editTenantIdx = idx;
       populatePlanSelectDropdowns();
       document.getElementById("edit-tenant-id").value = t.id;
       document.getElementById("edit-spa-name").value = t.name;
       document.getElementById("edit-owner-phone").value = t.ownerPhone;
-      document.getElementById("edit-temp-pin").value = t.tempPin || "247208";
+      document.getElementById("edit-temp-pin").value = String(t.tempPin || "").trim();
       document.getElementById("edit-days-left").value = t.daysLeft;
       document.getElementById("edit-is-active").checked = t.isActive;
       document.getElementById("edit-modal").classList.remove("hidden");
@@ -3353,6 +3444,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
     function requestSaveEditTenant() {
       if (editTenantIdx === null) return;
       const t = tenants[editTenantIdx];
+      if (!t) return;
       const name = document.getElementById("edit-spa-name").value.trim();
       const phone = document.getElementById("edit-owner-phone").value.trim();
       const pin = document.getElementById("edit-temp-pin").value.trim();
@@ -3362,6 +3454,10 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
 
       if (!name || !phone) {
         alert("Vui lòng nhập đầy đủ tên Spa và SĐT Chủ Quán!");
+        return;
+      }
+      if (!pin) {
+        alert("Vui lòng nhập Mật khẩu PIN Chủ Quán!");
         return;
       }
 
@@ -3375,7 +3471,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
 
           t.name = name;
           t.ownerPhone = phone;
-          t.tempPin = pin || "247208";
+          t.tempPin = pin;
           const matchedPlan = pricingPlans.find(p => p.id === planId);
           if (matchedPlan) t.plan = matchedPlan.name;
           t.daysLeft = daysLeft;
@@ -3427,10 +3523,6 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
     function requestDeleteTenant(idx) {
       const t = tenants[idx];
       if (!t) return;
-      if (t.id === "khiem_thi_viet") {
-        alert("Không thể xóa cơ sở quản trị hệ thống mặc định!");
-        return;
-      }
       showConfirmDialog({
         title: `🗑️ XÓA CƠ SỞ: ${t.name}`,
         message: `Bạn có chắc chắn muốn XÓA vĩnh viễn cơ sở "${t.name}" khỏi hệ thống?`,
@@ -3443,7 +3535,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
 
           tenants.splice(idx, 1);
           try {
-            fetch('/api/tenants?id=' + encodeURIComponent(deletedTenant.id), { method: 'DELETE' }).catch(() => {});
+            await fetch('/api/tenants?id=' + encodeURIComponent(deletedTenant.id), { method: 'DELETE' });
           } catch (e) {}
           saveTenants();
           renderTable();
@@ -3472,7 +3564,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
           registerUndoAction({
             description: `Đã xóa cơ sở ${deletedTenant.name}`,
             revert: async () => {
-              tenants.splice(deletedIdx, 0, deletedTenant);
+              tenants.splice(Math.min(deletedIdx, tenants.length), 0, deletedTenant);
               saveTenants();
               renderTable();
               checkCustomerSession();
@@ -3489,6 +3581,67 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
           });
 
           showToast(`🗑️ Đã xóa cơ sở ${deletedTenant.name}!`);
+        }
+      });
+    }
+
+    function requestDeleteAllTenants() {
+      if (tenants.length === 0) {
+        showToast("ℹ️ Danh sách cơ sở hiện đã trống.");
+        return;
+      }
+      showConfirmDialog({
+        title: "🗑️ XÓA TẤT CẢ CƠ SỞ SPA",
+        message: `Bạn có chắc chắn muốn XÓA TOÀN BỘ ${tenants.length} cơ sở khỏi hệ thống?`,
+        details: "Danh sách trên Web Portal và máy chủ sẽ được đưa về trống ([]). Thao tác có thể hoàn tác trong vòng 10 giây.",
+        confirmText: "Xóa Tất Cả",
+        confirmClass: "bg-rose-600 hover:bg-rose-500 text-white",
+        onConfirm: async () => {
+          const prevTenants = JSON.parse(JSON.stringify(tenants));
+          tenants = [];
+          try {
+            await fetch('/api/tenants?all=true', { method: 'DELETE' });
+          } catch (e) {}
+          saveTenants();
+          renderTable();
+          checkCustomerSession();
+
+          if (firestoreDb) {
+            for (const pt of prevTenants) {
+              try {
+                await firestoreDb.collection("tenants").doc(pt.id).set({
+                  status: "DELETED",
+                  isLocked: true,
+                  lockedReason: "Cơ sở đã bị xóa hàng loạt trên Web Portal bởi Ban Quản Trị"
+                }, { merge: true });
+              } catch (e) {}
+            }
+          }
+
+          registerUndoAction({
+            description: `Đã xóa toàn bộ ${prevTenants.length} cơ sở`,
+            revert: async () => {
+              tenants = prevTenants;
+              saveTenants();
+              renderTable();
+              checkCustomerSession();
+              if (firestoreDb) {
+                for (const pt of prevTenants) {
+                  try {
+                    const restored = Object.assign({}, pt, {
+                      status: pt.isActive ? "ACTIVE" : "LOCKED",
+                      isLocked: !pt.isActive,
+                      lockedReason: ""
+                    });
+                    await firestoreDb.collection("tenants").doc(pt.id).set(restored);
+                  } catch (e) {}
+                }
+              }
+              showToast(`↩️ Đã khôi phục lại ${prevTenants.length} cơ sở!`);
+            }
+          });
+
+          showToast("🗑️ Đã xóa toàn bộ danh sách cơ sở!");
         }
       });
     }
@@ -3515,6 +3668,10 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
         alert("Vui lòng nhập tên Spa và Số điện thoại Chủ Quán!");
         return;
       }
+      if (!pin) {
+        alert("Vui lòng nhập hoặc tạo Mật khẩu PIN đăng nhập!");
+        return;
+      }
 
       const tenantId = "spa_" + phone.replace(/[^0-9]/g, "");
       const existing = tenants.find(t => t.id === tenantId || t.ownerPhone === phone);
@@ -3528,7 +3685,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
       showConfirmDialog({
         title: "Xác Nhận Khởi Tạo Cơ Sở Spa Mới",
         message: `Bạn có muốn cấp quyền và tạo tài khoản cho cơ sở "${name}"?`,
-        details: `SĐT Chủ Spa: ${phone} | Gói: ${selectedPlanObj.name} (+${selectedPlanObj.days} ngày) | PIN: ${pin || '247208'}`,
+        details: `SĐT Chủ Spa: ${phone} | Gói: ${selectedPlanObj.name} (+${selectedPlanObj.days} ngày) | PIN: ${pin}`,
         confirmText: "Tạo Cơ Sở & Xuất Zalo",
         onConfirm: async () => {
           const futureDate = new Date(Date.now() + selectedPlanObj.days * 86400000);
@@ -3543,7 +3700,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
             daysLeft: selectedPlanObj.days,
             isActive: true,
             monthlyFee: 500000,
-            tempPin: pin || "247208"
+            tempPin: pin
           };
 
           tenants.push(newTenant);
@@ -3568,7 +3725,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
                   planId: t.plan,
                   status: t.isActive ? "ACTIVE" : "LOCKED",
                   isLocked: !t.isActive,
-                  tempPin: t.tempPin || "247208",
+                  tempPin: String(t.tempPin || "").trim(),
                   daysLeft: t.daysLeft || 30,
                   expiryDate: t.expiryDate || "18/12/2026",
                   updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -3604,7 +3761,7 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
     let currentZaloWelcomePhone = "";
 
     function openZaloWelcomeModal(tenant, pin) {
-      const pinVal = pin || tenant.tempPin || "247208";
+      const pinVal = String(pin || (tenant && tenant.tempPin) || "").trim() || "(Chưa đặt)";
       currentZaloWelcomePhone = tenant.ownerPhone;
       const msg = `🎉 CHÀO MỪNG QUÝ CƠ SỞ ĐẾN VỚI HỆ THỐNG SAAS QUẢN LÝ SPA!
 
@@ -3665,8 +3822,9 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
     let currentZaloResetPhone = "";
 
     function openResetPasswordModal(idx) {
-      resetTenantIdx = idx;
       const t = tenants[idx];
+      if (!t) return;
+      resetTenantIdx = idx;
       document.getElementById("reset-spa-name").innerText = t.name;
       document.getElementById("reset-owner-phone").innerText = t.ownerPhone;
       generateRandomPin("reset-new-pin");
@@ -3687,6 +3845,7 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
     function requestConfirmResetPassword() {
       if (resetTenantIdx === null) return;
       const t = tenants[resetTenantIdx];
+      if (!t) return;
       const newPin = document.getElementById("reset-new-pin").value.trim();
       if (!newPin) {
         alert("Vui lòng nhập hoặc tạo mã PIN mới!");
@@ -3724,7 +3883,7 @@ Chúc Quý cơ sở kinh doanh hồng phát và quản lý tiệm thật hiệu 
               checkCustomerSession();
               if (firestoreDb) {
                 await firestoreDb.collection("tenants").doc(t.id).set({
-                  tempPin: oldPin,
+                  tempPin: String(oldPin || "").trim(),
                   updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
               }

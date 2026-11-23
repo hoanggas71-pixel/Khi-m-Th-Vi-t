@@ -76,20 +76,6 @@ if (!fs.existsSync(AI_CONFIG_FILE)) {
   saveAiConfigToDisk(initConfig);
 }
 
-const DEFAULT_TENANTS = [
-  {
-    id: "khiem_thi_viet",
-    name: "Spa Khiếm Thị Việt (Cơ sở 1)",
-    ownerPhone: "0397772963",
-    plan: "VIP 1 Năm",
-    expiryDate: "18/11/2027",
-    daysLeft: 365,
-    isActive: true,
-    monthlyFee: 500000,
-    tempPin: "247208"
-  }
-];
-
 function loadTenantsFromDisk() {
   try {
     if (fs.existsSync(TENANTS_FILE)) {
@@ -100,22 +86,30 @@ function loadTenantsFromDisk() {
   } catch (e) {
     console.error("Lỗi đọc tenants.json:", e.message);
   }
-  return DEFAULT_TENANTS;
+  return [];
 }
 
 function saveTenantsToDisk(tenants) {
+  if (!Array.isArray(tenants)) return false;
+  const tmpFile = `${TENANTS_FILE}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
   try {
-    fs.writeFileSync(TENANTS_FILE, JSON.stringify(tenants, null, 2), 'utf8');
+    const dir = path.dirname(TENANTS_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(tmpFile, JSON.stringify(tenants, null, 2), 'utf8');
+    fs.renameSync(tmpFile, TENANTS_FILE);
     return true;
   } catch (e) {
     console.error("Lỗi lưu tenants.json:", e.message);
+    try { if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile); } catch (_) {}
     return false;
   }
 }
 
-// Khởi tạo file nếu chưa có
+// Khởi tạo file rỗng [] nếu chưa có
 if (!fs.existsSync(TENANTS_FILE)) {
-  saveTenantsToDisk(DEFAULT_TENANTS);
+  saveTenantsToDisk([]);
 }
 
 const MIME_TYPES = {
@@ -129,7 +123,66 @@ const MIME_TYPES = {
   '.apk': 'application/vnd.android.package-archive'
 };
 
+const MAX_BODY_BYTES = 1024 * 1024; // 1MB cap
+
+function asString(v) {
+  return Array.isArray(v)
+    ? String(v[0] ?? '')
+    : (typeof v === 'string' || typeof v === 'number')
+      ? String(v)
+      : '';
+}
+
+function readJsonBody(req, res, onParsed, { allowEmpty = false } = {}) {
+  const chunks = [];
+  let totalBytes = 0;
+  let aborted = false;
+
+  req.on('data', chunk => {
+    if (aborted) return;
+    totalBytes += chunk.length;
+    if (totalBytes > MAX_BODY_BYTES) {
+      aborted = true;
+      req.pause();
+      res.writeHead(413, {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Connection': 'close'
+      });
+      res.end(JSON.stringify({ success: false, error: "Payload too large" }), () => {
+        req.destroy();
+      });
+      return;
+    }
+    chunks.push(chunk);
+  });
+
+  req.on('end', () => {
+    if (aborted) return;
+    let parsed;
+    try {
+      const raw = Buffer.concat(chunks).toString('utf8');
+      parsed = (allowEmpty && !raw.trim()) ? {} : JSON.parse(raw);
+    } catch (e) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+      res.end(JSON.stringify({ success: false, error: "Invalid JSON format" }));
+      return;
+    }
+    try {
+      onParsed(parsed);
+    } catch (err) {
+      console.error("Lỗi xử lý request body:", err);
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+      }
+      if (!res.writableEnded) {
+        res.end(JSON.stringify({ success: false, error: "Internal Server Error" }));
+      }
+    }
+  });
+}
+
 const server = http.createServer((req, res) => {
+  try {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -164,29 +217,27 @@ const server = http.createServer((req, res) => {
       }));
       return;
     } else if (req.method === 'POST') {
-      let body = '';
-      req.on('data', chunk => { body += chunk; });
-      req.on('end', () => {
-        try {
-          const payload = JSON.parse(body || '{}');
-          if (typeof payload === 'object' && payload !== null) {
-            const saved = saveAiConfigToDisk(payload);
-            if (saved) {
-              res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-              res.end(JSON.stringify({
-                success: true,
-                message: "Cấu hình AI hệ thống đã lưu thành công",
-                apiKey: saved.apiKey,
-                model: saved.model,
-                updatedAt: saved.updatedAt
-              }));
-              return;
-            }
+      readJsonBody(req, res, (payload) => {
+        if (typeof payload === 'object' && payload !== null && !Array.isArray(payload)) {
+          const saved = saveAiConfigToDisk(payload);
+          if (saved) {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+            res.end(JSON.stringify({
+              success: true,
+              message: "Cấu hình AI hệ thống đã lưu thành công",
+              apiKey: saved.apiKey,
+              model: saved.model,
+              updatedAt: saved.updatedAt
+            }));
+            return;
           }
-        } catch (e) {}
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+          res.end(JSON.stringify({ success: false, error: "Failed to save AI config" }));
+          return;
+        }
         res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ success: false, error: "Invalid JSON format" }));
-      });
+      }, { allowEmpty: true });
       return;
     }
   }
@@ -199,53 +250,77 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify(tenants));
       return;
     } else if (req.method === 'POST') {
-      let body = '';
-      req.on('data', chunk => { body += chunk; });
-      req.on('end', () => {
-        try {
-          const list = JSON.parse(body);
-          if (Array.isArray(list)) {
-            saveTenantsToDisk(list);
-            res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-            res.end(JSON.stringify({ success: true, count: list.length }));
-            return;
-          }
-        } catch (e) {}
-        res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
-        res.end(JSON.stringify({ error: "Invalid JSON format" }));
+      readJsonBody(req, res, (list) => {
+        const isValidList = Array.isArray(list) && list.every(item =>
+          item && typeof item === 'object' && !Array.isArray(item) &&
+          typeof item.id === 'string' && item.id.trim().length > 0 &&
+          typeof item.name === 'string' && item.name.trim().length > 0
+        );
+        if (!isValidList) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+          res.end(JSON.stringify({ error: "Invalid tenants payload" }));
+          return;
+        }
+        const sanitized = list.map(item => ({
+          ...item,
+          id: item.id.trim(),
+          name: item.name.trim(),
+          ownerPhone: typeof item.ownerPhone === 'string' ? item.ownerPhone.trim() : ''
+        }));
+        if (!saveTenantsToDisk(sanitized)) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+          res.end(JSON.stringify({ error: "Failed to save tenants" }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: true, count: sanitized.length }));
       });
       return;
     } else if (req.method === 'DELETE') {
-      const tenantId = parsedUrl.query.id;
-      if (tenantId) {
-        if (tenantId === 'khiem_thi_viet') {
-          res.writeHead(403, { 'Content-Type': 'application/json; charset=UTF-8' });
-          res.end(JSON.stringify({ error: "Không thể xóa cơ sở quản trị hệ thống mặc định" }));
+      const deleteAll = asString(parsedUrl.query.all).trim();
+      if (deleteAll === 'true') {
+        if (!saveTenantsToDisk([])) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+          res.end(JSON.stringify({ error: "Failed to clear tenants" }));
           return;
         }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify({ success: true, count: 0 }));
+        return;
+      }
+      const tenantId = asString(parsedUrl.query.id).trim();
+      if (tenantId) {
         let list = loadTenantsFromDisk();
         list = list.filter(t => t.id !== tenantId);
-        saveTenantsToDisk(list);
+        if (!saveTenantsToDisk(list)) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+          res.end(JSON.stringify({ error: "Failed to save tenants" }));
+          return;
+        }
         res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ success: true, count: list.length }));
         return;
       }
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+      res.end(JSON.stringify({ error: "Missing id or all=true parameter" }));
+      return;
     }
   }
 
   // API 3: Xác thực đăng nhập hoặc kiểm tra trạng thái cơ sở cho Ứng dụng APK (Chủ Spa)
   if (pathname === '/api/tenants/auth' || pathname === '/api/auth' || pathname === '/api/tenants/status') {
-    const phone = (parsedUrl.query.phone || '').trim().replace(/[^0-9]/g, '');
-    const pin = (parsedUrl.query.pin || '').trim();
-    const queryId = (parsedUrl.query.id || parsedUrl.query.tenantId || '').trim();
+    const phone = asString(parsedUrl.query.phone).trim().replace(/[^0-9]/g, '');
+    const pin = asString(parsedUrl.query.pin).trim();
+    const queryId = (asString(parsedUrl.query.id) || asString(parsedUrl.query.tenantId)).trim();
 
     const checkAuth = (p, pass, qId) => {
       const tenants = loadTenantsFromDisk();
-      const cleanP = (p || '').replace(/[^0-9]/g, '');
+      const cleanP = asString(p).replace(/[^0-9]/g, '');
+      const cleanQId = asString(qId).trim();
       const t = tenants.find(item => {
-        const itemPhone = (item.ownerPhone || '').replace(/[^0-9]/g, '');
+        const itemPhone = asString(item.ownerPhone).replace(/[^0-9]/g, '');
         const matchPhone = cleanP && itemPhone === cleanP;
-        const matchId = qId && item.id === qId;
+        const matchId = cleanQId && item.id === cleanQId;
         return matchPhone || matchId;
       });
 
@@ -257,14 +332,19 @@ const server = http.createServer((req, res) => {
         return { success: false, locked: true, message: "Cơ sở này đang bị khóa tạm thời. Vui lòng liên hệ Dev để gia hạn." };
       }
 
-      // Nếu không gửi mã PIN hoặc truy vấn endpoint /status -> Đây là yêu cầu kiểm tra trạng thái định kỳ (Heartbeat)
-      if (!pass || pathname === '/api/tenants/status') {
+      // Chỉ cho phép kiểm tra trạng thái định kỳ (Heartbeat) không cần PIN trên endpoint /api/tenants/status
+      if (pathname === '/api/tenants/status') {
         return { success: true, active: true, tenant: t };
       }
 
-      const expectedPin = (t.tempPin || "247208").trim();
-      if (pass === expectedPin || pass === "247208" || pass === "1234") {
+      const cleanPass = asString(pass).trim();
+      const expectedPin = asString(t.tempPin).trim();
+      if (expectedPin.length > 0 && cleanPass.length > 0 && cleanPass === expectedPin) {
         return { success: true, tenant: t };
+      }
+
+      if (cleanPass.length === 0 || expectedPin.length === 0) {
+        return { success: false, message: "Thiếu mã PIN hoặc sai mật khẩu!" };
       }
 
       return { success: false, message: "Sai mật khẩu / mã PIN đăng nhập!" };
@@ -276,30 +356,59 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify(result));
       return;
     } else if (req.method === 'POST') {
-      let body = '';
-      req.on('data', chunk => { body += chunk; });
-      req.on('end', () => {
-        try {
-          const data = JSON.parse(body);
-          const result = checkAuth(data.phone, data.pin);
-          res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
-          res.end(JSON.stringify(result));
+      readJsonBody(req, res, (data) => {
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
+          res.end(JSON.stringify({ error: "Invalid payload" }));
           return;
-        } catch (e) {}
-        res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
-        res.end(JSON.stringify({ error: "Invalid payload" }));
+        }
+        const result = checkAuth(data.phone, data.pin, asString(data.id) || asString(data.tenantId));
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+        res.end(JSON.stringify(result));
       });
       return;
     }
   }
 
   // Static File Serving
-  let reqPath = pathname;
-  if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
+  const publicRoot = path.resolve(PUBLIC_DIR);
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(pathname || '/');
+  } catch (e) {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=UTF-8' });
+    res.end('Bad Request');
+    return;
+  }
+  if (decodedPath.includes('\0')) {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=UTF-8' });
+    res.end('Bad Request');
+    return;
+  }
 
-  let filePath = path.join(PUBLIC_DIR, reqPath);
+  if (decodedPath.includes(':')) {
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=UTF-8' });
+    res.end('Forbidden');
+    return;
+  }
+
+  const relPath = (decodedPath === '/' || decodedPath === '') ? 'index.html' : decodedPath.replace(/^\/+/, '');
+  let filePath = path.resolve(publicRoot, relPath);
+
+  if (filePath !== publicRoot && !filePath.startsWith(publicRoot + path.sep)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=UTF-8' });
+    res.end('Forbidden');
+    return;
+  }
+
+  if (path.basename(filePath).split(':')[0].toLowerCase() === 'tenants.json') {
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=UTF-8' });
+    res.end('Forbidden');
+    return;
+  }
+
   if (!fs.existsSync(filePath)) {
-    filePath = path.join(PUBLIC_DIR, 'index.html');
+    filePath = path.join(publicRoot, 'index.html');
   }
 
   const ext = path.extname(filePath).toLowerCase();
@@ -332,6 +441,15 @@ const server = http.createServer((req, res) => {
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
   });
+  } catch (err) {
+    console.error("Lỗi xử lý request:", err);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=UTF-8' });
+    }
+    if (!res.writableEnded) {
+      res.end(JSON.stringify({ success: false, error: "Internal Server Error" }));
+    }
+  }
 });
 
 server.listen(PORT, '0.0.0.0', () => {
