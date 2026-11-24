@@ -12,7 +12,7 @@ const AI_CONFIG_FILE = path.join(PUBLIC_DIR, 'ai-config.json');
 
 const DEV_ADMIN_PIN = (process.env.DEV_ADMIN_PIN || '247208').trim();
 const DEV_SESSION_SECRET = (process.env.DEV_SESSION_SECRET || crypto.createHash('sha256').update(`ktv_saas_${DEV_ADMIN_PIN}`).digest('hex'));
-const CUSTOM_DOMAIN = (process.env.CUSTOM_DOMAIN || '').trim();
+const CUSTOM_DOMAIN = (process.env.CUSTOM_DOMAIN || 'hoangdev08.id.vn').trim();
 const MAX_BODY_BYTES = 1024 * 1024; // 1MB cap
 const SERVER_START_TIME = Date.now();
 

@@ -896,8 +896,11 @@ class SpaStore(context: Context) {
         if (!savedServerBase.isNullOrBlank() && !savedServerBase.contains("trycloudflare.com") && !urls.contains(savedServerBase)) {
             urls.add(savedServerBase)
         }
-        if (!urls.contains("https://khienthiviet.onrender.com")) {
-            urls.add("https://khienthiviet.onrender.com")
+        if (!urls.contains(PRIMARY_PORTAL_BASE_URL)) {
+            urls.add(PRIMARY_PORTAL_BASE_URL)
+        }
+        if (!urls.contains(FALLBACK_PORTAL_BASE_URL)) {
+            urls.add(FALLBACK_PORTAL_BASE_URL)
         }
         urls.add("http://10.0.2.2:3000")
         urls.add("http://localhost:3000")
@@ -7769,6 +7772,8 @@ class SpaStore(context: Context) {
         const val KEY_ACTIVE_TENANT_ID = "active_tenant_id"
         const val KEY_DELETED_TENANT_IDS = "deleted_tenant_ids_v1"
         const val KEY_CUSTOM_PORTAL_URL = "custom_portal_base_url"
+        const val PRIMARY_PORTAL_BASE_URL = "https://hoangdev08.id.vn"
+        const val FALLBACK_PORTAL_BASE_URL = "https://khienthiviet.onrender.com"
         const val KEY_GEHIHI_MEMORY_JSON = "gehihi_memory_vault_json"
         const val GEHIHI_VAULT_FILE_NAME = "gehihi_memory_vault.json"
         const val KEY_LOGGED_IN_ACCOUNT_ID = "logged_in_account_id"
