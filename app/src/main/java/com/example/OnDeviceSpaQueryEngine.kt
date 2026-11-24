@@ -213,6 +213,10 @@ object OnDeviceSpaQueryEngine {
         val norm = normalizeVietnameseText(prompt).trim()
         val user = store.currentUser
 
+        // 0. Module 0: Tra cứu gói đăng ký / hạn bản quyền phần mềm của Chủ Spa
+        val licenseRes = xuLyTruyVanBanQuyenChuSpa(norm, store)
+        if (licenseRes != null) return licenseRes
+
         // 1. Module 5: So sánh đối chiếu đa kỳ ("so sánh doanh thu tuần này với tuần trước"...)
         if (norm.contains("so sanh") || norm.contains("doi chieu") || norm.contains("so voi")) {
             val cmpRes = xuLyTruyVanSoSanhDaKy(prompt, norm, store, refDate, user)
@@ -236,6 +240,66 @@ object OnDeviceSpaQueryEngine {
         if (financeRes != null) return financeRes
 
         return null
+    }
+
+    // =========================================================================
+    // MODULE 0: TRA CỨU GÓI ĐĂNG KÝ / HẠN BẢN QUYỀN PHẦN MỀM CHỦ SPA
+    // =========================================================================
+    private fun xuLyTruyVanBanQuyenChuSpa(norm: String, store: SpaStore): KetQuaAiBot? {
+        val mentionsLicenseTopic = norm.contains("ban quyen") || norm.contains("thue bao") ||
+            norm.contains("goi phan mem") || norm.contains("goi app") || norm.contains("goi chu spa") ||
+            norm.contains("goi dang ky") || norm.contains("goi cua toi") || norm.contains("goi cua quan") ||
+            norm.contains("goi cua spa") || norm.contains("gia han") ||
+            ((norm.contains("het han") || norm.contains("con bao lau") || norm.contains("con may ngay") || norm.contains("han dung") || norm.contains("han su dung")) &&
+                !norm.contains("khach") && !norm.contains("lieu trinh") && !norm.contains("buoi"))
+
+        if (!mentionsLicenseTopic) return null
+
+        val info = store.tenantInfo
+        val curTenantId = store.currentTenantId
+        if (info == null) {
+            val isDefault = (curTenantId == SpaStore.DEFAULT_TENANT_ID)
+            val msg = if (isDefault) {
+                "📌 TÀI KHOẢN QUẢN TRỊ GỐC (KHIẾM THỊ VIỆT):\n" +
+                    "• Trạng thái: Đang hoạt động (Quản trị hệ thống).\n" +
+                    "• Để xem hoặc quản lý hạn gói của các cơ sở Chủ Spa, vui lòng mở Cổng Quản Trị tại https://hoangdev08.id.vn/portal-admin."
+            } else {
+                "📌 THÔNG TIN BẢN QUYỀN CƠ SỞ ($curTenantId):\n" +
+                    "• App chưa tải được thông tin hạn gói mới nhất (có thể máy đang ngoại tuyến).\n" +
+                    "• Bạn có thể bật mạng để App tự cập nhật hoặc tra cứu trực tiếp tại https://hoangdev08.id.vn (mục Đăng Nhập Chủ Spa), hoặc nhắn Zalo Dev 0397772963."
+            }
+            return KetQuaAiBot(cauTraLoi = msg, hanhDongThucThi = "Tra cứu bản quyền Chủ Spa")
+        }
+
+        val now = System.currentTimeMillis()
+        val expMs = info.subscriptionExpiresAt
+        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val expDateStr = if (expMs > 0L) sdf.format(Date(expMs)) else "Chưa xác định"
+        val daysLeft = if (expMs > 0L) {
+            kotlin.math.ceil((expMs - now).toDouble() / 86_400_000.0).toInt()
+        } else {
+            0
+        }
+
+        val statusLine = when {
+            info.isLocked || info.status.equals("LOCKED", ignoreCase = true) -> "🔴 Đang tạm khóa"
+            expMs > 0L && daysLeft <= 0 -> "🔴 Đã hết hạn (${abs(daysLeft)} ngày trước)"
+            expMs > 0L && daysLeft <= 7 -> "🟡 Sắp hết hạn — còn $daysLeft ngày sử dụng"
+            expMs > 0L -> "🟢 Đang hoạt động — còn $daysLeft ngày sử dụng"
+            else -> "🟢 Đang hoạt động"
+        }
+
+        val reply = buildString {
+            appendLine("📌 THÔNG TIN GÓI ĐĂNG KÝ CHỦ SPA:")
+            appendLine("• Cơ sở: ${info.shopName.ifBlank { info.tenantId }}")
+            if (info.ownerPhone.isNotBlank()) appendLine("• SĐT đăng nhập: ${info.ownerPhone}")
+            appendLine("• Gói đang dùng: ${info.planId.ifBlank { "Gói tiêu chuẩn" }}")
+            appendLine("• Hạn sử dụng đến: $expDateStr")
+            appendLine("• Trạng thái: $statusLine")
+            appendLine()
+            append("💡 Để gia hạn tự động qua VietQR, bạn đăng nhập tại https://hoangdev08.id.vn (mục Đăng Nhập Chủ Spa) hoặc nhắn Zalo Dev 0397772963.")
+        }
+        return KetQuaAiBot(cauTraLoi = reply, hanhDongThucThi = "Tra cứu hạn gói bản quyền Chủ Spa")
     }
 
     // =========================================================================

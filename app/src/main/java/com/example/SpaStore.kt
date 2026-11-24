@@ -1281,11 +1281,25 @@ class SpaStore(context: Context) {
                                 }
                                 break
                             } else if (ok) {
-                                // Cơ sở đang hoạt động bình thường, nếu đang bị khóa trước đó thì mở khóa
+                                // Cơ sở đang hoạt động bình thường -> đồng bộ hạn gói mới nhất (expiredAt / plan) & mở khóa nếu vừa gia hạn
+                                val tObj = json.optJSONObject("tenant")
+                                val serverExpAt = json.optLong("expiredAt", tObj?.optLong("expiredAt", 0L) ?: 0L)
+                                val serverPlan = tObj?.optString("plan", "").orEmpty()
+                                val serverShopName = tObj?.optString("name", "").orEmpty()
                                 withContext(Dispatchers.Main) {
                                     if (isTenantLocked) {
                                         isTenantLocked = false
                                         tenantLockReason = ""
+                                    }
+                                    val curInfo = tenantInfo
+                                    if (curInfo != null && (serverExpAt > 0L || serverPlan.isNotBlank() || serverShopName.isNotBlank())) {
+                                        tenantInfo = curInfo.copy(
+                                            shopName = serverShopName.ifBlank { curInfo.shopName },
+                                            planId = serverPlan.ifBlank { curInfo.planId },
+                                            subscriptionExpiresAt = if (serverExpAt > 0L) serverExpAt else curInfo.subscriptionExpiresAt,
+                                            isLocked = false,
+                                            status = "ACTIVE"
+                                        )
                                     }
                                 }
                                 break
