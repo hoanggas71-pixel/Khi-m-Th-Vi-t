@@ -17,7 +17,7 @@ const MAX_BODY_BYTES = 1024 * 1024; // 1MB cap
 const SERVER_START_TIME = Date.now();
 
 const DEFAULT_PRICING_PLANS = [
-  { id: "2_weeks", name: "Dùng Thử 2 Tuần", days: 14, fee: 0, enabled: true, tag: "Miễn Phí 100%" },
+  { id: "2_weeks", name: "Dùng Thử 1 Tháng", days: 30, fee: 0, enabled: true, tag: "Miễn Phí 100%" },
   { id: "1_month", name: "Gói 1 Tháng", days: 30, fee: 500000, enabled: true, tag: "Tiêu chuẩn" },
   { id: "3_months", name: "Gói 3 Tháng", days: 90, fee: 1400000, enabled: true, tag: "Tiết kiệm 100k" },
   { id: "6_months", name: "Gói 6 Tháng", days: 180, fee: 2600000, enabled: true, tag: "Phổ biến nhất" },
