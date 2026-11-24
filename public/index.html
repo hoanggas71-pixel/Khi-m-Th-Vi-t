@@ -1455,20 +1455,27 @@
     }
 
     // ==========================================
-    // Cấu hình Bảng Giá SaaS & Ngân Hàng Dev
+    // Cấu hình Bảng Giá SaaS & Ngân Hàng Dev + Xác thực Dev Server
     // ==========================================
+    const STORAGE_KEY_DEV_TOKEN = "dev_auth_token";
+    const STORAGE_KEY_TENANTS_CLEARED = "dev_tenants_explicitly_cleared";
+    let serverStorageInfo = { storageMode: "local-ephemeral", cloudSynced: false, hasMutationSinceBoot: false, customDomain: "" };
+
+    function getDevAuthHeaders(extra = {}) {
+      const headers = Object.assign({ "Content-Type": "application/json" }, extra);
+      const token = sessionStorage.getItem(STORAGE_KEY_DEV_TOKEN);
+      if (token) {
+        headers["Authorization"] = "Bearer " + token;
+      }
+      return headers;
+    }
+
     function loadPricingConfig() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY_PRICING);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length >= 3) {
-            const p2w = parsed.find(p => p.id === "2_weeks");
-            if (p2w) {
-              p2w.name = "Dùng Thử 2 Tuần";
-              p2w.fee = 0;
-              p2w.tag = "Dùng Thử Miễn Phí";
-            }
+          if (Array.isArray(parsed) && parsed.length >= 1) {
             return parsed;
           }
         }
@@ -1478,6 +1485,7 @@
 
     function savePricingConfig(plans) {
       localStorage.setItem(STORAGE_KEY_PRICING, JSON.stringify(plans));
+      syncPortalConfigToServer();
     }
 
     function loadBankConfig() {
@@ -1493,13 +1501,81 @@
 
     function saveBankConfig(bank) {
       localStorage.setItem(STORAGE_KEY_BANK, JSON.stringify(bank));
+      syncPortalConfigToServer();
+    }
+
+    async function syncPortalConfigToServer() {
+      if (!sessionStorage.getItem(STORAGE_KEY_DEV_TOKEN)) return;
+      try {
+        await fetch('/api/system/portal-config', {
+          method: 'POST',
+          headers: getDevAuthHeaders(),
+          body: JSON.stringify({
+            pricingPlans,
+            bankConfig,
+            globalMaintenance: isGlobalMaintenance,
+            globalMaintenanceMsg
+          })
+        });
+      } catch (e) {}
+    }
+
+    async function loadPortalConfigFromServer() {
+      try {
+        const res = await fetch('/api/system/portal-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.success) {
+          if (Array.isArray(data.pricingPlans) && data.pricingPlans.length > 0) {
+            pricingPlans = data.pricingPlans;
+            localStorage.setItem(STORAGE_KEY_PRICING, JSON.stringify(pricingPlans));
+          }
+          if (data.bankConfig && data.bankConfig.accountNo) {
+            bankConfig = Object.assign({}, DEFAULT_BANK_CONFIG, data.bankConfig);
+            localStorage.setItem(STORAGE_KEY_BANK, JSON.stringify(bankConfig));
+          }
+          if (data.globalMaintenance !== undefined) {
+            isGlobalMaintenance = Boolean(data.globalMaintenance);
+            localStorage.setItem(STORAGE_KEY_MAINTENANCE, isGlobalMaintenance ? "true" : "false");
+          }
+          if (data.globalMaintenanceMsg) {
+            globalMaintenanceMsg = data.globalMaintenanceMsg;
+            localStorage.setItem(STORAGE_KEY_MAINTENANCE_MSG, globalMaintenanceMsg);
+          }
+          populatePlanSelectDropdowns();
+          renderCustomerPricing();
+          updateMaintenanceUI();
+        }
+      } catch (e) {}
+    }
+
+    async function refreshServerStorageStatus() {
+      try {
+        const res = await fetch('/api/status/storage');
+        if (!res.ok) return null;
+        const info = await res.json();
+        if (info && info.ok) {
+          serverStorageInfo = info;
+          if (info.storageMode === 'firestore' && info.cloudSynced) {
+            updateCloudStatusBadge(true, "Cloud Firestore: Bền Vững 100%");
+          } else if (info.storageMode === 'github-branch' && info.cloudSynced) {
+            updateCloudStatusBadge(true, "GitHub Data Branch: Bền Vững");
+          } else if (info.storageMode !== 'local-ephemeral') {
+            updateCloudStatusBadge(false, `Cloud (${info.storageMode}): Chờ đồng bộ`);
+          } else if (!firestoreDb) {
+            updateCloudStatusBadge(false, "Chế độ Local (Tự bảo vệ trình duyệt)");
+          }
+          return info;
+        }
+      } catch (e) {}
+      return null;
     }
 
     let pricingPlans = loadPricingConfig();
     let bankConfig = loadBankConfig();
 
     // ==========================================
-    // Quản Lý Cơ Sở (Tenants) & Đồng Bộ API
+    // Quản Lý Cơ Sở (Tenants) & Đồng Bộ API (Chống Reset Khi Render Ngủ Dậy)
     // ==========================================
     function loadTenants() {
       try {
@@ -1515,25 +1591,63 @@
       return JSON.parse(JSON.stringify(DEFAULT_TENANTS));
     }
 
-    function saveTenants() {
+    function saveTenants(explicitClear = false) {
       try {
         localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
-        fetch('/api/tenants', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(tenants)
-        }).catch(() => {});
+        if (tenants.length > 0) {
+          localStorage.removeItem(STORAGE_KEY_TENANTS_CLEARED);
+        } else if (explicitClear) {
+          localStorage.setItem(STORAGE_KEY_TENANTS_CLEARED, "true");
+        }
+        if (sessionStorage.getItem(STORAGE_KEY_DEV_TOKEN)) {
+          fetch('/api/tenants', {
+            method: 'POST',
+            headers: getDevAuthHeaders(),
+            body: JSON.stringify(tenants)
+          }).catch(() => {});
+        }
       } catch (e) {}
     }
 
     async function syncTenantsWithApi() {
       try {
-        const res = await fetch('/api/tenants');
+        const statusInfo = await refreshServerStorageStatus();
+        const isDev = Boolean(sessionStorage.getItem(STORAGE_KEY_DEV_TOKEN));
+        const res = await fetch('/api/tenants', {
+          headers: isDev ? getDevAuthHeaders() : {}
+        });
         if (res.ok) {
           const list = await res.json();
           if (Array.isArray(list)) {
-            tenants = list.filter(t => t.id !== "spa_123456789");
-            localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
+            const cleanServerList = list.filter(t => t.id !== "spa_123456789");
+            const localSaved = loadTenants();
+            const wasExplicitlyCleared = localStorage.getItem(STORAGE_KEY_TENANTS_CLEARED) === "true";
+
+            // CHỐNG RESET KHI RENDER NGỦ DẬY:
+            // Nếu Render đang ở chế độ local-ephemeral và vừa tỉnh giấc với danh sách rỗng [] (chưa có thao tác xóa nào từ lúc bật),
+            // trong khi trình duyệt Dev vẫn đang giữ các cơ sở đã thêm -> TỰ ĐỘNG KHÔI PHỤC LÊN RENDER thay vì xóa đè mất!
+            if (
+              cleanServerList.length === 0 &&
+              localSaved.length > 0 &&
+              !wasExplicitlyCleared &&
+              (!statusInfo || (statusInfo.storageMode === "local-ephemeral" && !statusInfo.hasMutationSinceBoot))
+            ) {
+              tenants = localSaved;
+              if (isDev) {
+                await fetch('/api/tenants', {
+                  method: 'POST',
+                  headers: getDevAuthHeaders(),
+                  body: JSON.stringify(tenants)
+                }).catch(() => {});
+                showToast(`♻️ Đã tự động khôi phục ${tenants.length} cơ sở lên máy chủ Render sau khi ngủ dậy!`);
+              }
+            } else {
+              tenants = cleanServerList;
+              localStorage.setItem(STORAGE_KEY_TENANTS, JSON.stringify(tenants));
+              if (tenants.length > 0) {
+                localStorage.removeItem(STORAGE_KEY_TENANTS_CLEARED);
+              }
+            }
             renderTable();
             renderCustomerPricing();
             checkCustomerSession();
@@ -1582,25 +1696,57 @@
       document.getElementById("dev-pin-error").classList.add("hidden");
     }
 
-    function verifyDevPin() {
+    async function verifyDevPin() {
       const input = document.getElementById("dev-pin-input").value.trim();
-      const currentPin = localStorage.getItem(STORAGE_KEY_DEV_PIN) || DEFAULT_DEV_PIN;
       const errEl = document.getElementById("dev-pin-error");
-
-      if (input === currentPin) {
-        sessionStorage.setItem("dev_authed", "true");
-        closeDevPinModal();
-        switchToDevView();
-        showToast("🔓 Đã mở khóa Bảng Điều Hành Dev Super Admin!");
-      } else {
+      if (!input) {
         errEl.classList.remove("hidden");
-        document.getElementById("dev-pin-input").value = "";
-        document.getElementById("dev-pin-input").focus();
+        return;
       }
+
+      try {
+        const res = await fetch('/api/dev/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: input })
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data && data.success && data.token) {
+          sessionStorage.setItem(STORAGE_KEY_DEV_TOKEN, data.token);
+          sessionStorage.setItem("dev_authed", "true");
+          closeDevPinModal();
+          switchToDevView();
+          await syncTenantsWithApi();
+          await loadSystemAiConfig();
+          showToast("🔓 Đã mở khóa Bảng Điều Hành Dev Super Admin!");
+          return;
+        }
+        if (res.status === 401) {
+          errEl.classList.remove("hidden");
+          document.getElementById("dev-pin-input").value = "";
+          document.getElementById("dev-pin-input").focus();
+          return;
+        }
+      } catch (e) {
+        // Fallback offline nếu mở file HTML trực tiếp không qua server
+        const currentPin = localStorage.getItem(STORAGE_KEY_DEV_PIN) || DEFAULT_DEV_PIN;
+        if (input === currentPin) {
+          sessionStorage.setItem("dev_authed", "true");
+          closeDevPinModal();
+          switchToDevView();
+          showToast("🔓 Đã mở khóa Bảng Điều Hành Dev (Offline)!");
+          return;
+        }
+      }
+
+      errEl.classList.remove("hidden");
+      document.getElementById("dev-pin-input").value = "";
+      document.getElementById("dev-pin-input").focus();
     }
 
     function lockDevPortal() {
       sessionStorage.removeItem("dev_authed");
+      sessionStorage.removeItem(STORAGE_KEY_DEV_TOKEN);
       switchToCustomerView();
       showToast("🔒 Đã khóa bảng điều khiển Dev!");
     }
@@ -1610,7 +1756,7 @@
     // ==========================================
     let currentCustomerTenant = null;
 
-    function handleCustomerLogin() {
+    async function handleCustomerLogin() {
       const phoneInput = document.getElementById("cust-phone-input").value.trim().replace(/[^0-9]/g, '');
       const pinInput = document.getElementById("cust-pin-input").value.trim();
       const errBox = document.getElementById("cust-login-error");
@@ -1621,24 +1767,54 @@
         return;
       }
 
-      const found = tenants.find(t => {
-        const p = (t.ownerPhone || '').replace(/[^0-9]/g, '');
-        return p === phoneInput;
-      });
+      // Xác thực trực tiếp qua Server API (không bao giờ lộ tempPin ra trình duyệt khách)
+      try {
+        const res = await fetch('/api/tenants/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phoneInput, pin: pinInput })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && data.tenant) {
+            const idx = tenants.findIndex(t => t.id === data.tenant.id);
+            if (idx >= 0) tenants[idx] = Object.assign({}, tenants[idx], data.tenant);
+            else tenants.push(data.tenant);
+            errBox.classList.add("hidden");
+            sessionStorage.setItem(STORAGE_KEY_CUSTOMER_SESSION, data.tenant.id);
+            renderCustomerPortal(data.tenant);
+            showToast(`🎉 Xin chào Chủ Spa: ${data.tenant.name}!`);
+            return;
+          }
+          if (data && data.locked) {
+            errBox.innerText = "🔒 " + (data.message || "Cơ sở này đang bị tạm khóa hoặc đã hết hạn. Vui lòng liên hệ Dev 0397772963 để gia hạn.");
+            errBox.classList.remove("hidden");
+            return;
+          }
+          if (data && data.notFound) {
+            errBox.innerText = "⚠️ Không tìm thấy cơ sở với số điện thoại này! Hãy tải bản dùng thử 14 ngày full tính năng miễn phí hoặc liên hệ Dev qua Zalo 0397772963 để kích hoạt nhé.";
+            errBox.classList.remove("hidden");
+            return;
+          }
+          errBox.innerText = "⚠️ " + ((data && data.message) || "Mật khẩu PIN không chính xác! Vui lòng kiểm tra lại.");
+          errBox.classList.remove("hidden");
+          return;
+        }
+      } catch (e) {}
 
+      // Fallback local nếu mở file offline không có server
+      const found = tenants.find(t => (t.ownerPhone || '').replace(/[^0-9]/g, '') === phoneInput);
       if (!found) {
-        errBox.innerText = "⚠️ Không tìm thấy cơ sở với số điện thoại này! Hãy tải bản dùng thử 2 tuần full tính năng miễn phí hoặc liên hệ Dev qua Zalo 0397772963 để kích hoạt nhé.";
+        errBox.innerText = "⚠️ Không tìm thấy cơ sở với số điện thoại này!";
         errBox.classList.remove("hidden");
         return;
       }
-
       const expectedPin = String(found.tempPin || "").trim();
       if (!expectedPin || pinInput !== expectedPin) {
         errBox.innerText = "⚠️ Mật khẩu PIN không chính xác! Vui lòng kiểm tra lại.";
         errBox.classList.remove("hidden");
         return;
       }
-
       errBox.classList.add("hidden");
       sessionStorage.setItem(STORAGE_KEY_CUSTOMER_SESSION, found.id);
       renderCustomerPortal(found);
@@ -2449,6 +2625,7 @@
           isGlobalMaintenance = willBeMaintenance;
           localStorage.setItem(STORAGE_KEY_MAINTENANCE, isGlobalMaintenance ? "true" : "false");
           updateMaintenanceUI();
+          syncPortalConfigToServer();
 
           if (firestoreDb) {
             try {
@@ -2487,6 +2664,7 @@
       if (input) {
         globalMaintenanceMsg = input.value.trim() || "Hệ thống đang bảo trì nâng cấp kỹ thuật định kỳ.";
         localStorage.setItem(STORAGE_KEY_MAINTENANCE_MSG, globalMaintenanceMsg);
+        syncPortalConfigToServer();
         if (showFeedback) showToast("💾 Đã lưu thông báo bảo trì thành công!");
       }
     }
@@ -2673,7 +2851,9 @@
         }
         if (badgeText) badgeText.innerText = "Đang kiểm tra...";
 
-        const res = await fetch("/api/system/ai-config");
+        const res = await fetch("/api/system/ai-config", {
+          headers: getDevAuthHeaders()
+        });
         if (res.ok) {
           const data = await res.json();
           if (data && data.success) {
@@ -2734,7 +2914,7 @@
 
         const res = await fetch("/api/system/ai-config", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getDevAuthHeaders(),
           body: JSON.stringify({ apiKey, model })
         });
 
@@ -3535,9 +3715,12 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
 
           tenants.splice(idx, 1);
           try {
-            await fetch('/api/tenants?id=' + encodeURIComponent(deletedTenant.id), { method: 'DELETE' });
+            await fetch('/api/tenants?id=' + encodeURIComponent(deletedTenant.id), {
+              method: 'DELETE',
+              headers: getDevAuthHeaders()
+            });
           } catch (e) {}
-          saveTenants();
+          saveTenants(tenants.length === 0);
           renderTable();
           checkCustomerSession();
 
@@ -3600,9 +3783,12 @@ Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật ng
           const prevTenants = JSON.parse(JSON.stringify(tenants));
           tenants = [];
           try {
-            await fetch('/api/tenants?all=true', { method: 'DELETE' });
+            await fetch('/api/tenants?all=true', {
+              method: 'DELETE',
+              headers: getDevAuthHeaders()
+            });
           } catch (e) {}
-          saveTenants();
+          saveTenants(true);
           renderTable();
           checkCustomerSession();
 
@@ -3962,15 +4148,29 @@ Lưu ý: Mở ứng dụng Quản Lý Spa trên thiết bị và đăng nhập b
       }
     });
 
-    // Bootstrapping
+    // Bootstrapping + Hỗ trợ tự định tuyến Subdomain .id.vn (admin.tenban.id.vn / portal-*.id.vn / /portal-admin)
     initFirebase();
     populatePlanSelectDropdowns();
     renderCustomerPricing();
     updateMaintenanceUI();
     renderTable();
     checkCustomerSession();
+    loadPortalConfigFromServer();
     syncTenantsWithApi();
     loadSystemAiConfig();
+
+    (function autoRouteDevSubdomain() {
+      try {
+        const host = (window.location.hostname || "").toLowerCase();
+        const pathname = (window.location.pathname || "").toLowerCase();
+        const params = new URLSearchParams(window.location.search || "");
+        const isAdminSubdomain = host.startsWith("admin.") || host.startsWith("portal-");
+        const isAdminPath = pathname === "/portal-admin" || pathname === "/dev-admin" || params.get("portal") === "dev";
+        if (isAdminSubdomain || isAdminPath) {
+          promptDevLogin();
+        }
+      } catch (e) {}
+    })();
   </script>
 </body>
 </html>

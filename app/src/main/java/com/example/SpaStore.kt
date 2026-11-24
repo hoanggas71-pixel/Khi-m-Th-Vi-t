@@ -758,6 +758,7 @@ class SpaStore(context: Context) {
     ): Boolean {
         val cleanPhone = normalizePhoneDigits(ownerPhone)
         val tkId = "tk_owner_$cleanPhone"
+        unmarkTenantDeleted(tenantId, cleanPhone)
 
         // Lưu dữ liệu của tenant trước đó nếu đổi cơ sở
         val isDifferentTenant = (activeTenantOverride != null && activeTenantOverride != tenantId)
@@ -829,39 +830,109 @@ class SpaStore(context: Context) {
         return ok
     }
 
+    fun isTenantMarkedDeleted(tenantIdOrPhone: String): Boolean {
+        val clean = tenantIdOrPhone.trim()
+        if (clean.isBlank() || clean == DEFAULT_TENANT_ID || clean == DEFAULT_ADMIN_PHONE) return false
+        val deletedSet = prefs.getStringSet(KEY_DELETED_TENANT_IDS, emptySet()) ?: emptySet()
+        val digits = normalizePhoneDigits(clean)
+        return deletedSet.contains(clean) ||
+            (digits.isNotBlank() && (deletedSet.contains(digits) || deletedSet.contains("spa_$digits")))
+    }
+
+    fun unmarkTenantDeleted(tenantId: String, ownerPhone: String = "") {
+        val existing = prefs.getStringSet(KEY_DELETED_TENANT_IDS, emptySet())?.toMutableSet() ?: return
+        val digits = normalizePhoneDigits(ownerPhone)
+        val changed = existing.remove(tenantId) or
+            (digits.isNotBlank() && (existing.remove(digits) or existing.remove("spa_$digits")))
+        if (changed) {
+            prefs.edit().putStringSet(KEY_DELETED_TENANT_IDS, existing).apply()
+        }
+    }
+
+    /**
+     * Xóa vĩnh viễn cache đăng nhập và dữ liệu cục bộ của một cơ sở đã bị xóa trên Web Portal
+     * để tài khoản cũ (ví dụ 12345/12345) không bao giờ đăng nhập lại được dù tắt mạng.
+     */
+    fun clearDeletedTenantCache(tenantId: String, ownerPhone: String = "") {
+        val cleanId = tenantId.trim()
+        val digits = normalizePhoneDigits(ownerPhone)
+        if (cleanId == DEFAULT_TENANT_ID || digits == DEFAULT_ADMIN_PHONE) return
+
+        val updatedSet = prefs.getStringSet(KEY_DELETED_TENANT_IDS, emptySet())?.toMutableSet() ?: mutableSetOf()
+        if (cleanId.isNotBlank()) updatedSet.add(cleanId)
+        if (digits.isNotBlank()) {
+            updatedSet.add(digits)
+            updatedSet.add("spa_$digits")
+        }
+
+        val editor = prefs.edit().putStringSet(KEY_DELETED_TENANT_IDS, updatedSet)
+        if (cleanId.isNotBlank()) {
+            editor.remove("${KEY_DATA_JSON}_$cleanId")
+        }
+        if (digits.isNotBlank()) {
+            editor.remove("${KEY_DATA_JSON}_spa_$digits")
+        }
+        val activeSaved = prefs.getString(KEY_ACTIVE_TENANT_ID, null)
+        if (activeSaved == cleanId || (digits.isNotBlank() && activeSaved == "spa_$digits")) {
+            editor.remove(KEY_ACTIVE_TENANT_ID)
+            editor.remove(KEY_LOGGED_IN_ACCOUNT_ID)
+            activeTenantOverride = null
+        }
+        editor.apply()
+
+        taiKhoans.removeAll { tk ->
+            tk.id != "tk_admin" && (
+                (cleanId.isNotBlank() && tk.tenantId == cleanId) ||
+                (digits.isNotBlank() && (normalizePhoneDigits(tk.username) == digits || tk.id == "tk_owner_$digits"))
+            )
+        }
+    }
+
+    private fun buildPortalBaseUrls(): List<String> {
+        val urls = mutableListOf<String>()
+        val customUrl = prefs.getString(KEY_CUSTOM_PORTAL_URL, null)?.trim()?.trimEnd('/')
+        if (!customUrl.isNullOrBlank()) urls.add(customUrl)
+        val savedServerBase = prefs.getString("last_server_base_url", null)?.trim()?.trimEnd('/')
+        if (!savedServerBase.isNullOrBlank() && !savedServerBase.contains("trycloudflare.com") && !urls.contains(savedServerBase)) {
+            urls.add(savedServerBase)
+        }
+        if (!urls.contains("https://khienthiviet.onrender.com")) {
+            urls.add("https://khienthiviet.onrender.com")
+        }
+        urls.add("http://10.0.2.2:3000")
+        urls.add("http://localhost:3000")
+        urls.add("http://127.0.0.1:3000")
+        return urls
+    }
+
     /**
      * Khi máy phụ hoặc Chủ Spa mới tạo tài khoản trên Web Dev bấm Đăng nhập:
-     * 1. Tra cứu trực tiếp qua Local Server API (hỗ trợ tức thì trên máy ảo Android LDPlayer/Emulator qua cổng 3000)
-     * 2. Tra cứu qua Firestore Cloud Database (hỗ trợ online thật khi triển khai ra Internet)
-     * 3. Tự động cấp quyền khởi tạo tài khoản Owner và mở app ngay lập tức!
+     * 1. Tài khoản Admin gốc (0397772963) luôn ưu tiên đăng nhập trực tiếp Offline trên máy (không bị chặn khi mất mạng).
+     * 2. Với cơ sở Chủ Spa khách hàng: hỏi xác thực trực tiếp qua Web Portal API (.id.vn / Render) TRƯỚC với timeout đủ lớn (25s)
+     *    để đợi server thức dậy; nếu server báo notFound (đã xóa) -> xóa sạch cache cục bộ và chặn đăng nhập tuyệt đối!
+     * 3. Chỉ dùng fallback offline cục bộ nếu máy hoàn toàn mất mạng VÀ cơ sở chưa từng bị đánh dấu xóa.
      */
     suspend fun pullLatestFromCloudAndLogin(phoneOrUsername: String, rawPassword: String, rememberMe: Boolean = true): Boolean = withContext(Dispatchers.IO) {
         lastAuthErrorMessage = ""
-        if (login(phoneOrUsername, rawPassword, rememberMe = rememberMe)) return@withContext true
-
         val cleanPhone = normalizePhoneDigits(phoneOrUsername)
         val cleanPass = rawPassword.trim()
+        val isRootAdminAttempt = (cleanPhone == DEFAULT_ADMIN_PHONE || phoneOrUsername.trim().equals("admin", ignoreCase = true))
 
-        // 1. Kiểm tra qua Local API Server & Cloud Tunnel (Hỗ trợ máy ảo Android LDPlayer / Emulator kết nối Web Dev qua cổng 3000 và Internet)
-        val savedServerBase = prefs.getString("last_server_base_url", null)
-        val localApiUrls = mutableListOf<String>()
-        if (!savedServerBase.isNullOrBlank()) {
-            localApiUrls.add("$savedServerBase/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
+        // 1. Tài khoản Admin gốc hoặc nhân viên nội bộ cơ sở mặc định đăng nhập offline ngay lập tức
+        if (isRootAdminAttempt) {
+            if (login(phoneOrUsername, rawPassword, rememberMe = rememberMe)) return@withContext true
         }
-        localApiUrls.add("https://dialog-particularly-economic-loves.trycloudflare.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
-        localApiUrls.add("https://khienthiviet.onrender.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
-        localApiUrls.add("https://stretch-rid-utils-decreased.trycloudflare.com/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
-        localApiUrls.add("http://10.0.2.2:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
-        localApiUrls.add("http://192.168.1.105:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
-        localApiUrls.add("http://172.16.1.2:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
-        localApiUrls.add("http://localhost:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
-        localApiUrls.add("http://127.0.0.1:3000/api/tenants/auth?phone=$cleanPhone&pin=$cleanPass")
+
+        // 2. Xác thực trực tiếp qua Web Portal API (.id.vn / Render / Localhost)
+        val baseUrls = buildPortalBaseUrls()
         var serverResponded = false
-        for (apiUrl in localApiUrls) {
+        for (baseUrl in baseUrls) {
             try {
+                val apiUrl = "$baseUrl/api/tenants/auth?phone=${java.net.URLEncoder.encode(cleanPhone, "UTF-8")}&pin=${java.net.URLEncoder.encode(cleanPass, "UTF-8")}"
+                val isRemoteHttps = baseUrl.startsWith("https://")
                 val conn = (java.net.URL(apiUrl).openConnection() as java.net.HttpURLConnection).apply {
-                    connectTimeout = 2500
-                    readTimeout = 3000
+                    connectTimeout = if (isRemoteHttps) 12000 else 1500
+                    readTimeout = if (isRemoteHttps) 25000 else 2000
                     requestMethod = "GET"
                     setRequestProperty("Accept", "application/json")
                 }
@@ -871,9 +942,7 @@ class SpaStore(context: Context) {
                     val json = org.json.JSONObject(respText)
                     if (json.optBoolean("success", false)) {
                         runCatching {
-                            val uri = java.net.URI(apiUrl)
-                            val base = "${uri.scheme}://${uri.authority}"
-                            prefs.edit().putString("last_server_base_url", base).apply()
+                            prefs.edit().putString("last_server_base_url", baseUrl).apply()
                         }
                         val tObj = json.optJSONObject("tenant")
                         if (tObj != null) {
@@ -894,12 +963,17 @@ class SpaStore(context: Context) {
                             )
                         }
                     } else {
-                        // Máy chủ phản hồi từ chối đăng nhập với lý do cụ thể
                         val msg = json.optString("message", "")
                         if (json.optBoolean("notFound", false)) {
-                            lastAuthErrorMessage = "Không tìm thấy cơ sở với SĐT này trên Web Portal!"
-                        } else if (json.optBoolean("locked", false)) {
-                            lastAuthErrorMessage = "Cơ sở này đang bị tạm khóa trên Web Portal. Vui lòng gia hạn."
+                            // Xóa sạch cache cục bộ nếu cơ sở này từng đăng nhập trước đó trên máy (chặn 12345/12345)
+                            clearDeletedTenantCache("spa_$cleanPhone", cleanPhone)
+                            // Kiểm tra nếu là tài khoản nhân viên nội bộ của cơ sở hiện tại (không phải Chủ Spa)
+                            if (currentTenantId == DEFAULT_TENANT_ID && login(phoneOrUsername, rawPassword, rememberMe = rememberMe)) {
+                                return@withContext true
+                            }
+                            lastAuthErrorMessage = "Không tìm thấy cơ sở với SĐT này trên Web Portal (hoặc cơ sở đã bị xóa)!"
+                        } else if (json.optBoolean("locked", false) || json.optBoolean("expired", false)) {
+                            lastAuthErrorMessage = msg.ifBlank { "Cơ sở này đang bị tạm khóa hoặc đã hết hạn. Vui lòng gia hạn." }
                         } else if (msg.isNotBlank()) {
                             lastAuthErrorMessage = msg
                         } else {
@@ -911,6 +985,15 @@ class SpaStore(context: Context) {
             } catch (e: Exception) {
                 // Thử endpoint tiếp theo
             }
+        }
+
+        // 3. Nếu không kết nối được server (Offline), chỉ cho phép đăng nhập cục bộ nếu cơ sở CHƯA từng bị xóa
+        if (!serverResponded) {
+            if (isTenantMarkedDeleted(cleanPhone)) {
+                lastAuthErrorMessage = "Tài khoản cơ sở này đã bị xóa khỏi hệ thống và không thể đăng nhập lại!"
+                return@withContext false
+            }
+            if (login(phoneOrUsername, rawPassword, rememberMe = rememberMe)) return@withContext true
         }
 
         // 2. Kiểm tra qua Firestore Cloud Database nếu có kết nối
@@ -1160,43 +1243,36 @@ class SpaStore(context: Context) {
                     currentUser?.username?.let { normalizePhoneDigits(it) }
                 }?.ifBlank { currentUser?.username } ?: break
 
-                val savedServerBase = prefs.getString("last_server_base_url", null)
-                val endpoints = mutableListOf<String>()
-                if (!savedServerBase.isNullOrBlank()) {
-                    endpoints.add("$savedServerBase/api/tenants/status?phone=$phone&tenantId=$tId")
+                val endpoints = buildPortalBaseUrls().map { baseUrl ->
+                    "$baseUrl/api/tenants/status?phone=${java.net.URLEncoder.encode(phone, "UTF-8")}&tenantId=${java.net.URLEncoder.encode(tId, "UTF-8")}"
                 }
-                endpoints.add("https://dialog-particularly-economic-loves.trycloudflare.com/api/tenants/status?phone=$phone&tenantId=$tId")
-                endpoints.add("https://khienthiviet.onrender.com/api/tenants/status?phone=$phone&tenantId=$tId")
-                endpoints.add("https://stretch-rid-utils-decreased.trycloudflare.com/api/tenants/status?phone=$phone&tenantId=$tId")
-                endpoints.add("http://10.0.2.2:3000/api/tenants/status?phone=$phone&tenantId=$tId")
-                endpoints.add("http://192.168.1.105:3000/api/tenants/status?phone=$phone&tenantId=$tId")
-                endpoints.add("http://172.16.1.2:3000/api/tenants/status?phone=$phone&tenantId=$tId")
-                endpoints.add("http://localhost:3000/api/tenants/status?phone=$phone&tenantId=$tId")
-                endpoints.add("http://127.0.0.1:3000/api/tenants/status?phone=$phone&tenantId=$tId")
 
                 for (urlStr in endpoints) {
                     try {
+                        val isRemoteHttps = urlStr.startsWith("https://")
                         val conn = (java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection).apply {
-                            connectTimeout = 2000
-                            readTimeout = 2000
+                            connectTimeout = if (isRemoteHttps) 8000 else 1500
+                            readTimeout = if (isRemoteHttps) 12000 else 2000
                             requestMethod = "GET"
                         }
                         if (conn.responseCode == 200) {
                             val res = conn.inputStream.bufferedReader().use { it.readText() }
                             val json = org.json.JSONObject(res)
                             val ok = json.optBoolean("success", false)
-                            val locked = json.optBoolean("locked", false)
+                            val locked = json.optBoolean("locked", false) || json.optBoolean("expired", false)
                             val notFound = json.optBoolean("notFound", false) || res.contains("Không tìm thấy cơ sở")
+                            val coldStartEmpty = json.optBoolean("coldStartEmpty", false)
 
                             if (locked) {
                                 withContext(Dispatchers.Main) {
                                     isTenantLocked = true
-                                    tenantLockReason = json.optString("message", "Cơ sở đang bị tạm khóa. Vui lòng liên hệ Dev.")
+                                    tenantLockReason = json.optString("message", "Cơ sở đang bị tạm khóa hoặc đã hết hạn. Vui lòng liên hệ Dev.")
                                 }
                                 break
-                            } else if (notFound) {
-                                // Chỉ ngắt phiên khi Web Portal xác nhận cơ sở đã bị xóa hoàn toàn khỏi hệ sinh thái
+                            } else if (notFound && !coldStartEmpty) {
+                                // Chỉ ngắt phiên và XÓA SẠCH CACHE khi Web Portal xác nhận cơ sở đã bị xóa thật sự
                                 withContext(Dispatchers.Main) {
+                                    clearDeletedTenantCache(tId, phone)
                                     facilityTerminationNotice = "Tài khoản cơ sở này đã bị xóa khỏi hệ sinh thái Khiếm Thị Việt trên Web Portal. Phiên làm việc đã kết thúc."
                                     logout()
                                 }
@@ -7691,6 +7767,8 @@ class SpaStore(context: Context) {
         const val PREFS_NAME = "tamquat_fresh_v2"
         const val KEY_DATA_JSON = "data_json"
         const val KEY_ACTIVE_TENANT_ID = "active_tenant_id"
+        const val KEY_DELETED_TENANT_IDS = "deleted_tenant_ids_v1"
+        const val KEY_CUSTOM_PORTAL_URL = "custom_portal_base_url"
         const val KEY_GEHIHI_MEMORY_JSON = "gehihi_memory_vault_json"
         const val GEHIHI_VAULT_FILE_NAME = "gehihi_memory_vault.json"
         const val KEY_LOGGED_IN_ACCOUNT_ID = "logged_in_account_id"

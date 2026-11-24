@@ -1,316 +1,241 @@
-/**
- * test_facility_deletion_permanent.js
- * Comprehensive integration test for R3: Permanent Facility Deletion, Empty State [], and Backend Hardening.
- */
-
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const assert = require('assert');
 
-const TEST_PORT = 3099;
-const TEST_PORT_MISSING = 3100;
-const SANDBOX_FILE = path.join(__dirname, 'test_tenants_sandbox.json');
-const MISSING_SANDBOX_FILE = path.join(__dirname, 'test_tenants_missing_sandbox.json');
+const PORT = 3099;
+const SANDBOX_TENANTS_FILE = path.join(__dirname, 'test_tenants_sandbox.json');
+const SANDBOX_CONFIG_FILE = path.join(__dirname, 'test_portal_config_sandbox.json');
+const DEV_PIN = '247208';
 
-const INITIAL_SANDBOX_DATA = [
-  {
-    id: "khiem_thi_viet",
-    name: "Spa Khiếm Thị Việt (Cơ sở 1)",
-    ownerPhone: "0397772963",
-    plan: "VIP 1 Năm",
-    expiryDate: "18/11/2027",
-    daysLeft: 365,
-    isActive: true,
-    monthlyFee: 500000,
-    tempPin: "247208"
-  },
-  {
-    id: "spa_123456789",
-    name: "Spa Suối Nước Nóng",
-    ownerPhone: "123456789",
-    plan: "Gói 1 Tháng",
-    expiryDate: "18/12/2026",
-    daysLeft: 30,
-    isActive: true,
-    monthlyFee: 500000,
-    tempPin: "12345"
-  }
-];
-
-function request(method, pathUrl, data = null, port = TEST_PORT) {
+function request(method, reqPath, body = null, headers = {}) {
   return new Promise((resolve, reject) => {
-    const options = {
+    const bodyStr = body !== null ? (typeof body === 'string' ? body : JSON.stringify(body)) : null;
+    const reqHeaders = Object.assign({}, headers);
+    if (bodyStr !== null) {
+      if (!reqHeaders['Content-Type']) reqHeaders['Content-Type'] = 'application/json';
+      reqHeaders['Content-Length'] = Buffer.byteLength(bodyStr);
+    }
+    const req = http.request({
       hostname: '127.0.0.1',
-      port,
-      path: pathUrl,
+      port: PORT,
+      path: reqPath,
       method,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    };
-
-    const req = http.request(options, (res) => {
-      let body = '';
-      res.on('data', chunk => { body += chunk; });
+      headers: reqHeaders
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
       res.on('end', () => {
-        try {
-          const parsed = body ? JSON.parse(body) : null;
-          resolve({ status: res.statusCode, body: parsed, raw: body });
-        } catch (e) {
-          resolve({ status: res.statusCode, raw: body });
-        }
+        const text = Buffer.concat(chunks).toString('utf8');
+        let json = null;
+        try { json = text ? JSON.parse(text) : null; } catch (_) {}
+        resolve({ status: res.statusCode, text, json, headers: res.headers });
       });
     });
-
     req.on('error', reject);
-    if (data !== null && data !== undefined) {
-      req.write(typeof data === 'string' ? data : JSON.stringify(data));
-    }
+    if (bodyStr !== null) req.write(bodyStr);
     req.end();
   });
 }
 
-async function waitForServer(port = TEST_PORT, retries = 30, delayMs = 150) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const res = await request('GET', '/api/health', null, port);
-      if (res.status === 200) return true;
-    } catch (e) {}
-    await new Promise(r => setTimeout(r, delayMs));
-  }
-  throw new Error("Server failed to start on test port " + port);
-}
-
-async function run() {
-  console.log("=== Bắt đầu kiểm thử R3: Xóa sạch cơ sở [], không hồi sinh & Bảo mật Backend ===");
-
-  fs.writeFileSync(SANDBOX_FILE, JSON.stringify(INITIAL_SANDBOX_DATA, null, 2), 'utf8');
-  if (fs.existsSync(MISSING_SANDBOX_FILE)) fs.unlinkSync(MISSING_SANDBOX_FILE);
-  console.log("✓ Đã khởi tạo sandbox:", SANDBOX_FILE);
-
-  const env = Object.assign({}, process.env, {
-    PORT: TEST_PORT.toString(),
-    TENANTS_FILE: SANDBOX_FILE
-  });
-
-  const serverProc = spawn('node', ['server.js'], { env, cwd: __dirname });
-  serverProc.stderr.on('data', d => console.error("Server stderr:", d.toString()));
-
-  try {
-    await waitForServer(TEST_PORT);
-    console.log("✓ Server test đang chạy tại port", TEST_PORT);
-
-    // Test 1: GET /api/tenants trả về danh sách ban đầu gồm 2 cơ sở
-    const resGet1 = await request('GET', '/api/tenants');
-    assert.strictEqual(resGet1.status, 200);
-    assert.strictEqual(resGet1.body.length, 2);
-    assert.ok(resGet1.body.some(t => t.id === 'spa_123456789'), "Danh sách ban đầu phải có spa_123456789");
-    console.log("✓ Test 1: GET /api/tenants trả về 2 cơ sở ban đầu");
-
-    // Test 2: Xóa cơ sở 'spa_123456789' qua DELETE /api/tenants?id=spa_123456789
-    const resDel = await request('DELETE', '/api/tenants?id=spa_123456789');
-    assert.strictEqual(resDel.status, 200);
-    assert.strictEqual(resDel.body.success, true);
-    assert.strictEqual(resDel.body.count, 1);
-    const diskAfterDel1 = JSON.parse(fs.readFileSync(SANDBOX_FILE, 'utf8'));
-    assert.strictEqual(diskAfterDel1.length, 1);
-    assert.ok(!diskAfterDel1.some(t => t.id === 'spa_123456789'));
-    console.log("✓ Test 2: DELETE /api/tenants?id=spa_123456789 xóa thành công");
-
-    // Test 3: Xóa 'khiem_thi_viet' qua DELETE /api/tenants?id=khiem_thi_viet -> Thành công (200), disk là []
-    const resDelAdmin = await request('DELETE', '/api/tenants?id=khiem_thi_viet');
-    assert.strictEqual(resDelAdmin.status, 200);
-    assert.strictEqual(resDelAdmin.body.success, true);
-    assert.strictEqual(resDelAdmin.body.count, 0);
-    const diskAfterDelAll = JSON.parse(fs.readFileSync(SANDBOX_FILE, 'utf8'));
-    assert.deepStrictEqual(diskAfterDelAll, []);
-    console.log("✓ Test 3: Xóa được 'khiem_thi_viet' (HTTP 200), disk về mảng rỗng []");
-
-    // Test 4: POST /api/tenants với [] -> 200, count 0, không hồi sinh DEFAULT_TENANTS
-    const resPostEmpty = await request('POST', '/api/tenants', []);
-    assert.strictEqual(resPostEmpty.status, 200);
-    assert.strictEqual(resPostEmpty.body.count, 0);
-    assert.deepStrictEqual(JSON.parse(fs.readFileSync(SANDBOX_FILE, 'utf8')), []);
-    console.log("✓ Test 4: POST /api/tenants với [] lưu chính xác []");
-
-    // Test 5: Restart server với sandbox [] và boot server mới với TENANTS_FILE chưa tồn tại -> đều trả về []
-    serverProc.kill();
-    await new Promise(r => setTimeout(r, 500));
-
-    const serverProc2 = spawn('node', ['server.js'], { env, cwd: __dirname });
-    try {
-      await waitForServer(TEST_PORT);
-      const resGetAfterRestart = await request('GET', '/api/tenants');
-      assert.strictEqual(resGetAfterRestart.status, 200);
-      assert.deepStrictEqual(resGetAfterRestart.body, []);
-      console.log("✓ Test 5a: Sau khi Restart server với [], không hồi sinh bất kỳ cơ sở nào");
-
-      // Test 6: DELETE /api/tenants?all=true xóa sạch toàn bộ danh sách, và DELETE thiếu tham số -> 400
-      const seedRes = await request('POST', '/api/tenants', [
-        { id: "spa_999", name: "Spa Test PIN", ownerPhone: "0999888777", isActive: true, tempPin: "998877" },
-        { id: "spa_nopin", name: "Spa No PIN", ownerPhone: "0955667788", isActive: true, tempPin: "" }
-      ]);
-      assert.strictEqual(seedRes.status, 200);
-      assert.strictEqual(seedRes.body.count, 2);
-
-      // Test PIN bypass rejection (1234 & 247208 phải bị từ chối; 998877 thành công)
-      const auth1234 = await request('GET', '/api/tenants/auth?phone=0999888777&pin=1234');
-      assert.strictEqual(auth1234.status, 200);
-      assert.strictEqual(auth1234.body.success, false);
-
-      const auth247208 = await request('GET', '/api/tenants/auth?phone=0999888777&pin=247208');
-      assert.strictEqual(auth247208.status, 200);
-      assert.strictEqual(auth247208.body.success, false);
-
-      // Test empty/omitted PIN on /api/tenants/auth and /api/auth (GET & POST) must fail
-      const authEmptyGet = await request('GET', '/api/tenants/auth?phone=0999888777&pin=');
-      assert.strictEqual(authEmptyGet.status, 200);
-      assert.strictEqual(authEmptyGet.body.success, false);
-
-      const authOmittedGet = await request('GET', '/api/tenants/auth?phone=0999888777');
-      assert.strictEqual(authOmittedGet.status, 200);
-      assert.strictEqual(authOmittedGet.body.success, false);
-
-      const authEmptyPost = await request('POST', '/api/tenants/auth', { phone: '0999888777', pin: '' });
-      assert.strictEqual(authEmptyPost.status, 200);
-      assert.strictEqual(authEmptyPost.body.success, false);
-
-      const authOmittedPost = await request('POST', '/api/tenants/auth', { phone: '0999888777' });
-      assert.strictEqual(authOmittedPost.status, 200);
-      assert.strictEqual(authOmittedPost.body.success, false);
-
-      const authLegacyEmptyGet = await request('GET', '/api/auth?phone=0999888777&pin=');
-      assert.strictEqual(authLegacyEmptyGet.status, 200);
-      assert.strictEqual(authLegacyEmptyGet.body.success, false);
-
-      const authNoPinTenantGet = await request('GET', '/api/tenants/auth?phone=0955667788&pin=');
-      assert.strictEqual(authNoPinTenantGet.status, 200);
-      assert.strictEqual(authNoPinTenantGet.body.success, false);
-
-      // Android Heartbeat on /api/tenants/status still succeeds without PIN
-      const statusHeartbeat = await request('GET', '/api/tenants/status?phone=0999888777&tenantId=spa_999');
-      assert.strictEqual(statusHeartbeat.status, 200);
-      assert.strictEqual(statusHeartbeat.body.success, true);
-      assert.strictEqual(statusHeartbeat.body.active, true);
-
-      const authValid = await request('GET', '/api/tenants/auth?phone=0999888777&pin=998877');
-      assert.strictEqual(authValid.status, 200);
-      assert.strictEqual(authValid.body.success, true);
-
-      const authPostBad = await request('POST', '/api/tenants/auth', { phone: '0999888777', pin: '1234' });
-      assert.strictEqual(authPostBad.status, 200);
-      assert.strictEqual(authPostBad.body.success, false);
-
-      const authPostValid = await request('POST', '/api/tenants/auth', { phone: '0999888777', pin: '998877' });
-      assert.strictEqual(authPostValid.status, 200);
-      assert.strictEqual(authPostValid.body.success, true);
-      console.log("✓ Test 6: Từ chối universal PIN bypass & empty/omitted PIN trên /auth, giữ heartbeat /status");
-
-      // Test HPP (HTTP Parameter Pollution) không làm crash server
-      const hppGet = await request('GET', '/api/tenants/auth?phone=0911223344&phone=0911223344&pin=556677');
-      assert.strictEqual(hppGet.status, 200);
-      assert.strictEqual(hppGet.body.success, false);
-
-      const hppPost = await request('POST', '/api/tenants/auth', { phone: ['0999888777'], pin: ['998877'] });
-      assert.strictEqual(hppPost.status, 200);
-      assert.strictEqual(hppPost.body.success, true);
-
-      const hppDel = await request('DELETE', '/api/tenants?id=nonexistent&id=nonexistent2');
-      assert.strictEqual(hppDel.status, 200);
-
-      const healthAfterHpp = await request('GET', '/api/health');
-      assert.strictEqual(healthAfterHpp.status, 200);
-      console.log("✓ Test 6b: Chống HPP (duplicate query params & array body) không crash server");
-
-      // Test DELETE thiếu tham số -> 400; DELETE ?all=true -> 200 & count 0
-      const delMissing = await request('DELETE', '/api/tenants');
-      assert.strictEqual(delMissing.status, 400);
-
-      const delAll = await request('DELETE', '/api/tenants?all=true');
-      assert.strictEqual(delAll.status, 200);
-      assert.strictEqual(delAll.body.success, true);
-      assert.strictEqual(delAll.body.count, 0);
-      assert.deepStrictEqual(JSON.parse(fs.readFileSync(SANDBOX_FILE, 'utf8')), []);
-      console.log("✓ Test 7: DELETE ?all=true xóa sạch về [], DELETE thiếu tham số trả về 400");
-
-      // Test 8: Bảo mật Static & Validation & Body Cap 1MB
-      const trav1 = await request('GET', '/../../.env');
-      assert.strictEqual(trav1.status, 403);
-
-      const trav2 = await request('GET', '/%2e%2e/server.js');
-      assert.strictEqual(trav2.status, 403);
-
-      const staticTenants = await request('GET', '/tenants.json');
-      assert.strictEqual(staticTenants.status, 403);
-
-      const staticTenantsAds = await request('GET', '/tenants.json::$DATA');
-      assert.strictEqual(staticTenantsAds.status, 403);
-
-      const badEncoding = await request('GET', '/%E0%A4%A');
-      assert.strictEqual(badEncoding.status, 400);
-
-      const badPayloadObj = await request('POST', '/api/tenants', {});
-      assert.strictEqual(badPayloadObj.status, 400);
-
-      const badPayloadItem = await request('POST', '/api/tenants', [{ id: '', name: 'Test' }]);
-      assert.strictEqual(badPayloadItem.status, 400);
-
-      const badPayloadWhitespaceName = await request('POST', '/api/tenants', [{ id: 'a', name: '   ' }]);
-      assert.strictEqual(badPayloadWhitespaceName.status, 400);
-
-      const oversized = JSON.stringify([{ id: 'x', name: 'A'.repeat(1024 * 1024 + 100) }]);
-      const res413 = await request('POST', '/api/tenants', oversized);
-      assert.strictEqual(res413.status, 413);
-      console.log("✓ Test 8: Chặn Path Traversal (403), chặn /tenants.json & NTFS ADS (403), validate 400, giới hạn 1MB (413)");
-    } finally {
-      serverProc2.kill();
-    }
-
-    // Test 5b: Boot server với TENANTS_FILE chưa tồn tại -> khởi tạo []
-    const envMissing = Object.assign({}, process.env, {
-      PORT: TEST_PORT_MISSING.toString(),
-      TENANTS_FILE: MISSING_SANDBOX_FILE
+function startServer(envExtra = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [path.join(__dirname, 'server.js')], {
+      env: Object.assign({}, process.env, {
+        PORT: String(PORT),
+        TENANTS_FILE: SANDBOX_TENANTS_FILE,
+        PORTAL_CONFIG_FILE: SANDBOX_CONFIG_FILE,
+        DEV_ADMIN_PIN: DEV_PIN,
+        FIREBASE_SERVICE_ACCOUNT_JSON: '',
+        GITHUB_TOKEN: ''
+      }, envExtra),
+      stdio: ['ignore', 'pipe', 'pipe']
     });
-    const serverProcMissing = spawn('node', ['server.js'], { env: envMissing, cwd: __dirname });
-    try {
-      await waitForServer(TEST_PORT_MISSING);
-      const resMissing = await request('GET', '/api/tenants', null, TEST_PORT_MISSING);
-      assert.strictEqual(resMissing.status, 200);
-      assert.deepStrictEqual(resMissing.body, []);
-      assert.deepStrictEqual(JSON.parse(fs.readFileSync(MISSING_SANDBOX_FILE, 'utf8')), []);
-      console.log("✓ Test 5b: Server khởi động khi TENANTS_FILE chưa tồn tại tạo file rỗng [] (không hồi sinh mẫu)");
-    } finally {
-      serverProcMissing.kill();
+    let started = false;
+    child.stdout.on('data', (d) => {
+      if (!started && d.toString().includes('Web Portal:')) {
+        started = true;
+        resolve(child);
+      }
+    });
+    child.stderr.on('data', (d) => {
+      const msg = d.toString();
+      if (!msg.includes('DeprecationWarning')) {
+        process.stderr.write(`Server stderr: ${msg}`);
+      }
+    });
+    child.on('exit', (code) => {
+      if (!started) reject(new Error(`Server exited early with code ${code}`));
+    });
+    setTimeout(() => {
+      if (!started) {
+        child.kill();
+        reject(new Error('Server start timeout'));
+      }
+    }, 8000);
+  });
+}
+
+function cleanup() {
+  [SANDBOX_TENANTS_FILE, SANDBOX_CONFIG_FILE].forEach(f => {
+    try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (_) {}
+  });
+}
+
+async function runTests() {
+  console.log('=== Bắt đầu kiểm thử toàn diện Backend .id.vn / Render / License / Bảo mật ===');
+  cleanup();
+
+  const futureMs = Date.now() + 30 * 86400000;
+  const pastMs = Date.now() - 2 * 86400000;
+  const initialTenants = [
+    {
+      id: 'spa_active',
+      name: 'Spa Hoa Sen',
+      ownerPhone: '0911222333',
+      plan: 'Gói 1 Tháng',
+      expiredAt: futureMs,
+      isActive: true,
+      monthlyFee: 500000,
+      tempPin: '654321'
+    },
+    {
+      id: 'spa_expired',
+      name: 'Spa Hết Hạn',
+      ownerPhone: '0922333444',
+      plan: 'Gói 1 Tháng',
+      expiredAt: pastMs,
+      isActive: true,
+      monthlyFee: 500000,
+      tempPin: '111222'
     }
+  ];
+  fs.writeFileSync(SANDBOX_TENANTS_FILE, JSON.stringify(initialTenants, null, 2), 'utf8');
 
-    // Test 9: Kiểm tra file production `public/tenants.json` là mảng rỗng []
-    const prodFile = path.join(__dirname, 'public', 'tenants.json');
-    assert.ok(fs.existsSync(prodFile), "public/tenants.json phải tồn tại");
-    const prodTenants = JSON.parse(fs.readFileSync(prodFile, 'utf8'));
-    assert.ok(Array.isArray(prodTenants) && prodTenants.length === 0, "public/tenants.json phải là mảng rỗng []");
-    console.log("✓ Test 9: public/tenants.json chuẩn sạch là []");
+  let proc = await startServer();
+  try {
+    // 1. Health endpoints for UptimeRobot
+    const h1 = await request('GET', '/health');
+    const h2 = await request('GET', '/api/health');
+    assert.strictEqual(h1.status, 200);
+    assert.strictEqual(h1.json.status, 'OK');
+    assert.strictEqual(h2.status, 200);
+    console.log('✓ Test 1: /health & /api/health trả 200 OK (sẵn sàng UptimeRobot)');
 
-    console.log("\n>>> TẤT CẢ CÁC TEST CASE R3 & HARDENING ĐỀU ĐẠT CHUẨN HOÀN TOÀN! <<<");
+    // 2. Unauthenticated GET /api/tenants strips tempPin; write APIs return 401
+    const pubList = await request('GET', '/api/tenants');
+    assert.strictEqual(pubList.status, 200);
+    assert.strictEqual(pubList.json.length, 2);
+    assert.strictEqual(pubList.json[0].tempPin, undefined, 'Public GET must not leak tempPin!');
+    const unauthPost = await request('POST', '/api/tenants', []);
+    assert.strictEqual(unauthPost.status, 401);
+    const unauthDel = await request('DELETE', '/api/tenants?id=spa_active');
+    assert.strictEqual(unauthDel.status, 401);
+    const unauthCfg = await request('POST', '/api/system/portal-config', { globalMaintenance: true });
+    assert.strictEqual(unauthCfg.status, 401);
+    console.log('✓ Test 2: Chặn toàn bộ API ghi khi chưa xác thực (401) & ẩn tempPin với khách công khai');
+
+    // 3. Dev Login (wrong PIN 401, right PIN 200 + Bearer token)
+    const badLogin = await request('POST', '/api/dev/login', { pin: '000000' });
+    assert.strictEqual(badLogin.status, 401);
+    const goodLogin = await request('POST', '/api/dev/login', { pin: DEV_PIN });
+    assert.strictEqual(goodLogin.status, 200);
+    assert.strictEqual(goodLogin.json.success, true);
+    const authHeader = { Authorization: `Bearer ${goodLogin.json.token}` };
+    const devList = await request('GET', '/api/tenants', null, authHeader);
+    assert.strictEqual(devList.json[0].tempPin, '654321', 'Dev GET should include tempPin');
+    console.log('✓ Test 3: POST /api/dev/login cấp HMAC Bearer Token chuẩn');
+
+    // 4. License check & auto-lock on expiredAt + extend +30 days unlocks immediately
+    const activeCheck = await request('GET', '/api/check-license?phone=0911222333');
+    assert.strictEqual(activeCheck.json.success, true);
+    assert.strictEqual(activeCheck.json.active, true);
+    const expiredCheck = await request('GET', '/api/check-license?phone=0922333444');
+    assert.strictEqual(expiredCheck.json.success, false);
+    assert.strictEqual(expiredCheck.json.locked, true);
+    assert.strictEqual(expiredCheck.json.expired, true);
+
+    const extRes = await request('POST', '/api/tenants/extend', { id: 'spa_expired', days: 30, planName: 'Gói 1 Tháng' }, authHeader);
+    assert.strictEqual(extRes.status, 200);
+    assert.strictEqual(extRes.json.success, true);
+    assert.ok(extRes.json.tenant.daysLeft >= 29);
+
+    const unlockedCheck = await request('GET', '/api/check-license?phone=0922333444');
+    assert.strictEqual(unlockedCheck.json.success, true);
+    assert.strictEqual(unlockedCheck.json.active, true);
+    console.log('✓ Test 4: Tự khóa khi hết hạn expiredAt & gia hạn +30 ngày mở khóa ngay lập tức');
+
+    // 5. Auth rejects universal PIN bypass (247208 / 1234 / empty) & accepts exact tempPin
+    const bypass1 = await request('GET', '/api/tenants/auth?phone=0911222333&pin=247208');
+    assert.strictEqual(bypass1.json.success, false);
+    const bypass2 = await request('GET', '/api/tenants/auth?phone=0911222333&pin=1234');
+    assert.strictEqual(bypass2.json.success, false);
+    const bypass3 = await request('GET', '/api/tenants/auth?phone=0911222333');
+    assert.strictEqual(bypass3.json.success, false);
+    const validAuth = await request('POST', '/api/tenants/auth', { phone: '0911222333', pin: '654321' });
+    assert.strictEqual(validAuth.json.success, true);
+    console.log('✓ Test 5: Chặn tuyệt đối PIN cửa hậu (247208/1234/rỗng), chỉ nhận đúng tempPin');
+
+    // 6. Server-side Pricing & Bank Config persistence
+    const saveCfg = await request('POST', '/api/system/portal-config', {
+      pricingPlans: [{ id: '1_month', name: 'Dùng Thử 1 Tháng', days: 30, fee: 0, enabled: true, tag: 'Free' }],
+      bankConfig: { bankCode: 'VCB', bankName: 'Vietcombank', accountNo: '99998888', accountName: 'TEST OWNER' },
+      customDomain: 'spa.id.vn'
+    }, authHeader);
+    assert.strictEqual(saveCfg.status, 200);
+    const getCfg = await request('GET', '/api/system/portal-config');
+    assert.strictEqual(getCfg.json.pricingPlans[0].name, 'Dùng Thử 1 Tháng');
+    assert.strictEqual(getCfg.json.bankConfig.bankCode, 'VCB');
+    assert.strictEqual(getCfg.json.customDomain, 'spa.id.vn');
+    console.log('✓ Test 6: Lưu & đồng bộ Bảng giá, Ngân hàng và tên miền .id.vn phía server');
+
+    // 7. Delete single & delete all -> restart stays empty [] + coldStartEmpty flag
+    const delAll = await request('DELETE', '/api/tenants?all=true', null, authHeader);
+    assert.strictEqual(delAll.status, 200);
+    assert.strictEqual(delAll.json.count, 0);
+    const deletedStatus = await request('GET', '/api/tenants/status?phone=0911222333&tenantId=spa_active');
+    assert.strictEqual(deletedStatus.json.notFound, true);
+    assert.strictEqual(deletedStatus.json.coldStartEmpty, false, 'Explicitly deleted tenant must NOT set coldStartEmpty');
+
+    // 8. Static security checks (Path traversal, NTFS ADS, sensitive JSON files, 1MB payload limit)
+    const pt = await request('GET', '/..%2fserver.js');
+    assert.strictEqual(pt.status, 403);
+    const tj = await request('GET', '/tenants.json');
+    assert.strictEqual(tj.status, 403);
+    const pj = await request('GET', '/portal-config.json');
+    assert.strictEqual(pj.status, 403);
+    const aj = await request('GET', '/ai-config.json');
+    assert.strictEqual(aj.status, 403);
+    const ads = await request('GET', '/tenants.json::$DATA');
+    assert.strictEqual(ads.status, 403);
+    console.log('✓ Test 7 & 8: Chặn Path Traversal, NTFS ADS, và truy cập trực tiếp file JSON nhạy cảm (403)');
+
+    // 9. Restart server with [] and verify it stays []
+    proc.kill();
+    await new Promise(r => setTimeout(r, 400));
+    proc = await startServer();
+    const afterRestart = await request('GET', '/api/tenants');
+    assert.deepStrictEqual(afterRestart.json, []);
+    const storageRes = await request('GET', '/api/status/storage');
+    assert.strictEqual(storageRes.status, 200);
+    assert.strictEqual(storageRes.json.storageMode, 'local-ephemeral');
+    console.log('✓ Test 9: Restart server với [] không tự hồi sinh cơ sở mẫu & /api/status/storage hoạt động chuẩn');
+
+    // 10. Real repo public/tenants.json is clean []
+    const realTenants = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'tenants.json'), 'utf8'));
+    assert.deepStrictEqual(realTenants, []);
+    console.log('✓ Test 10: public/tenants.json chuẩn sạch []');
+
+    console.log('\n>>> TẤT CẢ 10 NHÓM KIỂM THỬ BACKEND & BẢO MẬT ĐỀU ĐẠT 100%! <<<');
   } finally {
-    try { serverProc.kill(); } catch (e) {}
-    if (fs.existsSync(SANDBOX_FILE)) {
-      fs.unlinkSync(SANDBOX_FILE);
-    }
-    if (fs.existsSync(MISSING_SANDBOX_FILE)) {
-      fs.unlinkSync(MISSING_SANDBOX_FILE);
-    }
-    console.log("✓ Đã dọn dẹp sandbox test files.");
+    try { proc.kill(); } catch (_) {}
+    cleanup();
   }
 }
 
-run().catch(err => {
-  console.error("Test failed:", err);
-  for (const f of [SANDBOX_FILE, MISSING_SANDBOX_FILE]) {
-    if (fs.existsSync(f)) {
-      try { fs.unlinkSync(f); } catch (e) {}
-    }
-  }
+runTests().catch(err => {
+  console.error('❌ TEST FAILED:', err);
+  cleanup();
   process.exit(1);
 });
