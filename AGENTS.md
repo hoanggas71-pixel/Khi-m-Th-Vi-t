@@ -27,4 +27,20 @@
 
 ## 4. Đóng Gói APK & Kiểm Thử Trước Khi Push
 - Luôn chạy `node test_facility_deletion_permanent.js` và `node test_gemini_key_validation.js` trước khi push thay đổi Web/Backend.
-- Khi có thay đổi Kotlin/Android, chạy `.\gradlew.bat testDebugUnitTest assembleDebug` và đồng bộ file APK mới tới cả `KhiemThiViet-CaiDat.apk`, `public/KhiemThiViet-CaiDat.apk`, `CAI_DAT_APK/KhiemThiViet.apk`, `CAI_DAT_APK/KhiemThiViet-CaiDat.apk`.
+- Khi có thay đổi Kotlin/Android, chạy `.\gradlew.bat testDebugUnitTest assembleDebug` và đồng bộ file APK mới tới cả `KhiemThiViet-CaiDat.apk`, `public/KhiemThiViet-CaiDat.apk`, `CAI_DAT_APK/KhiemThiViet.apk`.
+
+## 5. Quy Trình Deploy Render & Chuẩn Tính Năng Thật
+- **Quy trình cập nhật lên web thật (`https://hoangdev08.id.vn`):**
+  1. Kiểm thử pass 100% ở local → `git add` → `git commit` → `git push origin main`.
+  2. Vào **Render Dashboard → dịch vụ `khienthiviet` → Manual Deploy → Clear build cache & deploy**.
+  3. Đợi Render báo **Live** → mở `https://hoangdev08.id.vn` bấm `Ctrl + F5` để nạp bản mới nhất (tránh cache trình duyệt/Cloudflare).
+- **Cấm bịa tính năng trên Web:** Mọi mô tả tính năng, thẻ bảng giá và hướng dẫn trên `public/index.html` bắt buộc phải đối chiếu đúng 100% với 6 Tab thật trong `app/src/main/java/com/example/MainActivity.kt`:
+  1. Tab 1 (`Vé`): Quản lý Vé phục vụ, chốt vé, hoa hồng KTV & thanh toán VietQR Napas 247.
+  2. Tab 2 (`Khách`): Quản lý Khách hàng, danh sách KTV, tiến độ gói & lịch sử dịch vụ.
+  3. Tab 3 (`Dịch vụ`): Quản lý Dịch vụ lẻ & Gói liệu trình nhiều buổi.
+  4. Tab 4 (`Sổ quỹ`): Sổ quỹ Thu Chi minh bạch.
+  5. Tab 5 (`Báo cáo`): Báo cáo Doanh thu & Bảng lương / Hoa hồng KTV.
+  6. Tab 6 (`Quyền hạn`): Tài khoản NV, Chủ cơ sở (Admin), Sao lưu dữ liệu (Đám mây / Zalo `.json`), Trợ lý AI `gehihi` (hỗ trợ tra cứu thời hạn gói) và tối ưu trợ năng TalkBack tiếng Việt.
+- **Chính sách Dùng thử & Chủ Spa tự quản trị:**
+  - Gói dùng thử mặc định là **Dùng Thử 1 Tháng (30 ngày — 0đ)** đồng bộ trên cả Web (`public/index.html`) và Server (`server.js`).
+  - Chủ Spa có thể tự đổi Mã PIN ngay trên Cổng Web qua `POST /api/tenants/change-pin` (xác thực PIN cũ, đồng bộ Firestore ngay lập tức).
