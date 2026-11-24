@@ -804,6 +804,53 @@ const server = http.createServer((req, res) => {
     // ---------------------------------------------------------------------
     // API 2: Quản lý Danh sách Cơ sở (Tenants)
     // ---------------------------------------------------------------------
+    // ---------------------------------------------------------------------
+    // API 2b: Chủ Spa tự đổi mã PIN đăng nhập (xác thực bằng PIN cũ)
+    // ---------------------------------------------------------------------
+    if (pathname === '/api/tenants/change-pin' && req.method === 'POST') {
+      readJsonBody(req, res, (body) => {
+        const phone = asString(body && body.phone).trim().replace(/[^0-9]/g, '');
+        const id = asString(body && body.id).trim();
+        const oldPin = asString(body && body.oldPin).trim();
+        const newPin = asString(body && body.newPin).trim();
+
+        if ((!phone && !id) || !oldPin || !newPin) {
+          sendJson(res, 400, { success: false, error: "Vui lòng nhập đầy đủ mã PIN cũ và mã PIN mới!" });
+          return;
+        }
+        if (newPin.length < 4 || newPin.length > 32) {
+          sendJson(res, 400, { success: false, error: "Mã PIN mới phải từ 4 đến 32 ký tự!" });
+          return;
+        }
+        const idx = memoryState.tenants.findIndex(item => {
+          const itemPhone = asString(item.ownerPhone).replace(/[^0-9]/g, '');
+          return (id && item.id === id) || (phone && itemPhone === phone);
+        });
+        if (idx < 0) {
+          sendJson(res, 404, { success: false, error: "Không tìm thấy cơ sở Spa tương ứng!" });
+          return;
+        }
+        const current = normalizeTenant(memoryState.tenants[idx]);
+        if (!current.tempPin || !safeEqual(oldPin, current.tempPin)) {
+          sendJson(res, 401, { success: false, error: "Mã PIN hiện tại không chính xác!" });
+          return;
+        }
+        memoryState.tenants[idx] = normalizeTenant(Object.assign({}, current, { tempPin: newPin }));
+        memoryState.updatedAt = new Date().toISOString();
+        storageStatus.hasMutationSinceBoot = true;
+        if (!persistMemoryStateToDisk()) {
+          sendJson(res, 500, { success: false, error: "Không thể lưu mã PIN mới lên máy chủ!" });
+          return;
+        }
+        triggerCloudBackupAsync();
+        sendJson(res, 200, {
+          success: true,
+          message: "Đổi mã PIN Chủ Spa thành công! Vui lòng dùng mã PIN mới cho các lần đăng nhập tiếp theo."
+        });
+      });
+      return;
+    }
+
     if (pathname === '/api/tenants/extend' && req.method === 'POST') {
       if (!requireDevAuth(req, res)) return;
       readJsonBody(req, res, (body) => {

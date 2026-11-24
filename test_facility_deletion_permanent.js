@@ -175,7 +175,18 @@ async function runTests() {
     assert.strictEqual(bypass3.json.success, false);
     const validAuth = await request('POST', '/api/tenants/auth', { phone: '0911222333', pin: '654321' });
     assert.strictEqual(validAuth.json.success, true);
-    console.log('✓ Test 5: Chặn tuyệt đối PIN cửa hậu (247208/1234/rỗng), chỉ nhận đúng tempPin');
+
+    // 5b. Self-service Spa Owner PIN change (/api/tenants/change-pin)
+    const badChange = await request('POST', '/api/tenants/change-pin', { phone: '0911222333', oldPin: '000000', newPin: '998877' });
+    assert.strictEqual(badChange.status, 401);
+    const goodChange = await request('POST', '/api/tenants/change-pin', { phone: '0911222333', oldPin: '654321', newPin: '998877' });
+    assert.strictEqual(goodChange.status, 200);
+    assert.strictEqual(goodChange.json.success, true);
+    const oldPinFail = await request('POST', '/api/tenants/auth', { phone: '0911222333', pin: '654321' });
+    assert.strictEqual(oldPinFail.json.success, false);
+    const newPinOk = await request('POST', '/api/tenants/auth', { phone: '0911222333', pin: '998877' });
+    assert.strictEqual(newPinOk.json.success, true);
+    console.log('✓ Test 5: Chặn PIN cửa hậu (247208/1234/rỗng) & Chủ Spa tự đổi PIN an toàn qua /api/tenants/change-pin');
 
     // 6. Server-side Pricing & Bank Config persistence
     const saveCfg = await request('POST', '/api/system/portal-config', {
